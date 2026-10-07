@@ -28,18 +28,23 @@ python3.12 -m knee.smoke
 
 The default smoke check writes only temporary synthetic CSVs, validates 12 probabilities and row ordering, then cleans them up. With no PyTorch, automatic device selection returns CPU; this is not proof of a working GPU runtime.
 
-## Optional ML environment, when ready
+## Reproducible local ML environment
+
+Use Python **3.12.9** (recorded in `.python-version`) and **uv 0.9.13**, the tool version used for this setup. Runtime dependencies and distribution hashes are recorded in [uv.lock](uv.lock); the setuptools build backend is pinned in [pyproject.toml](pyproject.toml). From the project root:
 
 ```bash
-python3.12 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e '.[ml]'
-python -m knee.smoke --torch --device mps
+uv sync --locked --extra ml --no-python-downloads --cache-dir cache/uv
+.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m knee.smoke
+.venv/bin/python -m knee.smoke --torch --device cpu
+env -u PYTORCH_ENABLE_MPS_FALLBACK .venv/bin/python -m knee.smoke --torch --device mps
 ```
 
-These commands are documented, not executed by setup. Dependencies are broad starting constraints, not a reproducible lockfile. After a working platform installation, record exact package versions and experiment seeds. On CUDA hosts, keep the platform's preinstalled torch or use the [official PyTorch installer](https://pytorch.org/get-started/locally/) for its driver/runtime. Do not copy Mac wheels to Kaggle. [MPS documentation](https://docs.pytorch.org/docs/stable/notes/mps.html) describes Apple GPU availability checks.
+`--locked` fails if the project metadata needs a lock update; upgrades are deliberate. See the [uv locking documentation](https://docs.astral.sh/uv/concepts/projects/sync/). Keep `--extra ml` when syncing this environment; omitting it removes the optional ML packages. `.venv/` and `cache/` are ignored. The default dependency-free commands above still work without installing ML packages. See [STATUS.md](STATUS.md) for the verified environment and backend results.
 
-`configs/local.toml` starts with float32, batch size 1, 224px, 8 slices/plane, no loader workers and a 2 GiB cache budget. These are proposed experiment settings; the synthetic forward pass deliberately uses only 32px and 2 slices/plane. Device `auto` prefers CUDA, then MPS, then CPU. Explicit unavailable devices fail. There is no silent per-operation CPU fallback. MPS support and memory use must be tested after installation; CUDA-specific mixed precision code should be enabled only on CUDA after testing.
+This environment is validated locally on macOS arm64 only. The universal lock also contains other platforms' dependencies, but CUDA/Kaggle compatibility has not been tested. On CUDA hosts, preserve the platform's preinstalled torch or use the [official PyTorch installer](https://pytorch.org/get-started/locally/) for its driver/runtime and record a separate tested environment. Do not copy Mac wheels to Kaggle. [MPS documentation](https://docs.pytorch.org/docs/stable/notes/mps.html) describes Apple GPU availability checks. Explicit device requests fail when unavailable; the MPS check above disables inherited CPU fallback.
+
+`configs/local.toml` starts with float32, batch size 1, 224px, 8 slices/plane, no loader workers and a 2 GiB cache budget. These are proposed experiment settings; the synthetic forward pass deliberately uses only 32px and 2 slices/plane. Device `auto` prefers CUDA, then MPS, then CPU. Explicit unavailable devices fail. There is no silent per-operation CPU fallback. The tiny MPS forward check passed; real-loader operations, memory use, and throughput still need measurement. CUDA-specific mixed precision code should be enabled only on CUDA after testing.
 
 ## Competition facts and verification boundary
 
