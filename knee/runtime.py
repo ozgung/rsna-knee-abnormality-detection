@@ -52,12 +52,19 @@ def competition_root(root="/kaggle/input"):
     return matches[0]
 
 
-def infer(data_dir, encoder_dir, head_path, output_path, *, max_seconds=28000, repeat=1):
-    """Read test IDs/series/images and checkpoint only. Reports never enter this path."""
+def infer(data_dir, encoder_dir, head_path, output_path, *, max_seconds=28000, repeat=1,
+          additional_head_paths=(), head_weights=None):
+    """Image-only inference; optional compatible heads share each encoded study.
+
+    The original single-head call is unchanged. For an ensemble pass remaining
+    checkpoint paths in additional_head_paths; head_weights covers the first head
+    and all additional heads, in order. Omitted weights mean equal probabilities.
+    """
     import numpy as np
     import torch
     from knee.dicom import PREPROCESSING_VERSION, StudyLoadError, load_study
-    from knee.features import StudyHead, encode_volume, load_encoder
+    from knee.features import encode_volume, load_encoder
+    from knee.ensemble import PredictionHeads
     from knee.experiment import environment, json_write
     from knee.submission import write_submission
     from knee.validation import read_csv, read_schema
@@ -77,16 +84,9 @@ def infer(data_dir, encoder_dir, head_path, output_path, *, max_seconds=28000, r
         by_study[row[id_column]].append(row)
     if set(ids) != set(by_study):
         raise ValueError("Test study/series coverage differs")
-    checkpoint = torch.load(head_path, map_location="cpu", weights_only=True)
-    if checkpoint["targets"] != targets:
-        raise ValueError("Checkpoint target order mismatch")
-    prep = checkpoint["preprocessing"]
-    if prep["preprocessing_version"] != PREPROCESSING_VERSION:
-        raise ValueError("Preprocessing version mismatch")
-    state = checkpoint["state_dict"]
-    head = StudyHead(state["mean"], state["std"], state["prior_logits"].sigmoid(),
-                     kind=checkpoint["config"]["kind"], hidden=checkpoint["config"]["hidden"]).cuda().eval()
-    head.load_state_dict(state, strict=True)
+    heads = PredictionHeads([head_path, *additional_head_paths], targets, PREPROCESSING_VERSION,
+                            device="cuda", weights=head_weights)
+    prep = heads.preprocessing
     encoder = load_encoder(encoder_dir, "cuda")
     result, totals, errors = {}, Counter(), Counter()
     empty = 0
@@ -101,7 +101,7 @@ def infer(data_dir, encoder_dir, head_path, output_path, *, max_seconds=28000, r
                                     slices_per_plane=prep["slices_per_plane"], crop_mm=prep["crop_mm"])
                 features = encode_volume(encoder, volume, "cuda")
                 with torch.inference_mode():
-                    pred = head(torch.from_numpy(features)[None].cuda(), torch.from_numpy(volume.slice_mask)[None].cuda()).sigmoid()[0].cpu().numpy()
+                    pred = heads(torch.from_numpy(features)[None].cuda(), torch.from_numpy(volume.slice_mask)[None].cuda())[0].cpu().numpy()
                 totals.update(volume.audit["counts"])
                 errors.update(volume.audit["errors"])
                 totals["missing_planes"] += volume.audit["missing_planes"]
@@ -109,7 +109,7 @@ def infer(data_dir, encoder_dir, head_path, output_path, *, max_seconds=28000, r
                 # Predeclared fallback for unavailable imagery only, always counted.
                 empty += 1
                 errors.update(exc.audit["errors"])
-                pred = state["prior_logits"].sigmoid().numpy()
+                pred = heads.prior_probabilities.cpu().numpy()
             if not np.isfinite(pred).all():
                 raise ValueError("Nonfinite prediction")
             if repetition and not np.allclose(result[uid], pred, atol=1e-5, rtol=1e-4):
@@ -135,6 +135,8 @@ def infer(data_dir, encoder_dir, head_path, output_path, *, max_seconds=28000, r
               "estimated_1300_seconds":float(np.mean(timings)*1300), "counts":dict(totals), "errors":dict(errors),
               "max_rss_kib":resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
               "cuda_peak_bytes":torch.cuda.max_memory_allocated(), "environment":environment(),
+              "head_count":len(heads.heads), "head_weights":list(heads.weights),
+              "head_checkpoint_sha256":heads.checkpoint_sha256, "feature_sha256":heads.feature_sha256,
               "output_sha256":hashlib.sha256(Path(output_path).read_bytes()).hexdigest()}
     json_write(Path(output_path).with_name("inference.json"), report)
     print(json.dumps(report), flush=True)
