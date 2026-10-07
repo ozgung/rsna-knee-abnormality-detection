@@ -27,7 +27,8 @@ Last updated: **2026-10-08 (Europe/Istanbul)**. Read this first, then [README](R
 | TRAIN-01 | done | Baseline trained, preserved and evaluated; artifacts retrieved. |
 | SUBMIT-01 | done | First entry56922773 COMPLETE; public score **0.756**, verified22:42UTC. |
 | SUBMIT-02 | active | Entry56923149 submitted after all offline checks passed; wait for score. |
-| TRAIN-02 | proposed | After scores, compare additional non-fat-suppressed sagittal/coronal series with the same frozen encoder/split; audit actual contrast headers first. A cheap fixed attention-temperature comparison can precede re-extraction. Recheck budget/deadlines. |
+| REF-02 | ready after this run | Audit the published Pilkwang v15 weight manifest/provenance, then reproduce its exact offline inference as a separate reference. Retain attribution and preprocessing; compare against verified public0.891. Recheck resource budget and restore CLI login first. |
+| TRAIN-02 | proposed | Compare a partially fine-tuned DINO encoder under the same split, then sequence/crop coverage separately. Stop prioritizing head-seed sweeps; predeclare metric and bounded compute before launch. |
 
 ## Active remote jobs
 
@@ -46,10 +47,12 @@ Last updated: **2026-10-08 (Europe/Istanbul)**. Read this first, then [README](R
 
 ## Decisions, blockers and latest checks
 
-- No current approval blocker. Kaggle rejected embedded weights because notebook source exceeded1MB. Automatic approval review rejected a separate upload containing a private prediction fixture; removed the fixture, verified a weights-only payload and uploaded that safer dataset successfully. No rejected payload was uploaded.
+- No current approval blocker. Kaggle CLI authentication expired around22:50UTC after the successful first score check; the in-app browser remains authenticated and confirms the second hidden-test notebook is running. Renew normal CLI login before the next CLI training workflow; do not extract browser cookies. Kaggle rejected embedded weights because notebook source exceeded1MB. Automatic approval review rejected a separate upload containing a private prediction fixture; removed the fixture, verified a weights-only payload and uploaded that safer dataset successfully. No rejected payload was uploaded.
 - Preserve baseline and fixed weak-holdout selection. Do not choose candidates or blending from gold/public leaderboard. Public methods support future partial DINO tuning, adjacent-slice channels and finding-specific pooling, but their gold-selection/provenance limitations matter; avoid opaque weights.
 - Offline inference reads images/series/test IDs only, uses actual hidden test IDs rather than visible sample rows, checks finite probabilities and exact target order; prior fallback is explicit and bounded. Raw image symlinks are removed even on failure.
 - Latest checks: **60/60 ML-environment tests pass**, dependency-free smoke PASS; generated notebooks compile, private/offline settings and weight payload verified; `git diff --check` PASS. Dependency-free suite:26 passed,34 optional ML skips; smoke passed. No full pipeline claim rests on synthetic tests alone.
 - Next action: wait for second-entry scoring and compare with first public score0.756. Every01 task is complete. All47 ignored agent-output files preserved with hash manifest under `outputs/agent-archives/20261008/`; all three managed worktrees confirmed archived. No further training planned in this run. Descriptive paired gold bootstrap puts ensemble-minus-first95% interval at[-0.00978,0.01182]; no demonstrated gold improvement.
 
 Metadata follow-up: non-fat-suppressed sagittal coverage4,266/4,407 studies and coronal3,406/4,407; axial857/4,407. Current one-series-per-plane selection usually discards this complementary input. Fluid_Sensitive and Fat_Suppression flags are identical in all24,371 rows and do not distinguish T1 from PD/T2; recover DICOM contrast evidence before naming sequence types. Aggregate: `outputs/analysis/20261008/sequence-coverage.json`. This motivates sequence coverage ahead of a larger encoder; no third run launched.
+
+User challenged the0.756 score against Pilkwang0.891. Live v15 notebook/logs confirm20 models,336px/130mm, six slots,12 slices and10 windows/member; our frozen224px/three-series representation is much smaller. Barun ResNet34 v3 was now inspected:46 labeled training studies,12 validation, best local AUC0.6086, no demonstrated public score. Revised TRAIN-02 toward reference reproduction and encoder adaptation; exact causal contributions remain untested. Details and primary links are in the experiment record.
