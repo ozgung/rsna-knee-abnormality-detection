@@ -14,7 +14,7 @@ import time
 CODECS = ["pydicom==3.0.2", "pylibjpeg==2.1.0", "pylibjpeg-libjpeg==2.3.0", "pylibjpeg-openjpeg==2.5.0"]
 
 
-def prepare_codecs(wheel_dir, *, download=False):
+def prepare_codecs(wheel_dir, *, download=False, expected_hashes=None):
     wheel_dir = Path(wheel_dir)
     if download:
         wheel_dir.mkdir(parents=True, exist_ok=True)
@@ -23,8 +23,23 @@ def prepare_codecs(wheel_dir, *, download=False):
     wheels = sorted(wheel_dir.glob("*.whl"))
     if len(wheels) != len(CODECS):
         raise ValueError("Missing codec wheel bundle")
+    hashes = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in wheels}
+    if expected_hashes is not None and hashes != expected_hashes:
+        raise ValueError("Codec wheel hashes differ from the training bundle")
     subprocess.run([sys.executable, "-m", "pip", "install", "--no-index", "--no-deps", *map(str, wheels)], check=True)
-    return {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in wheels}
+    return hashes
+
+
+def training_artifacts(root="/kaggle/input", slug="knee-dino-train-20261008"):
+    """Known attachment layouts; never recurse through the raw DICOM corpus."""
+    root = Path(root)
+    candidates = [root / "notebooks" / "ozgung" / slug / "artifacts",
+                  root / slug / "artifacts"]
+    matches = [p for p in candidates if (p / "extraction.json").exists()
+               and (p / "attention/head.pt").exists()]
+    if len(matches) != 1:
+        raise ValueError(f"Expected one trained artifact attachment, found {len(matches)}")
+    return matches[0]
 
 
 def competition_root(root="/kaggle/input"):

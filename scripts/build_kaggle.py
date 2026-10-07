@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 
 
-def build(destination, slug, entry, *, internet=False, kernel_sources=()):
+def build(destination, slug, entry, *, internet=False, kernel_sources=(), weak_labels=True):
     root = Path(__file__).resolve().parents[1]
     files = {str(p.relative_to(root)): p.read_text() for p in sorted((root / "knee").glob("*.py"))}
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
@@ -37,7 +37,8 @@ def build(destination, slug, entry, *, internet=False, kernel_sources=()):
     meta = {"id": f"ozgung/{slug}", "title": slug.replace("-", " ").title(),
             "code_file": "notebook.ipynb", "language": "python", "kernel_type": "notebook",
             "is_private": True, "enable_gpu": True, "enable_tpu": False,
-            "enable_internet": internet, "dataset_sources": ["stevenleehans/rsna-knee-llm-report-labels"],
+            "enable_internet": internet,
+            "dataset_sources": ["stevenleehans/rsna-knee-llm-report-labels"] if weak_labels else [],
             "competition_sources": ["rsna-knee-abnormality-detection"],
             "kernel_sources": list(kernel_sources), "model_sources": ["metaresearch/dinov2/PyTorch/small/1"]}
     (destination / "kernel-metadata.json").write_text(json.dumps(meta, indent=2))
@@ -51,5 +52,7 @@ if __name__ == "__main__":
     parser.add_argument("entry_file")
     parser.add_argument("--internet", action="store_true")
     parser.add_argument("--kernel-source", action="append", default=[])
+    parser.add_argument("--no-weak-labels", action="store_true")
     args = parser.parse_args()
-    print(build(args.destination, args.slug, Path(args.entry_file).read_text(), internet=args.internet, kernel_sources=args.kernel_source))
+    print(build(args.destination, args.slug, Path(args.entry_file).read_text(), internet=args.internet,
+                kernel_sources=args.kernel_source, weak_labels=not args.no_weak_labels))
