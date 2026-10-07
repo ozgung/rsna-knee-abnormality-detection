@@ -136,13 +136,18 @@ def make_plan(data_dir, weak_path, config):
 
 def environment():
     import platform
+    import torch
     versions = {}
     for name in ('numpy', 'pandas', 'torch', 'timm', 'pydicom', 'pylibjpeg', 'pylibjpeg-libjpeg', 'pylibjpeg-openjpeg'):
         try:
             versions[name] = importlib.metadata.version(name)
         except importlib.metadata.PackageNotFoundError:
             versions[name] = None
-    return {'python': platform.python_version(), 'versions': versions,
+    return {'python': platform.python_version(), 'platform': platform.platform(), 'versions': versions,
+            'device': 'cuda' if torch.cuda.is_available() else 'cpu',
+            'cuda_devices': [{'name': torch.cuda.get_device_name(i),
+                              'total_memory_bytes': torch.cuda.get_device_properties(i).total_memory}
+                             for i in range(torch.cuda.device_count())],
             'code_revision': os.environ.get('KNEE_CODE_REVISION', 'unversioned'),
             'source_sha256': os.environ.get('KNEE_SOURCE_SHA256', 'unversioned')}
 
