@@ -20,7 +20,6 @@ ids = expected["ids"].tolist()
 gold_root = Path("/kaggle/working/gold-rehearsal")
 gold_root.mkdir(exist_ok=True)
 # The inference function sees the same test-only contract as the real submission.
-(gold_root / "test_series").symlink_to(root / "train_series", target_is_directory=True)
 with (gold_root / "test.csv").open("w", newline="") as f:
     w = csv.writer(f)
     w.writerow([id_column])
@@ -35,7 +34,12 @@ with (gold_root / "test_series.csv").open("w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=columns)
     w.writeheader()
     w.writerows([r for r in series if r[id_column] in selected])
-gold_report = infer(gold_root, encoder, artifacts / "attention/head.pt", gold_root / "predictions.csv")
+(gold_root / "test_series").symlink_to(root / "train_series", target_is_directory=True)
+try:
+    gold_report = infer(gold_root, encoder, artifacts / "attention/head.pt", gold_root / "predictions.csv")
+finally:
+    # Never leave a raw-image tree linked into collected notebook outputs.
+    (gold_root / "test_series").unlink()
 _, output_rows = read_csv(gold_root / "predictions.csv")
 predictions = {r[id_column]: [float(r[t]) for t in targets] for r in output_rows}
 observed = np.asarray([predictions[uid] for uid in ids])
