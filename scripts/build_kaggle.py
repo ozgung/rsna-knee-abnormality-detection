@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 
 
-def build(destination, slug, entry, *, internet=False, kernel_sources=(), weak_labels=True):
+def build(destination, slug, entry, *, internet=False, kernel_sources=(), weak_labels=True, gpu=True):
     root = Path(__file__).resolve().parents[1]
     files = {str(p.relative_to(root)): p.read_text() for p in sorted((root / "knee").glob("*.py"))}
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
@@ -36,7 +36,7 @@ def build(destination, slug, entry, *, internet=False, kernel_sources=(), weak_l
     (destination / "notebook.ipynb").write_text(json.dumps(nb, indent=2))
     meta = {"id": f"ozgung/{slug}", "title": slug.replace("-", " ").title(),
             "code_file": "notebook.ipynb", "language": "python", "kernel_type": "notebook",
-            "is_private": True, "enable_gpu": True, "enable_tpu": False,
+            "is_private": True, "enable_gpu": gpu, "enable_tpu": False,
             "enable_internet": internet,
             "dataset_sources": ["stevenleehans/rsna-knee-llm-report-labels"] if weak_labels else [],
             "competition_sources": ["rsna-knee-abnormality-detection"],
@@ -53,6 +53,7 @@ if __name__ == "__main__":
     parser.add_argument("--internet", action="store_true")
     parser.add_argument("--kernel-source", action="append", default=[])
     parser.add_argument("--no-weak-labels", action="store_true")
+    parser.add_argument("--cpu", action="store_true")
     args = parser.parse_args()
     print(build(args.destination, args.slug, Path(args.entry_file).read_text(), internet=args.internet,
-                kernel_sources=args.kernel_source, weak_labels=not args.no_weak_labels))
+                kernel_sources=args.kernel_source, weak_labels=not args.no_weak_labels, gpu=not args.cpu))

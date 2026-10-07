@@ -1,6 +1,6 @@
 # RSNA Knee Abnormality Detection
 
-Local experiment scaffold for [the Kaggle competition](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection). This is setup code, not a trained solution. It contains no competition data, labels, credentials, or weights.
+Offline-first Python project for [the Kaggle competition](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection). It implements a bounded DICOM-to-study pipeline, frozen DINOv2 feature extraction, weak-label head training, and offline Kaggle inference. Current run results and completion state are in [STATUS.md](STATUS.md). Tracked files contain no competition data, labels, credentials, or weights.
 
 ## Project management and AI-assisted development
 
@@ -48,9 +48,9 @@ This environment is validated locally on macOS arm64 only. The universal lock al
 
 ## Competition facts and verification boundary
 
-The prior official-page review supplied with this setup records 12 study-level MRI abnormality probabilities scored by macro ROC-AUC; the data listing is 569.76 GB across 819,640 files. Training has a small directly labeled subset plus multilingual reports. Reports are training-only; hidden test inference (roughly 1,300 studies) must work from images alone. Exact counts such as 58 labeled or 4,407 report studies are **unverified until CSV audit** and must not be assumed.
+The October 8 official-page and real-CSV audit verified 12 study-level MRI abnormality probabilities scored by macro ROC-AUC, 4,407 training studies, 58 fully labeled studies, and 24,371 series. The full data listing is approximately 570 GB; it is not downloaded locally. Reports are training-only; hidden test inference (roughly 1,300 studies) works from images and series metadata. Exact target names and order are always read from the official sample CSV.
 
-The supplied official overview review records entry deadline **October 15, 2026, 23:59 UTC**, final submission **October 22, 2026, 23:59 UTC**, notebook runtime up to 9 hours, internet disabled, and public/free pretrained weights allowed subject to the rules. Source pages: [overview](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/overview), [data](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/data?select=test_series), [rules](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/rules). The web fetch in this setup returned no readable Kaggle page body, so recheck the live pages before entry or submission. External API use during training needs official clarification; an internet-off inference rule alone does not establish a blanket training API prohibition.
+The live official pages verified on October 8 record entry deadline **October 15, 2026, 23:59 UTC**, final submission **October 22, 2026, 23:59 UTC**, notebook runtime up to 9 hours, internet disabled, and public/free pretrained weights allowed subject to the rules. Source pages: [overview](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/overview), [data](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/data?select=test_series), [rules](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/rules). The CLI can read these pages using `kaggle competitions pages -c rsna-knee-abnormality-detection --content --format json`. Recheck them before later calendar planning. This implementation uses attached public labels and no external report-processing API.
 
 ## Mac, Kaggle and Colab workflow
 
@@ -74,6 +74,46 @@ These are implementation considerations, not a fixed execution sequence. Use [ST
 6. Train initially on a bounded sample; compare against prevalence predictions using held-out study labels. Use masked binary cross-entropy for missing labels and confidence weights for weak labels. Report each target AUC and macro mean; explicitly flag targets with only one class where AUC is undefined. Tiny labeled validation sets will have high variance.
 7. On Kaggle, run an offline rehearsal with all code, wheels (if needed) and allowed weights attached. Inspect the real sample CSV to set exact column names/order. `knee.submission.write_submission` validates an ID-to-12-probabilities mapping and preserves sample order; it does not infer probabilities or discover test studies. Confirm hidden-test handling, no train-report dependency, finite outputs, disk/RAM use and total wall-clock time with margin below 9 hours.
 
-## Remaining implementation
+## Real-data pipeline
 
-Dataset access and schema audit, DICOM loader, folds, report labeling, masked training/evaluation, compact cache format, checkpointing and an offline Kaggle inference notebook remain to be built. No real patient data or performance metric has been evaluated. Keep data, reports, secrets, generated CSVs and weights out of Git using the included `.gitignore`.
+The executable baseline is separate from the toy `knee/model.py` shape check:
+
+| Module | Responsibility |
+| --- | --- |
+| `knee.validation` | Real schema audit; patient/report grouping; prevalence and per-target AUC with explicit missing-label policy. |
+| `knee.dicom` | Bounded series selection, physical ordering/crop/orientation, normalization and missing-data masks. |
+| `knee.features` | Frozen DINOv2-Small CLS+mean-patch features and finding-specific attention/meanmax heads. |
+| `knee.experiment` | Deterministic bounded sampling, train-only statistics, weak-label training, checkpoint and experiment records. |
+| `knee.runtime` | Hash-verified local codec wheels; image-only inference; exact actual-test ID coverage. |
+| `knee.compare` | Optional three-head comparison; selection uses only weak-holdout BCE and preserves the baseline. |
+
+Audit already-authorized small metadata in ignored `data/raw/`:
+
+```bash
+python3.12 -m knee.validation --data-dir data/raw --output-dir outputs/validation/20261008
+```
+
+Build a private training notebook with the competition, vanilla DINOv2-Small and public v1 weak-label dataset attached:
+
+```bash
+python3.12 scripts/build_kaggle.py outputs/kaggle/train knee-dino-train-20261008 scripts/train_kaggle_entry.py --internet
+kaggle kernels push -p outputs/kaggle/train --timeout 7200
+```
+
+The training entry downloads pinned Linux codec wheels once and saves them beside the feature cache and trained head. Kaggle/Colab preserve the host CUDA PyTorch; the local Mac lock is not installed there. Each run records actual package versions, code/source hash, data fingerprints, preprocessing, seed and metrics. See the [first experiment record](docs/experiments/20261008-first-baseline.md) for the exact bounds and label-provenance limitation.
+
+After that version completes, build an independent offline rehearsal:
+
+```bash
+python3.12 scripts/build_kaggle.py outputs/kaggle/rehearsal knee-dino-rehearsal-20261008 scripts/rehearse_kaggle_entry.py --no-weak-labels --kernel-source ozgung/knee-dino-train-20261008
+kaggle kernels push -p outputs/kaggle/rehearsal --timeout 1800
+```
+
+It reprocesses all gold images and compares predictions against the saved cache-based evaluation, then checks the visible test twice. The final entry only reads the actual test metadata/images and checkpoint:
+
+```bash
+python3.12 scripts/build_kaggle.py outputs/kaggle/submission knee-dino-submission-20261008 scripts/submit_kaggle_entry.py --no-weak-labels --kernel-source ozgung/knee-dino-train-20261008
+kaggle kernels push -p outputs/kaggle/submission --timeout 28800
+```
+
+Only submit a completed, successfully rehearsed version. Inspect its actual version number and current quota first. `STATUS.md` records authorized submissions and their results. Do not overwrite an existing training notebook while a dependent submission is pending. Data, private linkage hashes, feature caches, outputs and weights stay out of Git.
