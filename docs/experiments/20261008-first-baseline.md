@@ -1,6 +1,6 @@
 # First image-only baseline — 2026-10-08
 
-Status: **trained and offline-rehearsed; first submission pending scoring**. Source revision `359c831`; bundled source SHA256 `64a0f7501c8d4097999c62b5b81d764b5a7b4c4409561c42f99237fe999d0bb3`.
+Status: **first submission COMPLETE, public score0.756; second submission pending scoring**. Source revision `359c831`; bundled source SHA256 `64a0f7501c8d4097999c62b5b81d764b5a7b4c4409561c42f99237fe999d0bb3`.
 
 ## Hypothesis and scope
 
@@ -48,7 +48,7 @@ An optional comparison is predeclared: attention seeds43/44 and meanmax seed42, 
 - Offline rehearsal: private `ozgung/knee-dino-rehearsal-20261008` v1, source`efad291`. All58 gold studies decoded again; max cached-versus-raw prediction difference1.78814e-7. Repeated visible-test predictions identical. No decoder errors, missing planes or fallback studies. Temporary raw-image symlink removed before output collection.
 - Gold58 inference109.59s including loading; mean1.418s/study, p953.384s. Visible3 inference25.88s including loading; mean2.045s/study. These imply approximately31–44minutes for1300studies, an extrapolation rather than a hidden-test measurement. Peak rehearsal CUDA252,073,472bytes; RSS1,778,056KiB. Verified9-hour limit has substantial measured headroom.
 - Downloaded visible submission hash/schema/exact test-ID order and finite[0,1] probabilities verified. Private pure test-only notebook `ozgung/knee-dino-submission-20261008` v1 completed with internet disabled and no weak-label dataset attached.
-- **First submission56922773**, sent2026-10-07 22:13:58UTC (October8 local), PENDING scoring. No score claim yet; four submissions remain today.
+- **First submission56922773**, sent2026-10-07 22:13:58UTC (October8 local), COMPLETE with public score **0.756**, verified2026-10-07 22:42UTC via logged-in UI and official CLI. The first hidden-test run succeeded; observed end-to-end time from submission to verification was under29minutes (includes queue/scoring; exact hidden inference runtime is not exposed).
 
 | Target | Positive / negative gold studies | AUC |
 | --- | --- | --- |
