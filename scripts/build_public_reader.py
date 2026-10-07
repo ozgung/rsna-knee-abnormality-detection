@@ -33,12 +33,14 @@ def build(source_dir, destination, slug, *, rehearsal=True, weight_hashes=None):
     bootstrap += "for name, content in sources.items():\n    (source_dir / name).write_text(content)\n"
     bootstrap += entry
     compile(bootstrap, "reader-notebook", "exec")
-    nb = {"nbformat": 4, "nbformat_minor": 5, "metadata": {}, "cells": [
-        {"cell_type": "markdown", "metadata": {}, "source": [
+    nb = {"nbformat": 4, "nbformat_minor": 5, "metadata": {
+        "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
+        "language_info": {"name": "python", "version": "3.12"}}, "cells": [
+        {"cell_type": "markdown", "id": "attribution", "metadata": {}, "source": [
             "# Audited public ConvNeXt reader\n",
             "Model and preprocessing: goodpjw2008, Apache-2.0. Source: https://www.kaggle.com/code/goodpjw2008/rsna-knee-stack-2-5d-convnext-mil-lb-0-944\n",
             "Own wrapper adds strict decoding checks, checkpoint hashes, actual test coverage and bounded offline rehearsal. No fitting or gold-based selection.\n"]},
-        {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": bootstrap.splitlines(True)}]}
+        {"cell_type": "code", "id": "reader-run", "metadata": {}, "execution_count": None, "outputs": [], "source": bootstrap.splitlines(True)}]}
     meta = {"id": f"ozgung/{slug}", "title": slug.replace("-", " ").title(), "code_file": "notebook.ipynb",
             "language": "python", "kernel_type": "notebook", "is_private": True,
             "enable_gpu": True, "enable_tpu": False, "enable_internet": False,

@@ -47,6 +47,7 @@ class ReaderPackagingTests(unittest.TestCase):
             self.assertTrue(meta['is_private']); self.assertFalse(meta['enable_internet'])
             self.assertEqual(meta['dataset_sources'],['goodpjw2008/rsna-knee-2-5d-convnext-reader'])
             notebook=json.loads((dest/'notebook.ipynb').read_text())
+            self.assertEqual(notebook['metadata']['kernelspec']['name'],'python3')
             for cell in notebook['cells']:
                 if cell['cell_type']=='code': compile(''.join(cell['source']),'generated','exec')
 
