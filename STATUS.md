@@ -4,7 +4,7 @@ Last updated: **2026-10-08 (Europe/Istanbul)**. Read this first, then [README](R
 
 ## Current snapshot
 
-- Objective: finish every 01 task through a scored first submission, with optional second-entry improvement. User authorized autonomous replanning, subagents, submissions and existing Colab credits; no purchases. Branch `codex/first-submission`, local Git only, no remote.
+- Objective: audit stronger public references, then target public AUC strictly above0.950. User explicitly authorized long and concurrent local/Kaggle/Colab training, subagents and promising submissions, with small pilots and resource discipline first. Existing Colab credits only; no purchases. Branch `codex/first-submission`, local Git only, no remote. Original01 tasks and second submission complete.
 - Real data: 4,407 training studies, 24,371 series, 58 fully labeled studies, 12 targets. Four nongold report duplicates of gold excluded. Exact schema comes from official files. Data and generated/private artifacts remain ignored.
 - Trained frozen DINOv2-Small baseline: 2,000 weak train / 300 weak validation / 58 gold; 7,074 series and 56,592 slices decoded with zero errors/missing planes. Extraction 2,807.88s. Gold macro AUC **0.720149**, prevalence **0.5**; all 12 defined. Weak BCE **0.463229**, prior **0.593802**. Source `359c831`.
 - Training-only normalization and report/patient exclusions verified. Observed PatientID hashes are unique per study and disjoint across folds, but anonymized identity semantics limit repeat-patient guarantees. Public v1 weak-label prompt independence from gold is unverified; gold AUC is exploratory. Exact 0.5 labels are masked.
@@ -27,7 +27,7 @@ Last updated: **2026-10-08 (Europe/Istanbul)**. Read this first, then [README](R
 | TRAIN-01 | done | Baseline trained, preserved and evaluated; artifacts retrieved. |
 | SUBMIT-01 | done | First entry56922773 COMPLETE; public score **0.756**, verified22:42UTC. |
 | SUBMIT-02 | done | Entry56923149 COMPLETE, public **0.757**, verified via logged-in browser; gain0.001 over first. |
-| REF-02 | ready | Audit the0.949 single-CoAtNet release and independent ConvNeXt reader for provenance, permissions and exact offline reproducibility; Pilkwang0.891 remains a fallback, not the strongest public reference. See [research follow-up](docs/experiments/20261008-community-followup.md). Recheck resource budget and restore CLI login before execution. |
+| REF-02 | active | Eligibility/source audit in parallel with bounded standalone ConvNeXt offline rehearsal. OAI-derived0.949 weights have unresolved host eligibility, not an explicit prohibition; defer their submission. ConvNeXt Apache-2.0 source uses competition images/ImageNet and public report labels. Verify hashes, actual hidden-ID contract, strict decode checks, repeatability and runtime before submission. |
 | TRAIN-02 | proposed | Compare a bounded fine-tuned2.5D CoAtNet/ConvNeXt or partial-DINO encoder with the frozen baseline; prioritize multi-sequence coverage and adjacent slices. Separate anatomy-aware TTA comparison. Stop head-seed sweeps; predeclare holdout metric and compute before launch. |
 
 ## Completed runs and resource state
@@ -36,7 +36,7 @@ Last updated: **2026-10-08 (Europe/Istanbul)**. Read this first, then [README](R
 - **Second competition entry56923149**, submitted2026-10-07 22:36:29UTC; **COMPLETE, public score0.757**, verified around23:06UTC via logged-in browser. Private `ozgung/knee-ensemble-submission-20261008` v1, source`5f66959`, bundleSHA`97f06aa2db0373c46f6cb2593c03d001cc4fca4eec7319cbab5288351ad7376e`. All-four equal ensemble selected only by weak BCE. Notebook and rehearsal COMPLETE; no visible notebook jobs running. Preserve this scored version and its inputs. No competition evaluation remains running.
 - Ensemble gold parity error **1.043e-7**, repeat test identical, no errors/fallback. Gold AUC **0.720727**; 58-study inference100.94s, peakCUDA252,470,784bytes across rehearsal. Visible3 inference26.82s including load. Reports in `outputs/kaggle/{ensemble-rehearsal-result,ensemble-submission-result}`. Visible CSV SHA`be43e19b805c97174f9d0bc051b15f0f170f51c670f7739c0446004ab2398ac8`, header/actual ID order/probabilities verified.
 - Ensemble inputs: competition + vanilla DINO + original training notebook + private `ozgung/knee-own-heads-20261008` v1. Dataset contains exactly four own trained heads; no study IDs, prediction fixtures, labels, reports or images. Rehearsal computes its reference from the existing Kaggle feature cache. Internet disabled.
-- No Kaggle notebook, competition evaluation, Colab session or local training job active. Existing user-authorized350-credit allocation expiresOctober18; remaining balance/provider cutoff unverified. No purchases.
+- Resource check October8: Kaggle CLI works, GPU28.91h and TPU20h remaining, refreshOctober10 00:00UTC; submissions2 used/3 available at23:36UTC October7. Colab UI shows351.8compute units and zero active sessions. Historical credit expiryOctober18 still unverified. No purchases. Bounded ConvNeXt rehearsal prepared, not yet launched at this checkpoint.
 
 ## Artifacts and reproducibility
 
