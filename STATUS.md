@@ -12,7 +12,7 @@ Complete all 01 tasks through the first scored Kaggle submission. User explicitl
 - Competition access works; no terms accepted during this run. Live official pages verified via `kaggle competitions pages -c rsna-knee-abnormality-detection --content --format json`. Entry/merge deadline October 15, final October 22, both 23:59 UTC. Notebook-only submission, internet disabled, <=9 hours. Five submissions remained at start; 30 free Kaggle GPU hours.
 - Implemented: deterministic bounded DICOM loading; geometry/intensity/padding masks; report/patient group exclusion; training-only feature normalization; frozen DINOv2-Small features; trainable attention/meanmax heads; weak-label training and explicit gold metrics; offline image-only inference. `knee/model.py` remains the unrelated untrained toy smoke architecture.
 - Public labels: Steven Lee Hans v1, exact 0.5 masked. Gold is excluded from our training and epoch selection. Upstream weak-label prompt independence from gold is **unverified**, so gold performance is exploratory. No CSV patient identity; useful DICOM PatientID hashes participate in exclusions, but missing/anonymized identities limit guarantees.
-- GPU probe completed on Tesla T4: DINO forward passes; all 30 sampled headers have geometry and PatientID (five distinct sampled IDs). Main extraction has decoded its first 700 studies without an empty study (~867 seconds); training/model quality still pending.
+- GPU probe completed on Tesla T4: DINO forward passes; all 30 sampled headers have geometry and PatientID (five distinct sampled IDs). Main extraction has decoded its first 1,100 studies without an empty study (~1,399 seconds); training/model quality still pending.
 - Local environment: Python3.12.9, torch2.14.1, numpy2.5.3, pandas3.0.6, pydicom3.0.2, sklearn1.9.1; locked macOS arm64 environment. Prior CPU/MPS synthetic checks passed. Kaggle: Python3.13, torch2.11+cu128, transformers5.16.1, numpy2.1.3. Exact remote versions will be retained in experiment outputs.
 - Raw metadata/weak labels are in ignored `data/`; no full raw corpus downloaded. Local cache remains below initial 2 GiB; ~31 GiB free before this run. Generated notebooks, private hashes, features and weights remain ignored.
 
@@ -38,7 +38,7 @@ Outputs `/kaggle/working/artifacts/{features.npz,extraction.json,patients-privat
 
 **Probe:** private `ozgung/knee-probe-20261008` v1 failed before code (missing kernelspec, fixed); v2 COMPLETED, ~630s. Aggregate/log retrieved at `outputs/kaggle/probe-result/`. Slow recursive file discovery in probe was replaced with direct attachment paths in actual experiment.
 
-**Gallery:** private CPU notebook `ozgung/knee-gallery-20261008` v1 RUNNING, cap1200s; two fixed gold-study examples for visual preprocessing QA. Retrieve only `preprocessing-example-*.png` and `gallery-audit.json` to ignored outputs. No identifiers or report text drawn.
+**Gallery:** private CPU notebook `ozgung/knee-gallery-20261008` v1 COMPLETED (~34s notebook runtime). Two fixed gold examples visually checked: 24 slices each, all planes, zero errors; joint anatomy retained. Images/audit/log in `outputs/kaggle/gallery-result/`; no identifiers or report text drawn. Public-source brief and original diagram saved in `outputs/research/2026-10-08/`.
 
 **Colab:** no runtime allocated this session. Existing user-authorized 350-credit allocation expires October18; actual balance/provider cutoff unverified. Target useful work and artifact retrieval by October17; no purchases authorized. Optional lightweight head comparison can use Colab after the feature cache exists. Release idle runtimes.
 
@@ -53,5 +53,7 @@ Outputs `/kaggle/working/artifacts/{features.npz,extraction.json,patients-privat
 ## Latest verification
 
 2026-10-08: `.venv/bin/python -m unittest discover -s tests -v`: **44 passed**. `python3.12 -m knee.smoke`: PASS (dependency-free synthetic). Entry scripts compile; `git diff --check` passes. Independent synthetic CPU training/checkpoint reload passed for attention and meanmax (max prediction discrepancy <=1e-6), including empty gold study and missing labels. Independent mocked hidden-ID replacement test passed exact actual-test coverage/order and rejected checkpoint target mismatch. These are not real-data quality or offline Kaggle success claims.
+
+Frozen first-submission/rehearsal bundles use source0cdcac7, internet disabled, no weak-label dataset attachment; their only notebook input is the private training run. Do not rebuild them while separately considering ensemble code.
 
 Latest changes: added offline artifact discovery/hash checks, pure inference and independent rehearsal entries, hidden-ID/mask regressions, and bounded optional head comparisons. Dependency-free full suite passes with26 optional ML skips; ML environment runs all44 tests. Prepared a private CPU image gallery for visual QA. Training run remains in progress. Concrete next action: finish TRAIN-01, launch offline rehearsal with the completed training notebook attached, then SUBMIT-01 through a scored result. Save aggregate experiment evidence and update this handoff before ending.

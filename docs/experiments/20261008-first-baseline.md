@@ -34,4 +34,10 @@ Epoch selection uses only weighted BCE on the weak-label holdout. Gold AUC is re
 
 The initial environment probe failed before project code because the generated notebook lacked `kernelspec`; fixed in the builder. Probe version2 completed: TeslaT4, all30 sampled headers contained geometry and PatientID (five distinct values), DINO shape [2,257,384]. The first experiment is extracting features successfully. A separate CPU-only private gallery run prepares two fixed gold examples for visual preprocessing inspection. Initial automatic approval rejection for Kaggle execution was resolved by verifying the private code-only payload, authenticated account destination, and the user's explicit first-submission authorization. No rejected action was bypassed.
 
+The CPU gallery completed and both fixed examples were visually checked: three planes and 24 decoded slices each, no errors, knee anatomy retained. Private images/audit: `outputs/kaggle/gallery-result/`. No report text or identifiers are drawn. The original pipeline schematic and primary-source research brief are under `outputs/research/2026-10-08/`.
+
+Pre-exclusion supervision audit confirms every target has both positive-leaning and negative-leaning weak probabilities in train/weak-validation. Synovitis is sparsest:329/2000 supervised training labels and41/300 weak-validation labels. Unknowns remain masked. Aggregate details: `outputs/validation/20261008/weak-support-pre-exclusions.json`.
+
+An optional comparison is predeclared: attention seeds43/44 and meanmax seed42, same cache/split, up to300s and80epochs each. Compare singles, all pairs and all-four equal-probability averages only by weak-validation BCE. Preserve baseline; no target-specific fitted blending. This small repeated comparison can overfit the weak holdout. Colab remains unallocated until the cache is ready. Input packaging includes only project code, compact features and baseline artifacts; no raw images or reports.
+
 Results, offline resource measurements, and submission score will replace this pending section after verification.
