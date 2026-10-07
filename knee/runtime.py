@@ -1,0 +1,126 @@
+"""Kaggle environment preparation and offline image-only inference."""
+from collections import Counter, defaultdict
+import csv
+import hashlib
+import json
+import os
+from pathlib import Path
+import resource
+import subprocess
+import sys
+import time
+
+
+CODECS = ["pydicom==3.0.2", "pylibjpeg==2.1.0", "pylibjpeg-libjpeg==2.3.0", "pylibjpeg-openjpeg==2.5.0"]
+
+
+def prepare_codecs(wheel_dir, *, download=False):
+    wheel_dir = Path(wheel_dir)
+    if download:
+        wheel_dir.mkdir(parents=True, exist_ok=True)
+        subprocess.run([sys.executable, "-m", "pip", "download", "--only-binary=:all:", "--no-deps",
+                        "--dest", str(wheel_dir), *CODECS], check=True)
+    wheels = sorted(wheel_dir.glob("*.whl"))
+    if len(wheels) != len(CODECS):
+        raise ValueError("Missing codec wheel bundle")
+    subprocess.run([sys.executable, "-m", "pip", "install", "--no-index", "--no-deps", *map(str, wheels)], check=True)
+    return {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in wheels}
+
+
+def competition_root(root="/kaggle/input"):
+    root = Path(root)
+    candidates = [root / "competitions/rsna-knee-abnormality-detection",
+                  root / "rsna-knee-abnormality-detection"]
+    matches = [p for p in candidates if (p / "sample_submission.csv").exists() and (p / "test_series.csv").exists()]
+    if len(matches) != 1:
+        raise ValueError(f"Expected one competition attachment, found {len(matches)}")
+    return matches[0]
+
+
+def infer(data_dir, encoder_dir, head_path, output_path, *, max_seconds=28000, repeat=1):
+    """Read test IDs/series/images and checkpoint only. Reports never enter this path."""
+    import numpy as np
+    import torch
+    from knee.dicom import PREPROCESSING_VERSION, StudyLoadError, load_study
+    from knee.features import StudyHead, encode_volume, load_encoder
+    from knee.experiment import environment, json_write
+    from knee.submission import write_submission
+    from knee.validation import read_csv, read_schema
+    if not torch.cuda.is_available():
+        raise RuntimeError("Offline inference explicitly requires CUDA")
+    torch.set_num_threads(2)
+    start = time.monotonic()
+    root = Path(data_dir)
+    id_column, targets = read_schema(root / "sample_submission.csv")
+    _, test_rows = read_csv(root / "test.csv")
+    ids = [r[id_column] for r in test_rows]
+    if not ids or len(set(ids)) != len(ids) or any(not uid for uid in ids):
+        raise ValueError("Invalid test IDs")
+    _, series = read_csv(root / "test_series.csv")
+    by_study = defaultdict(list)
+    for row in series:
+        by_study[row[id_column]].append(row)
+    if set(ids) != set(by_study):
+        raise ValueError("Test study/series coverage differs")
+    checkpoint = torch.load(head_path, map_location="cpu", weights_only=True)
+    if checkpoint["targets"] != targets:
+        raise ValueError("Checkpoint target order mismatch")
+    prep = checkpoint["preprocessing"]
+    if prep["preprocessing_version"] != PREPROCESSING_VERSION:
+        raise ValueError("Preprocessing version mismatch")
+    state = checkpoint["state_dict"]
+    head = StudyHead(state["mean"], state["std"], state["prior_logits"].sigmoid(),
+                     kind=checkpoint["config"]["kind"], hidden=checkpoint["config"]["hidden"]).cuda().eval()
+    head.load_state_dict(state, strict=True)
+    encoder = load_encoder(encoder_dir, "cuda")
+    result, totals, errors = {}, Counter(), Counter()
+    empty = 0
+    timings = []
+    for repetition in range(repeat):
+        for i, uid in enumerate(ids):
+            study_start = time.monotonic()
+            if study_start - start > max_seconds:
+                raise TimeoutError("Inference reached time bound; refusing a partial submission")
+            try:
+                volume = load_study(root / "test_series", uid, by_study[uid], image_size=prep["image_size"],
+                                    slices_per_plane=prep["slices_per_plane"], crop_mm=prep["crop_mm"])
+                features = encode_volume(encoder, volume, "cuda")
+                with torch.inference_mode():
+                    pred = head(torch.from_numpy(features)[None].cuda(), torch.from_numpy(volume.slice_mask)[None].cuda()).sigmoid()[0].cpu().numpy()
+                totals.update(volume.audit["counts"])
+                errors.update(volume.audit["errors"])
+                totals["missing_planes"] += volume.audit["missing_planes"]
+            except StudyLoadError as exc:
+                # Predeclared fallback for unavailable imagery only, always counted.
+                empty += 1
+                errors.update(exc.audit["errors"])
+                pred = state["prior_logits"].sigmoid().numpy()
+            if not np.isfinite(pred).all():
+                raise ValueError("Nonfinite prediction")
+            if repetition and not np.allclose(result[uid], pred, atol=1e-5, rtol=1e-4):
+                raise ValueError("Repeated offline predictions disagree")
+            result[uid] = pred.tolist()
+            timings.append(time.monotonic() - study_start)
+            if (i + 1) % 50 == 0:
+                print(json.dumps({"event":"inference_progress", "completed":i+1, "total":len(ids), "seconds":time.monotonic()-start}), flush=True)
+    if empty > max(1, int(len(ids) * repeat * .02)):
+        raise RuntimeError("More than 2% of studies lack usable images; inspect pipeline")
+    # Hidden reruns may replace test.csv without replacing the three-row example sample.
+    # Its header remains authoritative; actual test.csv controls hidden ID coverage/order.
+    template = Path(output_path).with_name("runtime-template.csv")
+    with template.open("w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([id_column, *targets])
+        writer.writerows([[uid, *([.5] * len(targets))] for uid in ids])
+    write_submission(template, result, output_path)
+    template.unlink()
+    report = {"status":"completed", "studies":len(ids), "repeat":repeat, "fallback_studies":empty,
+              "runtime_seconds":time.monotonic()-start, "mean_study_seconds":float(np.mean(timings)),
+              "p95_study_seconds":float(np.percentile(timings,95)),
+              "estimated_1300_seconds":float(np.mean(timings)*1300), "counts":dict(totals), "errors":dict(errors),
+              "max_rss_kib":resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+              "cuda_peak_bytes":torch.cuda.max_memory_allocated(), "environment":environment(),
+              "output_sha256":hashlib.sha256(Path(output_path).read_bytes()).hexdigest()}
+    json_write(Path(output_path).with_name("inference.json"), report)
+    print(json.dumps(report), flush=True)
+    return report
