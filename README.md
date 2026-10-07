@@ -44,7 +44,7 @@ env -u PYTORCH_ENABLE_MPS_FALLBACK .venv/bin/python -m knee.smoke --torch --devi
 
 This environment is validated locally on macOS arm64 only. The universal lock also contains other platforms' dependencies, but CUDA/Kaggle compatibility has not been tested. On CUDA hosts, preserve the platform's preinstalled torch or use the [official PyTorch installer](https://pytorch.org/get-started/locally/) for its driver/runtime and record a separate tested environment. Do not copy Mac wheels to Kaggle. [MPS documentation](https://docs.pytorch.org/docs/stable/notes/mps.html) describes Apple GPU availability checks. Explicit device requests fail when unavailable; the MPS check above disables inherited CPU fallback.
 
-`configs/local.toml` starts with float32, batch size 1, 224px, 8 slices/plane, no loader workers and a 2 GiB cache budget. These are proposed experiment settings; the synthetic forward pass deliberately uses only 32px and 2 slices/plane. Device `auto` prefers CUDA, then MPS, then CPU. Explicit unavailable devices fail. There is no silent per-operation CPU fallback. The tiny MPS forward check passed; real-loader operations, memory use, and throughput still need measurement. CUDA-specific mixed precision code should be enabled only on CUDA after testing.
+`configs/local.toml` starts with float32, batch size 1, 224px, 8 slices/plane, no loader workers and a 2 GiB cache budget. These are proposed experiment settings; the synthetic forward pass deliberately uses only 32px and 2 slices/plane. Device `auto` prefers CUDA, then MPS, then CPU. Explicit unavailable devices fail. There is no silent per-operation CPU fallback. The tiny MPS forward check passed; real-data extraction and offline inference were measured on Kaggle CUDA, as recorded in the experiment report. Real-loader throughput on MPS remains unmeasured. CUDA-specific mixed precision code should be enabled only on CUDA after testing.
 
 ## Competition facts and verification boundary
 
@@ -85,7 +85,9 @@ The executable baseline is separate from the toy `knee/model.py` shape check:
 | `knee.features` | Frozen DINOv2-Small CLS+mean-patch features and finding-specific attention/meanmax heads. |
 | `knee.experiment` | Deterministic bounded sampling, train-only statistics, weak-label training, checkpoint and experiment records. |
 | `knee.runtime` | Hash-verified local codec wheels; image-only inference; exact actual-test ID coverage. |
-| `knee.compare` | Optional three-head comparison; selection uses only weak-holdout BCE and preserves the baseline. |
+| `knee.compare` | Bounded three-head comparison; selection uses only weak-holdout BCE and preserves the baseline. |
+| `knee.ensemble` | Compatible probability averaging with one shared encoder pass and verified cache/preprocessing. |
+| `knee.rehearsal` | Raw-image versus cached prediction parity, report-free inputs, repeatability and failure cleanup. |
 
 Audit already-authorized small metadata in ignored `data/raw/`:
 
@@ -117,3 +119,6 @@ kaggle kernels push -p outputs/kaggle/submission --timeout 28800
 ```
 
 Only submit a completed, successfully rehearsed version. Inspect its actual version number and current quota first. `STATUS.md` records authorized submissions and their results. Do not overwrite an existing training notebook while a dependent submission is pending. Data, private linkage hashes, feature caches, outputs and weights stay out of Git.
+
+
+For a selected ensemble, `scripts/build_ensemble_kaggle.py` builds the notebook and a separate **weights-only** asset directory. Supply `--assets-dir` and the private `--dataset-source`; use `--rehearsal` for cached-feature versus raw-image parity. Kaggle notebook source must be below1MB, so do not embed checkpoint bytes. Inspect the exact upload directory before creating its private dataset; the builder rejects unexpected files. Rehearsal computes reference predictions from the existing training notebook cache on Kaggle. The pure entry reads only its small heads and test images/metadata. Never upload gold prediction fixtures, reports or identifiers as part of the weights package.
