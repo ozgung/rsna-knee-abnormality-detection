@@ -1,12 +1,10 @@
 """Package weak-selected heads as a private dataset for offline Kaggle inference."""
 import argparse
 import hashlib
-import io
 import json
 import math
 from pathlib import Path
 
-import numpy as np
 from build_kaggle import build
 
 
@@ -29,7 +27,7 @@ def build_selected(baseline_artifacts, comparisons, destination, slug, *, assets
     baseline_loss = next(c["weak_bce"] for c in report["comparisons"] if c["members"] == ["baseline"])
     if selected["weak_bce"] >= baseline_loss - report["selection_tolerance"]:
         raise ValueError("Selected candidate does not improve the protected baseline")
-    assets, hashes, expected, ids = {}, {}, [], None
+    assets, hashes = {}, {}
     for name in members:
         directory = baseline_artifacts / "attention" if name == "baseline" else comparisons / name
         content = (directory / "head.pt").read_bytes()
@@ -38,25 +36,11 @@ def build_selected(baseline_artifacts, comparisons, destination, slug, *, assets
             raise ValueError("Selected checkpoint hash mismatch")
         assets[name + ".pt"] = content
         hashes[name + ".pt"] = digest
-        if rehearsal:
-            with np.load(directory / "gold_predictions.npz", allow_pickle=False) as data:
-                if ids is None:
-                    ids = data["ids"].copy()
-                elif not np.array_equal(ids, data["ids"]):
-                    raise ValueError("Selected gold prediction ID order differs")
-                expected.append(data["predictions"].astype(np.float64))
-    if rehearsal:
-        buffer = io.BytesIO()
-        prediction = sum(w * p for w, p in zip(weights, expected))
-        np.savez_compressed(buffer, ids=ids, predictions=prediction, targets=report["targets"])
-        content = buffer.getvalue()
-        assets["expected-gold.npz"] = content
-        hashes["expected-gold.npz"] = hashlib.sha256(content).hexdigest()
     selection = {"members": members, "weights": weights, "weak_bce": selected["weak_bce"],
                  "baseline_weak_bce": baseline_loss, "feature_sha256": report["feature_sha256"],
                  "comparison_sha256": hashlib.sha256((comparisons / "comparison.json").read_bytes()).hexdigest(),
                  "asset_sha256": hashes}
-    unexpected = {p.name for p in assets_dir.iterdir()} - set(assets) - {"dataset-metadata.json", "expected-gold.npz"}
+    unexpected = {p.name for p in assets_dir.iterdir()} - set(assets) - {"dataset-metadata.json"}
     if unexpected:
         raise ValueError("Unexpected files in private asset upload directory")
     for name, content in assets.items():
@@ -86,9 +70,26 @@ def build_selected(baseline_artifacts, comparisons, destination, slug, *, assets
         "root,encoder=competition_root(),find_encoder('/kaggle/input')\n"
     )
     if rehearsal:
-        entry += ("from knee.rehearsal import rehearse\n"
-                  "rehearse(root,encoder,head_paths,selected_root/'expected-gold.npz',"
-                  "'/kaggle/working/ensemble-rehearsal',head_weights=selection['weights'])\n")
+        entry += (
+            "import numpy as np, torch\n"
+            "from knee.rehearsal import rehearse\n"
+            "from knee.ensemble import PredictionHeads\n"
+            "from knee.dicom import PREPROCESSING_VERSION\n"
+            "from knee.validation import read_schema\n"
+            "cache=artifacts/'features.npz'\n"
+            "if hashlib.sha256(cache.read_bytes()).hexdigest()!=selection['feature_sha256']:\n"
+            "    raise ValueError('Rehearsal feature fingerprint mismatch')\n"
+            "targets=read_schema(root/'sample_submission.csv')[1]\n"
+            "heads=PredictionHeads(head_paths,targets,PREPROCESSING_VERSION,device='cuda',weights=selection['weights'])\n"
+            "with np.load(cache,allow_pickle=False) as data:\n"
+            "    index=np.flatnonzero(data['splits']=='gold')\n"
+            "    features=torch.from_numpy(data['features'][index].astype(np.float32)).cuda()\n"
+            "    masks=torch.from_numpy(data['masks'][index]).cuda()\n"
+            "    expected=heads(features,masks).cpu().numpy()\n"
+            "    np.savez_compressed('/kaggle/working/expected-gold.npz',ids=data['ids'][index],predictions=expected,targets=targets)\n"
+            "del features,masks,heads\ntorch.cuda.empty_cache()\n"
+            "rehearse(root,encoder,head_paths,'/kaggle/working/expected-gold.npz',"
+            "'/kaggle/working/ensemble-rehearsal',head_weights=selection['weights'])\n")
     else:
         entry += ("infer(root,encoder,head_paths[0],'/kaggle/working/submission.csv',"
                   "additional_head_paths=head_paths[1:],head_weights=selection['weights'])\n")
