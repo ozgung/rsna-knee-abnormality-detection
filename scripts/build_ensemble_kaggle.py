@@ -1,19 +1,21 @@
-"""Embed the weak-selected small heads into a private offline Kaggle notebook."""
+"""Package weak-selected heads as a private dataset for offline Kaggle inference."""
 import argparse
-import base64
 import hashlib
 import io
 import json
 import math
 from pathlib import Path
-import zlib
 
 import numpy as np
 from build_kaggle import build
 
 
-def build_selected(baseline_artifacts, comparisons, destination, slug, *, rehearsal=False):
+def build_selected(baseline_artifacts, comparisons, destination, slug, *, assets_dir, dataset_source, rehearsal=False):
     baseline_artifacts, comparisons = Path(baseline_artifacts), Path(comparisons)
+    assets_dir = Path(assets_dir)
+    if not dataset_source.startswith("ozgung/") or len(dataset_source.split("/")) != 2:
+        raise ValueError("Expected a private dataset in the authenticated account")
+    assets_dir.mkdir(parents=True, exist_ok=True)
     report = json.loads((comparisons / "comparison.json").read_text())
     if report["status"] != "completed" or report["selection_uses_gold"]:
         raise ValueError("Require a completed gold-independent comparison")
@@ -34,7 +36,7 @@ def build_selected(baseline_artifacts, comparisons, destination, slug, *, rehear
         digest = hashlib.sha256(content).hexdigest()
         if digest != report["candidates"][name]["checkpoint_sha256"]:
             raise ValueError("Selected checkpoint hash mismatch")
-        assets[name + ".pt"] = base64.b64encode(zlib.compress(content)).decode()
+        assets[name + ".pt"] = content
         hashes[name + ".pt"] = digest
         if rehearsal:
             with np.load(directory / "gold_predictions.npz", allow_pickle=False) as data:
@@ -46,27 +48,38 @@ def build_selected(baseline_artifacts, comparisons, destination, slug, *, rehear
     if rehearsal:
         buffer = io.BytesIO()
         prediction = sum(w * p for w, p in zip(weights, expected))
-        np.savez_compressed(buffer, ids=ids, predictions=prediction)
+        np.savez_compressed(buffer, ids=ids, predictions=prediction, targets=report["targets"])
         content = buffer.getvalue()
-        assets["expected-gold.npz"] = base64.b64encode(zlib.compress(content)).decode()
+        assets["expected-gold.npz"] = content
         hashes["expected-gold.npz"] = hashlib.sha256(content).hexdigest()
     selection = {"members": members, "weights": weights, "weak_bce": selected["weak_bce"],
                  "baseline_weak_bce": baseline_loss, "feature_sha256": report["feature_sha256"],
                  "comparison_sha256": hashlib.sha256((comparisons / "comparison.json").read_bytes()).hexdigest(),
                  "asset_sha256": hashes}
+    unexpected = {p.name for p in assets_dir.iterdir()} - set(assets) - {"dataset-metadata.json", "expected-gold.npz"}
+    if unexpected:
+        raise ValueError("Unexpected files in private asset upload directory")
+    for name, content in assets.items():
+        (assets_dir / name).write_bytes(content)
+    (assets_dir / "dataset-metadata.json").write_text(json.dumps({
+        "title": "Knee Own Heads 20261008", "id": dataset_source,
+        "licenses": [{"name": "other"}],
+        "description": "Private trained head artifacts for the owner's competition entries. No raw images, report text or credentials."}, indent=2))
+    owner, dataset_slug = dataset_source.split("/")
     entry = (
-        "import base64, hashlib, json, os, zlib\nfrom pathlib import Path\n"
+        "import hashlib, json, os\nfrom pathlib import Path\n"
         "from knee.runtime import competition_root, infer, prepare_codecs, training_artifacts\n"
         "from knee.features import find_encoder\n"
         "os.environ['HF_HUB_OFFLINE']='1'\nos.environ['TRANSFORMERS_OFFLINE']='1'\n"
-        f"assets={assets!r}\nselection={selection!r}\n"
-        "selected_root=Path('/kaggle/working/selected-heads')\nselected_root.mkdir(exist_ok=True)\n"
-        "for name, encoded in assets.items():\n"
-        "    content=zlib.decompress(base64.b64decode(encoded))\n"
-        "    if hashlib.sha256(content).hexdigest()!=selection['asset_sha256'][name]:\n"
-        "        raise ValueError('Embedded selected artifact hash mismatch')\n"
-        "    (selected_root/name).write_bytes(content)\n"
-        "(selected_root/'selection.json').write_text(json.dumps(selection,indent=2))\n"
+        f"selection={selection!r}\n"
+        f"locations=[Path('/kaggle/input/datasets/{owner}/{dataset_slug}'),Path('/kaggle/input/{dataset_slug}')]\n"
+        "matches=[p for p in locations if (p/(selection['members'][0]+'.pt')).is_file()]\n"
+        "if len(matches)!=1: raise ValueError('Selected head dataset missing or ambiguous')\n"
+        "selected_root=matches[0]\n"
+        "for name,digest in selection['asset_sha256'].items():\n"
+        "    if hashlib.sha256((selected_root/name).read_bytes()).hexdigest()!=digest:\n"
+        "        raise ValueError('Selected artifact hash mismatch')\n"
+        "Path('/kaggle/working/selection.json').write_text(json.dumps(selection,indent=2))\n"
         "head_paths=[selected_root/(name+'.pt') for name in selection['members']]\n"
         "artifacts=training_artifacts()\n"
         "prepare_codecs(artifacts/'wheels',expected_hashes=json.loads((artifacts/'wheel-hashes.json').read_text()))\n"
@@ -81,6 +94,10 @@ def build_selected(baseline_artifacts, comparisons, destination, slug, *, rehear
                   "additional_head_paths=head_paths[1:],head_weights=selection['weights'])\n")
     digest = build(destination, slug, entry, internet=False,
                    kernel_sources=["ozgung/knee-dino-train-20261008"], weak_labels=False)
+    metadata_path = Path(destination, "kernel-metadata.json")
+    metadata = json.loads(metadata_path.read_text())
+    metadata["dataset_sources"] = [dataset_source]
+    metadata_path.write_text(json.dumps(metadata, indent=2))
     Path(destination, "selection.json").write_text(json.dumps(selection, indent=2))
     print(json.dumps({"source_sha256": digest, "selected": selected,
                       "notebook_bytes": Path(destination, "notebook.ipynb").stat().st_size}))
@@ -93,5 +110,7 @@ if __name__ == "__main__":
     parser.add_argument("destination")
     parser.add_argument("slug")
     parser.add_argument("--rehearsal", action="store_true")
+    parser.add_argument("--assets-dir", required=True)
+    parser.add_argument("--dataset-source", required=True)
     args = parser.parse_args()
-    build_selected(args.baseline_artifacts, args.comparisons, args.destination, args.slug, rehearsal=args.rehearsal)
+    build_selected(args.baseline_artifacts, args.comparisons, args.destination, args.slug, rehearsal=args.rehearsal, assets_dir=args.assets_dir, dataset_source=args.dataset_source)
