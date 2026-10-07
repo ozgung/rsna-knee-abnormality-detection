@@ -2,8 +2,9 @@
 
 Example (paths are local ignored inputs/outputs):
   python3.12 scripts/build_reference_rehearsal.py \
-    outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py \
-    outputs/kaggle/reference-rehearsal knee-reference-rehearsal-20261008
+    outputs/research/2026-10-08/raptor-audit/knee-mri-twelve-findings-from-a-single-model.py \
+    outputs/kaggle/reference-rehearsal knee-reference-rehearsal-20261008 \
+    --profile raptor --checkpoint-sha256 ACTUAL_AUDITED_SHA256
 
 No upload, model download, execution or submission occurs in this builder.
 """
@@ -18,10 +19,11 @@ from build_kaggle import build
 
 
 def build_reference(source_path, destination, slug, *, train_count=24, seed=20261008,
-                    max_seconds=3600, publisher_manifest=None):
+                    max_seconds=3600, publisher_manifest=None, profile="mirror", checkpoint_sha256=None):
     if not 1 <= train_count <= 24 or not 0 < max_seconds <= 3600:
         raise ValueError("Reference rehearsal exceeds its bounded study/time contract")
-    module, decoder, manifest = audit_source(Path(source_path).read_text())
+    module, decoder, manifest = audit_source(Path(source_path).read_text(), profile=profile,
+                                            checkpoint_sha256=checkpoint_sha256)
     if publisher_manifest is not None:
         publisher_manifest = Path(publisher_manifest)
         manifest["publisher_manifest"] = {"filename": publisher_manifest.name,
@@ -36,7 +38,7 @@ def build_reference(source_path, destination, slug, *, train_count=24, seed=2026
     destination = Path(destination)
     path = destination / "kernel-metadata.json"
     metadata = json.loads(path.read_text())
-    metadata["dataset_sources"], metadata["model_sources"] = [WEIGHT_DATASET], []
+    metadata["dataset_sources"], metadata["model_sources"] = [manifest["weight_dataset"]], []
     path.write_text(json.dumps(metadata, indent=2) + "\n")
     notebook_path = destination / "notebook.ipynb"
     notebook = json.loads(notebook_path.read_text())
@@ -45,7 +47,7 @@ def build_reference(source_path, destination, slug, *, train_count=24, seed=2026
         f"Attribution: {manifest['attribution']}. [Public inference source]({manifest['source_url']}).\n",
         "Private reproducibility check, not training or a competition submission. "
         "Three visible studies plus an ID-only deterministic sample; no label-based selection.\n",
-        "Public successful preprocessing and anatomical-mirror TTA are preserved. "
+        "The selected profile's public successful preprocessing and TTA setting are preserved. "
         "Caught decode failures and constant-prior predictions are rejected.\n",
         f"Reference contract SHA256: `{sha256(canonical_bytes(contract))}`.\n"]
     notebook_path.write_text(json.dumps(notebook, indent=2) + "\n")
@@ -63,6 +65,8 @@ if __name__ == "__main__":
     parser.add_argument("source_path", type=Path)
     parser.add_argument("destination", type=Path)
     parser.add_argument("slug")
+    parser.add_argument("--profile", choices=("raptor", "mirror"), required=True)
+    parser.add_argument("--checkpoint-sha256", help="Required for raptor; hash from independent checkpoint audit")
     parser.add_argument("--train-count", type=int, default=24)
     parser.add_argument("--seed", type=int, default=20261008)
     parser.add_argument("--max-seconds", type=int, default=3600)
@@ -71,4 +75,5 @@ if __name__ == "__main__":
     print(json.dumps(build_reference(args.source_path, args.destination, args.slug,
                                     train_count=args.train_count, seed=args.seed,
                                     max_seconds=args.max_seconds,
-                                    publisher_manifest=args.publisher_manifest), indent=2))
+                                    publisher_manifest=args.publisher_manifest,
+                                    profile=args.profile, checkpoint_sha256=args.checkpoint_sha256), indent=2))

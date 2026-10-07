@@ -67,7 +67,8 @@ class ReferenceContractTests(unittest.TestCase):
             spec = importlib.util.spec_from_file_location("reference_builder", directory / "build_reference_rehearsal.py")
             builder = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(builder)
-        manifest = {"attribution": "Synthetic source author", "source_url": "https://example.com/reference"}
+        manifest = {"attribution": "Synthetic source author", "source_url": "https://example.com/reference",
+                    "weight_dataset": builder.WEIGHT_DATASET}
         with tempfile.TemporaryDirectory() as temp:
             source = Path(temp) / "source.py"
             source.write_text("# synthetic input")
@@ -140,6 +141,34 @@ class ReferenceSnapshotTests(unittest.TestCase):
         mirrored = public._mirror_tri(sample, [1, 50], 96)
         self.assertTrue(torch.equal(mirrored[0], sample[0].flip(0)))
         self.assertTrue(torch.equal(mirrored[1], sample[1].flip(-1)))
+
+
+@unittest.skipUnless(os.environ.get("KNEE_RAPTOR_SOURCE") and importlib.util.find_spec("torch"),
+                     "requires optional audited Raptor source and torch")
+class RaptorSnapshotTests(unittest.TestCase):
+    def test_non_oai_profile_requires_checkpoint_pin_and_excludes_fp32_fallback(self):
+        import numpy as np
+        import torch
+        from knee.reference import RAPTOR_RECIPE, raptor_gpu_windows
+        source = Path(os.environ["KNEE_RAPTOR_SOURCE"]).read_text()
+        with self.assertRaisesRegex(ValueError, "checkpoint SHA256"):
+            audit_source(source, profile="raptor")
+        extracted, decoder, manifest = audit_source(source, profile="raptor", checkpoint_sha256="a" * 64)
+        self.assertEqual(decoder, "")
+        self.assertNotIn("def infer_probs", extracted)
+        self.assertNotIn("torch.load", extracted)
+        self.assertEqual(manifest["recipe"], RAPTOR_RECIPE)
+        public, fast = load_definitions(extracted, decoder, manifest)
+        self.assertIsNone(fast)
+        self.assertEqual(public.MAXS, 64)
+        self.assertEqual(public.K_EVAL, 42)
+        rng = np.random.default_rng(42)
+        volume = rng.integers(0, 256, (64, 336, 336), dtype=np.uint8)
+        mask = np.ones(64, np.uint8)
+        expected = public.eval_windows(volume, mask, 42, 384)
+        actual = raptor_gpu_windows(public, volume, mask, "cpu")
+        self.assertLessEqual(float((expected - actual).abs().max()), 3e-5)
+        self.assertEqual(expected.shape, (42, 3, 384, 384))
 
 
 if __name__ == "__main__":

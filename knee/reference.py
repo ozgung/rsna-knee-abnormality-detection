@@ -13,6 +13,7 @@ import hashlib
 import json
 from pathlib import Path
 import platform
+import re
 import resource
 import shutil
 import sys
@@ -26,6 +27,10 @@ WEIGHT_SHA256 = "7e5315dad125b99fc65b340b3de41de628e9be51ff5835355dd61c86472244e
 WEIGHT_NAME = "raptor_ft_alldata_t16_blendjev_oai_d96_r384_swa.pt"
 SOURCE_URL = "https://www.kaggle.com/code/nartaa/rsna-knee-0949-anatomical-mirror"
 WEIGHT_DATASET = "nartaa/rsna-knee-publication-swa-weights-20261007"
+RAPTOR_SOURCE_SHA256 = "859aae12ecea593b45ab0a5f6463fa573cd3083f340c161e920f10fbba29e81b"
+RAPTOR_SOURCE_URL = "https://www.kaggle.com/code/dreaddevelopment/knee-mri-twelve-findings-from-a-single-model"
+RAPTOR_WEIGHT_DATASET = "dreaddevelopment/raptor-knee-widedense"
+RAPTOR_WEIGHT_NAME = "raptor_ft_coatnet_v4_full.pt"
 CONSTANTS = {"INPUT_RES", "INPUT_MODE", "IMG", "CROP_MM", "SLOTS", "MAXS", "K_EVAL",
              "NORM", "LAB", "_MEAN", "_STD", "SLOT_SIZES", "SAGITTAL_SLOTS", "_WLUT"}
 DEFINITIONS = {"build_backbone", "RaptorClassifier", "_eval_centers", "_slot_index", "_mirror_tri",
@@ -39,6 +44,14 @@ RECIPE = {"image_size": 384, "crop_mm": 140.0, "input_res": 320, "input_mode": "
           "tta": "equal original and anatomical-mirror probabilities; CUDA fp16",
           "short_series": "public repeated sampling preserved",
           "slot_boundaries": "public cross-slot windows preserved"}
+RAPTOR_RECIPE = {"image_size": 336, "crop_mm": 140.0, "input_res": 384, "input_mode": "resize",
+                 "slots": [["Sagittal", 1, 18], ["Sagittal", 0, 14], ["Coronal", 1, 12],
+                           ["Coronal", 0, 8], ["Axial", -1, 12]],
+                 "windows": 42, "normalization": "imagenet", "fastread": "memoized_pydicom",
+                 "slice_span": [0.06, 0.94], "arch": "coatnet_rmlp_2_rw_384.sw_in12k_ft_in1k",
+                 "tta": "none; CUDA fp16; no silent fp32 fallback",
+                 "short_series": "public repeated sampling preserved",
+                 "slot_boundaries": "public cross-slot windows preserved"}
 
 
 def sha256(data: bytes) -> str:
@@ -49,26 +62,35 @@ def canonical_bytes(value) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
 
 
-def audit_source(source: str) -> tuple[str, str, dict]:
+def audit_source(source: str, *, profile="mirror", checkpoint_sha256=None) -> tuple[str, str, dict]:
     """Extract only reviewed definitions from exactly the inspected source bytes."""
-    if sha256(source.encode()) != SOURCE_SHA256:
+    if profile not in {"mirror", "raptor"}:
+        raise ValueError("Unknown audited reference profile")
+    source_pin = SOURCE_SHA256 if profile == "mirror" else RAPTOR_SOURCE_SHA256
+    if profile == "raptor" and (not isinstance(checkpoint_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", checkpoint_sha256)):
+        raise ValueError("Raptor requires an independently recorded checkpoint SHA256")
+    if sha256(source.encode()) != source_pin:
         raise ValueError("Public source differs from audited snapshot; review before changing pin")
     tree = ast.parse(source)
+    constants, definitions = CONSTANTS, DEFINITIONS
+    if profile == "raptor":
+        constants = CONSTANTS - {"INPUT_RES", "INPUT_MODE", "SLOT_SIZES", "SAGITTAL_SLOTS", "_WLUT"}
+        definitions = DEFINITIONS - {"_slot_index", "_mirror_tri", "infer_pair_probs", "gpu_windows", "infer_probs"}
     selected, found, payload = [], set(), None
     for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name in DEFINITIONS:
+        if isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name in definitions:
             selected.append(node)
             found.add(node.name)
         elif isinstance(node, ast.Assign):
             names = {t.id for t in node.targets if isinstance(t, ast.Name)}
             if names == {"_FASTREAD_B64"}:
                 payload = base64.b64decode(ast.literal_eval(node.value), validate=True)
-            elif names and names <= CONSTANTS:
+            elif names and names <= constants:
                 selected.append(node)
                 found.update(names)
-    if found != CONSTANTS | DEFINITIONS or payload is None:
+    if found != constants | definitions or (profile == "mirror" and payload is None):
         raise ValueError("Audited definition inventory differs")
-    if sha256(payload) != FASTREAD_SHA256:
+    if profile == "mirror" and sha256(payload) != FASTREAD_SHA256:
         raise ValueError("Embedded decoder differs from audited payload")
     # Imports are ours; no public top-level guards, model loading, file writing,
     # main(), error-to-prior wrappers, or base64 loader are carried into execution.
@@ -77,28 +99,39 @@ def audit_source(source: str) -> tuple[str, str, dict]:
               "from torch.nn import functional as F\nHDR_THREADS=4\nPX_THREADS=4\n")
     module = prefix + ast.unparse(ast.Module(body=selected, type_ignores=[])) + "\n"
     compile(module, "<audited-public-definitions>", "exec")
+    payload = payload or b""
     compile(payload, "<audited-fastread>", "exec")
-    manifest = {"source_url": SOURCE_URL, "source_sha256": SOURCE_SHA256,
-                "decoded_fastread_sha256": FASTREAD_SHA256,
+    mirror = profile == "mirror"
+    manifest = {"profile": profile, "source_url": SOURCE_URL if mirror else RAPTOR_SOURCE_URL,
+                "source_sha256": source_pin,
+                "decoded_fastread_sha256": FASTREAD_SHA256 if mirror else None,
                 "extracted_module_sha256": sha256(module.encode()),
-                "checkpoint_sha256": WEIGHT_SHA256, "checkpoint_file": WEIGHT_NAME,
-                "weight_dataset": WEIGHT_DATASET, "recipe": RECIPE,
-                "attribution": "Danial Zakaria (nartaa), based on Dread Development's Raptor inference",
+                "checkpoint_sha256": WEIGHT_SHA256 if mirror else checkpoint_sha256,
+                "checkpoint_file": WEIGHT_NAME if mirror else RAPTOR_WEIGHT_NAME,
+                "weight_dataset": WEIGHT_DATASET if mirror else RAPTOR_WEIGHT_DATASET,
+                "recipe": RECIPE if mirror else RAPTOR_RECIPE,
+                "attribution": "Danial Zakaria (nartaa), based on Dread Development's Raptor inference" if mirror else "Dread Development / Johnathan Wagner",
                 "purpose": "bounded offline reproduction; no training or score-based selection",
                 "permissions": "Source/checkpoint eligibility is audited separately; this tool grants no license."}
     return module, payload.decode(), manifest
 
 
 def load_definitions(module_source, decoder_source, manifest):
-    if (manifest.get("source_sha256") != SOURCE_SHA256 or
-            manifest.get("checkpoint_sha256") != WEIGHT_SHA256 or manifest.get("recipe") != RECIPE):
+    mirror = manifest.get("profile", "mirror") == "mirror"
+    if (manifest.get("profile", "mirror") not in {"mirror", "raptor"} or
+            manifest.get("source_sha256") != (SOURCE_SHA256 if mirror else RAPTOR_SOURCE_SHA256) or
+            (mirror and manifest.get("checkpoint_sha256") != WEIGHT_SHA256) or
+            not re.fullmatch(r"[0-9a-f]{64}", manifest.get("checkpoint_sha256", "")) or
+            manifest.get("recipe") != (RECIPE if mirror else RAPTOR_RECIPE)):
         raise ValueError("Reference manifest contract mismatch")
     if sha256(module_source.encode()) != manifest["extracted_module_sha256"]:
         raise ValueError("Extracted source hash mismatch")
-    if sha256(decoder_source.encode()) != FASTREAD_SHA256:
+    if (mirror and sha256(decoder_source.encode()) != FASTREAD_SHA256) or (not mirror and decoder_source):
         raise ValueError("Decoder source hash mismatch")
     public, decoder = types.ModuleType("audited_public"), types.ModuleType("audited_fastread")
     exec(compile(module_source, "<audited-public-definitions>", "exec"), public.__dict__)
+    if not mirror:
+        return public, None
     exec(compile(decoder_source, "<audited-fastread>", "exec"), decoder.__dict__)
     # Avoid the public helper raising process-wide file descriptor limits.
     decoder._KEEP_MAX = 256
@@ -241,26 +274,53 @@ def reference_reader(public):
     return (order, pixels, resize), failures
 
 
-def load_model(public, path, device):
+def load_model(public, path, device, manifest):
     import gc
     import timm
     import torch
     path = Path(path)
     with path.open("rb") as handle:
-        if hashlib.file_digest(handle, "sha256").hexdigest() != WEIGHT_SHA256:
+        if hashlib.file_digest(handle, "sha256").hexdigest() != manifest["checkpoint_sha256"]:
             raise ValueError("Reference checkpoint hash mismatch")
     # Never inherit the public weights_only=False pickle execution path.
     checkpoint = torch.load(path, map_location="cpu", weights_only=True)
-    if checkpoint.get("arch") != RECIPE["arch"] or int(checkpoint.get("res", 0)) != 384:
+    if checkpoint.get("arch") != manifest["recipe"]["arch"] or int(checkpoint.get("res", 0)) != 384:
         raise ValueError("Reference checkpoint architecture/resolution mismatch")
+    if "lab" in checkpoint and list(checkpoint["lab"]) != public.LAB:
+        raise ValueError("Reference checkpoint target order mismatch")
     public.timm = timm
-    backbone = public.build_backbone(RECIPE["arch"], pretrained=False)
+    backbone = public.build_backbone(manifest["recipe"]["arch"], pretrained=False)
     model = public.RaptorClassifier(backbone, F_dim=backbone.num_features)
     model.load_state_dict(checkpoint["model"], strict=True)
     model.eval().to(device)
     del checkpoint
     gc.collect()
     return model
+
+
+def raptor_gpu_windows(public, volume, mask, device):
+    """Diagnostic GPU equivalent; production retains the original CPU resize."""
+    import numpy as np
+    import torch
+    from torch.nn import functional as F
+    centers = np.asarray(public._eval_centers(mask, volume.shape[0], public.K_EVAL))
+    indices = np.stack([centers - 1, centers, centers + 1], axis=1)
+    triplets = torch.from_numpy(np.ascontiguousarray(volume[indices])).to(device).float() / 255.0
+    result = F.interpolate(triplets, size=(384, 384), mode="bilinear", align_corners=False)
+    return (result - public._MEAN.to(device)) / public._STD.to(device)
+
+
+def infer_checked(public, model, windows, device, *, mirror):
+    import torch
+    if mirror:
+        return public.infer_pair_probs(model, *windows, device)
+    if any(layer.training for layer in model.modules()):
+        raise ValueError("Reference inference unexpectedly in training mode")
+    with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
+        logits = model(windows[0].unsqueeze(0)).float()
+        if not torch.isfinite(logits).all():
+            raise ValueError("Reference logits are nonfinite")
+        return logits.sigmoid()[0].cpu().numpy()
 
 
 def _csv(path):
@@ -283,6 +343,7 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
     root, out = Path(root), Path(output_dir)
     out.mkdir(parents=True, exist_ok=False)
     public, decoder = load_definitions(public_source, decoder_source, manifest)
+    recipe, mirror = manifest["recipe"], manifest.get("profile", "mirror") == "mirror"
     # Pydicom diagnostics can include source values; failures are recorded below
     # as sanitized aggregate codes rather than third-party warnings.
     warnings.filterwarnings("ignore", module=r"pydicom(?:\..*)?")
@@ -304,13 +365,24 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
     visible_ids = [row["StudyInstanceUID"] for row in visible_rows]
     bounded_ids(visible_ids, count=3, seed=seed)  # Validate, but preserve official order.
     jobs = [("test", sid) for sid in visible_ids] + [("train", sid) for sid in selected_train]
-    counters = install_decoder_guards(decoder)
-    fast = decoder.make_builder("study_lut", 384, public.SLOTS, hdr_threads=4, px_threads=4)
+    counters = install_decoder_guards(decoder) if mirror else Counter()
+    fast = decoder.make_builder("study_lut", public.IMG, public.SLOTS, hdr_threads=4, px_threads=4) if mirror else None
     reference, failures = reference_reader(public)
+    # Per-study memoization removes repeated decodes while preserving every
+    # repeated sample's contribution to public percentile normalization.
+    pixel_cache = {}
+    def cached_pixels(path):
+        if path not in pixel_cache:
+            pixel_cache[path] = reference[1](path)
+            counters["decoded_unique_slices"] += 1
+        return pixel_cache[path]
+    if not mirror:
+        fast = lambda sid, rows, directory: public.build_study(sid, rows, directory,
+                                                              (reference[0], cached_pixels, reference[2]))
     torch.backends.cudnn.benchmark = True
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.set_num_threads(4)
-    model = load_model(public, checkpoint_path, device)
+    model = load_model(public, checkpoint_path, device, manifest)
     torch.cuda.reset_peak_memory_stats()
     setup_seconds = time.monotonic() - started
     def package_version(name):
@@ -345,33 +417,45 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
             before = time.monotonic()
             volume, mask = fast(sid, records[split], str(root / f"{split}_series"))
             fast_seconds = time.monotonic() - before
-            counts = validate_volume(volume, mask, plan)
+            pixel_cache.clear()
+            if failures:
+                raise ValueError("Production decoder swallowed an error")
+            counts = validate_volume(volume, mask, plan, image_size=public.IMG)
             reference_before = time.monotonic()
             reference_volume, reference_mask = public.build_study(sid, records[split], str(root / f"{split}_series"), reference)
             if failures:
                 raise ValueError("Reference decoder swallowed an error")
-            validate_volume(reference_volume, reference_mask, plan)
+            validate_volume(reference_volume, reference_mask, plan, image_size=public.IMG)
             if not np.array_equal(volume, reference_volume) or not np.array_equal(mask, reference_mask):
                 raise ValueError("Fast decoder differs from pydicom reference pixels/mask")
             reference_seconds = time.monotonic() - reference_before
             del reference_volume, reference_mask
-            windows, window_seconds = [], 0.0
-            for mirrored in (False, True):
+            windows, window_seconds, window_error = [], 0.0, 0.0
+            for mirrored in ((False, True) if mirror else (False,)):
                 before = time.monotonic()
-                gpu = public.gpu_windows(volume, mask, 94, 320, device, mirror=mirrored)
+                if mirror:
+                    gpu = public.gpu_windows(volume, mask, public.K_EVAL, recipe["input_res"], device, mirror=mirrored)
+                    production = gpu
+                else:
+                    cpu = public.eval_windows(volume, mask, public.K_EVAL, recipe["input_res"])
+                    production = cpu.to(device)
                 torch.cuda.synchronize()
                 window_seconds += time.monotonic() - before
-                cpu = public.eval_windows(volume, mask, 94, 320, mirror=mirrored)
-                if not torch.equal(cpu, gpu.cpu()):
-                    raise ValueError("CPU and GPU windows are not bit-identical")
+                if mirror:
+                    cpu = public.eval_windows(volume, mask, public.K_EVAL, recipe["input_res"], mirror=mirrored)
+                else:
+                    gpu = raptor_gpu_windows(public, volume, mask, device)
+                window_error = max(window_error, float((cpu - gpu.cpu()).abs().max()))
+                if window_error > (0 if mirror else 3e-5):
+                    raise ValueError("CPU and GPU windows exceed profile-specific parity tolerance")
                 del cpu
-                windows.append(gpu)
+                windows.append(production)
             torch.cuda.synchronize()
             before = time.monotonic()
-            probabilities = validate_predictions(public.infer_pair_probs(model, *windows, device))
+            probabilities = validate_predictions(infer_checked(public, model, windows, device, mirror=mirror))
             torch.cuda.synchronize()
             inference_seconds = time.monotonic() - before
-            repeated = validate_predictions(public.infer_pair_probs(model, *windows, device))
+            repeated = validate_predictions(infer_checked(public, model, windows, device, mirror=mirror))
             repeat_error = float(np.max(np.abs(probabilities - repeated)))
             if repeat_error > 1e-6:
                 raise ValueError("Repeated predictions exceed 1e-6 tolerance")
@@ -384,9 +468,9 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
                                       "fast_seconds": fast_seconds, "reference_seconds": reference_seconds,
                                       "windows_seconds": window_seconds, "inference_seconds": inference_seconds,
                                       "production_seconds": production_seconds,
-                                      "decoder_pixel_max_error": 0, "window_max_error": 0,
+                                      "decoder_pixel_max_error": 0, "window_max_error": window_error,
                                       "repeat_prediction_max_error": repeat_error})
-            del volume, mask, windows, gpu
+            del volume, mask, windows, gpu, production
             report["runtime_seconds"] = time.monotonic() - started
             save()
             print(json.dumps({"event": "reference_study_verified", "ordinal": ordinal,
