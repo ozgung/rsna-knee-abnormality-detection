@@ -115,6 +115,18 @@ class PackagingTests(unittest.TestCase):
             self.assertFalse(contract['fitted_weights_saved'])
             nb=json.loads((out/'notebook.ipynb').read_text())
             compile(''.join(nb['cells'][1]['source']),'built-diagnostic','exec')
+            alternate=Path(d)/'dataset-bundle'
+            transported=builder.build(ARCHIVE,PARENT/'outputs/kaggle/train04-cache-full-v2-result/coverage_cache',
+                PARENT/'outputs/kaggle/train04-reference-20261009-result/coverage_training',alternate,'synthetic-assets',
+                cache_kernel='ozgung/knee-train04-cache-full-20261008',reference_kernel='ozgung/knee-train04-reference-20261009',
+                reference_dataset='ozgung/knee-train04-initial-assets-20261009')
+            self.assertEqual(transported['reference_pins'],contract['reference_pins'])
+            self.assertEqual(transported['sources'],contract['sources'])
+            meta=json.loads((alternate/'kernel-metadata.json').read_text())
+            self.assertEqual(meta['dataset_sources'],['ozgung/knee-train04-initial-assets-20261009'])
+            self.assertEqual(meta['kernel_sources'],['ozgung/knee-train04-cache-full-20261008'])
+            code=''.join(json.loads((alternate/'notebook.ipynb').read_text())['cells'][1]['source'])
+            compile(code,'dataset-diagnostic','exec')
 
 
 if __name__=='__main__':unittest.main()

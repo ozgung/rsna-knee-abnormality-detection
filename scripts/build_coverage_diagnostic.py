@@ -39,8 +39,9 @@ def archived_sources(notebook):
     return bindings
 
 
-def build(archive,cache_receipts,reference_result,destination,slug,*,cache_kernel,reference_kernel):
+def build(archive,cache_receipts,reference_result,destination,slug,*,cache_kernel,reference_kernel,reference_dataset=None):
     reference_parts(cache_kernel,owner='ozgung');reference_parts(reference_kernel,owner='ozgung')
+    if reference_dataset:reference_parts(reference_dataset,owner='ozgung')
     if not slug or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789-' for c in slug):raise ValueError('Invalid slug')
     bundle=archived_sources(archive);cache=Path(cache_receipts);ref=Path(reference_result)
     report=json.loads((ref/'training-report.json').read_text());run=json.loads((ref/'run-contract.json').read_text())
@@ -63,6 +64,7 @@ def build(archive,cache_receipts,reference_result,destination,slug,*,cache_kerne
         'sources':{n:hashlib.sha256(s.encode()).hexdigest() for n,s in own.items()},'external':SOURCE_HASHES,
         'builder_sha256':file_sha256(__file__),'archive_sha256':file_sha256(archive),
         'cache_kernel':cache_kernel,'cache_pins':pins,'reference_kernel':reference_kernel,
+        'reference_dataset':reference_dataset,
         'reference_pins':{n:file_sha256(ref/n) for n in ('training-report.json','run-contract.json','initial.pt')},
         'initial_sha256':run['initial_model_sha256'],'reference_environment':run['contract']['runtime_environment'],
         'plan_fingerprint':plan['fingerprint'],'seed':42,'notebook_seconds':43200,
@@ -92,14 +94,17 @@ sys.path.insert(0,str(base))
 os.environ['KNEE_CODE_REVISION']={revision!r}
 os.environ['KNEE_SOURCE_SHA256']={digest!r}
 from knee.coverage_diagnostic import run
-from knee.fresh_reader_setup import notebook_root,time_limit
+from knee.fresh_reader_setup import dataset_root,notebook_root,time_limit
 from knee.validation import file_sha256
 from knee.fresh_reader import write_json
 try:
     with time_limit(CONTRACT['notebook_seconds']-(time.monotonic()-STARTED),'Kaggle GPU session'):
         inputs=Path('/kaggle/input')
         cache=notebook_root(inputs,CONTRACT['cache_kernel'],'coverage_cache',list(CONTRACT['cache_pins']))
-        ref=notebook_root(inputs,CONTRACT['reference_kernel'],'coverage_training',list(CONTRACT['reference_pins']))
+        if CONTRACT['reference_dataset']:
+            ref=dataset_root(inputs,CONTRACT['reference_dataset'],list(CONTRACT['reference_pins']))
+        else:
+            ref=notebook_root(inputs,CONTRACT['reference_kernel'],'coverage_training',list(CONTRACT['reference_pins']))
         for root,pins in [(cache,CONTRACT['cache_pins']),(ref,CONTRACT['reference_pins'])]:
             for name,digest in pins.items():
                 if file_sha256(root/name)!=digest:raise ValueError('Attachment identity differs')
@@ -118,7 +123,8 @@ except BaseException as exc:
         {'cell_type':'code','id':'run','metadata':{},'execution_count':None,'outputs':[],'source':entry.splitlines(True)}]}
     meta={'id':'ozgung/'+slug,'title':slug.replace('-',' ').title(),'code_file':'notebook.ipynb','language':'python',
           'kernel_type':'notebook','is_private':True,'enable_gpu':True,'enable_tpu':False,'enable_internet':False,
-          'dataset_sources':[],'kernel_sources':[cache_kernel,reference_kernel],'competition_sources':[],
+          'dataset_sources':[reference_dataset] if reference_dataset else [],
+          'kernel_sources':[cache_kernel]+([] if reference_dataset else [reference_kernel]),'competition_sources':[],
           'model_sources':[],'docker_image':DOCKER,'machine_shape':'NvidiaTeslaT4'}
     out=Path(destination);out.mkdir(parents=True,exist_ok=False)
     for name,value in [('notebook.ipynb',nb),('kernel-metadata.json',meta),('build-contract.json',contract)]:
@@ -130,5 +136,6 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('archive','cache_receipts','reference_result','destination','slug'):p.add_argument(name)
     p.add_argument('--cache-kernel',required=True);p.add_argument('--reference-kernel',required=True)
+    p.add_argument('--reference-dataset')
     a=p.parse_args();build(a.archive,a.cache_receipts,a.reference_result,a.destination,a.slug,
-        cache_kernel=a.cache_kernel,reference_kernel=a.reference_kernel)
+        cache_kernel=a.cache_kernel,reference_kernel=a.reference_kernel,reference_dataset=a.reference_dataset)
