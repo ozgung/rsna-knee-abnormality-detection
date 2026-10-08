@@ -232,3 +232,28 @@ wrapper aborts even when other planes are valid. This is a plausible common caus
 not a confirmed hidden traceback. Repair must preserve public preprocessing and
 healthy-input probabilities, expose aggregate degraded-input counts and pass new
 stress fixtures and offline qualification before another submission.
+
+## Corrected standalone qualification and entry, 01:38 UTC
+
+ConvNeXt repaired rehearsal `ozgung/knee-public-reader-rehearsal-v3-20261008` v1
+(source67a016f) passed67studies/319series,83missing slots, zero actual decode, empty
+or resource failures. All seven synthetic production-path stresses passed.
+Elapsed403.312s, peak CUDA1,430,410,240bytes. Healthy visible predictions exactly
+match the original wrapper; the repair changes failure handling only.
+
+Corrected standalone `ozgung/knee-public-reader-submission-20261008` v2
+(sourcef28dfd2) completed48.124s with byte-identical visible CSV SHA
+`e2598d9ab64915e6fecc85b53dc1864921f27c17cb30297ed92a04c12e1091e4`.
+Submitted01:37:10UTC as **56927932**, pending, three submissions remain today.
+No hidden traceback is available, so this repairs observed wrapper defects without
+claiming the exact hidden exception is established.
+
+A separate read-only source comparison reproduced Raptor wrapper rejection of
+missing IOP/IPP/spacing, unreadable or black selected frames, and an empty selected
+series alongside a valid plane. Public inference handles these. Pixel-error and
+black-frame cases yield exactly equal volumes/masks before our strict validator
+rejects them. A separate production policy will preserve public geometry defaults,
+selection and short-series repetition, keep whole-empty/model/output checks, and
+propagate fatal resource errors. Strict decoding comparisons remain audit-only.
+Fresh source-pinned synthetic and label-blind real qualification will precede any
+new blend entry. These are concrete defects, not proof of the hidden failure cause.
