@@ -25,3 +25,22 @@ Outputs are `run-contract.json`, `training-report.json`, `best.pt` and `weak-pre
 Interpretation is limited to a matched training count. Frozen features are3planes×8slice tokens, whereas fresh images are6slots×4three-frame windows; preprocessing and representation differ. This is not a causal architecture comparison. The old2,000-trained head also selected on300 development rows and ran CUDA. Shared weak labels and repeated use of the200 development rows remain limitations; no sealed or clinical generalization claim is possible here.
 
 Initial checks: eight focused synthetic regressions pass, including a real two-epoch synthetic head fit, source/label/role/mask rejection, train-only statistics/prior invariance, protected-component crosslinks, unopened object-valued gold labels, exact prediction order, a per-batch stop and an actual timer interrupt during setup. A read-only real input check passes exact512/200 alignment and712×3×8×768 finite features with nonempty masks. No real model fit has run. Independent review passed. All174 ML tests pass with the existing pinned external source/receipt fixtures enabled; default dependency-free smoke, source compilation and diff checks pass. The full-suite log is `/tmp/matched-dino-tests.log` in this implementation session.
+
+
+## Actual result, October8 at13:59UTC
+
+Integrated source`ad609f3`; one CPU run completedPASS. Exact documented command used output`outputs/experiments/matched512-dino-20261008`; local session43200 ended with exit0. Log`outputs/research/2026-10-08/matched512-live.log`. Root focused8tests and default smoke passed before fitting; author full suite174/174 and independent review passed. No GPU or further fit was used.
+
+Runtime1.622seconds,27completed epochs/216successful updates, early stopping; selectedepoch15 by the fixed BCE rule. Stable recomputed BCE0.476427977433, all12target AUC0.827198608813; no undefined targets. Best checkpoint SHA`f785d8754f4b7087ef472abe23da403d445fd0fe4ee612462bea0390de633e6a`. Private evidence and actual environment/config/source/ordered-cohort fingerprints are in the output folder. CUDA/MPS were not exercised.
+
+Independent final verification checked source/input/contract/checkpoint/evidence hashes, exact ordered200IDs/groups/labels, checkpoint metadata, epoch selection, all target supports and metrics. [Aggregate paired verification](../../outputs/analysis/matched512-dino/paired-verification.json), [analysis script](../../outputs/analysis/matched512-dino/verify_compare.py), [summary](../../outputs/analysis/matched512-dino/summary.md).
+
+| Control minus comparator | BCE difference (95% report-group interval) | AUC difference (95% interval) |
+|---|---|---|
+| Fresh four-epoch reader |−0.01943[−0.04110,0.00468]|+0.02172[−0.00780,0.05606]|
+| Fresh12-epoch selected reader |−0.01194[−0.03350,0.01012]|+0.02323[−0.00351,0.05301]|
+| Old2,000-row frozen single head |+0.02883[0.01351,0.04176]|−0.03037[−0.04823,−0.01507]|
+
+Each bootstrap scheme used2,000valid draws,163report groups and zero invalids. Matching training count narrows the apparent fresh-versus-frozen gap; both fresh comparisons include zero. This is not proof of equivalence or architectural superiority. The old2,000-row comparison retains the300-row selection-cohort/CUDA confounds. No gold/sealed metrics, public submission or larger-data gate change follows from this result.
+
+Next low-cost diagnostic: a separately declared2,000-row frozen-head CPU control using this same200-row selection cohort and exact head recipe, bounded at300seconds. It is not implemented or fitted yet. This would improve the sample-size comparison before choosing an image-model data expansion versus representation change. Do not extend the completed512run or silently reuse its contract.

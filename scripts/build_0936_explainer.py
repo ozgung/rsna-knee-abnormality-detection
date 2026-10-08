@@ -483,9 +483,11 @@ The next experiments should earn additional compute through bounded comparisons:
    overfit. It failed the predeclared larger-data gate. More duration is not the next step.
    A CPU audit switched the weak teacher on the same known cells; it did not reverse the
    fresh-versus-frozen ranking. Historical source versions remain unverified, so that consensus
-   is only a candidate alternative, not reconstructed training truth. The next diagnostic is a
-   frozen-DINO head trained on the same 512 rows, removing the training-count imbalance with
-   our older 2,000-row baseline. This work did not produce the 0.936 submission.
+   is only a candidate alternative, not reconstructed training truth. A frozen-DINO head trained
+   on the same 512 rows reached weak-label AUC 0.827; its paired difference from the fresh reader
+   had a 95% interval crossing zero. Matching training count narrows the apparent gap. A matched
+   2,000-row CPU control with the same 200-row selection cohort is the next low-cost comparison
+   before choosing more data versus a different representation. This work did not produce 0.936.
 2. **Scale only after a validation gate passes.** The prospective gate uses the same BCE-selected
    checkpoint: weak-validation BCE ≤0.456285 and AUC ≥0.850340. These are spending heuristics,
    not clinical or leaderboard guarantees. A full metadata/header audit has already frozen 300
