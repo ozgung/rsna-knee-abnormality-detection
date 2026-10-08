@@ -477,11 +477,15 @@ Exceeding **0.950** remains a research target, not a promised outcome.
 
 The next experiments should earn additional compute through bounded comparisons:
 
-1. **Establish useful learning in our own reader.** A separate fresh four-epoch ConvNeXt pilot
-   improved throughout training but remained below our frozen-feature weak-validation baseline.
-   A reviewed twelve-epoch experiment keeps the same 512 training / 200 development studies,
-   inputs and labels, changing the training horizon and its cosine schedule. It has a measured
-   timing gate and a 90-minute application cap. It is not part of the 0.936 submission.
+1. **Diagnose supervision before spending more GPU time.** Our separate twelve-epoch ConvNeXt
+   experiment on the same 512 training / 200 development studies completed in 17.6 minutes.
+   Epoch 6 was selected by weak-validation BCE (0.4884), with weak-label AUC 0.804; later epochs
+   overfit. It failed the predeclared larger-data gate. More duration is not the next step.
+   A CPU audit switched the weak teacher on the same known cells; it did not reverse the
+   fresh-versus-frozen ranking. Historical source versions remain unverified, so that consensus
+   is only a candidate alternative, not reconstructed training truth. The next diagnostic is a
+   frozen-DINO head trained on the same 512 rows, removing the training-count imbalance with
+   our older 2,000-row baseline. This work did not produce the 0.936 submission.
 2. **Scale only after a validation gate passes.** The prospective gate uses the same BCE-selected
    checkpoint: weak-validation BCE ≤0.456285 and AUC ≥0.850340. These are spending heuristics,
    not clinical or leaderboard guarantees. A full metadata/header audit has already frozen 300
