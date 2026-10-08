@@ -155,3 +155,19 @@ These baselines used2,000trainingstudies versus512in the new pilot; this is a ma
 validation cohort, not a matched training budget. No gold labels or metrics used.
 Aggregate per-target evidence and hash checks are in
 `outputs/analysis/fresh-pilot-baselines/actual-200-baselines.json`.
+
+## CUDA trainability diagnostic launched
+
+`ozgung/knee-fresh-cuda-probe-20261008` v1 launched at **00:33 UTC**, source `bf2cbe5`.
+Private; only the CPU64 notebook output attached. Fresh generic ImageNet initialization,
+32 hash-selected cached training studies, at most64 successful updates /96 attempts,
+600-second whole-stage cap and900-second external cap. No validation/gold use, no
+checkpoint persistence or reuse. Initial/final unaugmented training loss is a numerical
+diagnostic, not evidence of generalization. Report includes actual encoder state SHA,
+AMP skips, finite gradients, timing and peak memory. Independent source review found
+no launch blocker; parent integrated suite **108/108 PASS**. Real CUDA results pending.
+
+Full CPU cache `ozgung/knee-fresh-cache-20261008` v1 remains running since00:21UTC,
+source`ca6ff83`, internal7200s/external7500s. Two log-stream requests returned transient
+server500 errors; both CLI status and browser active-events panel still report RUNNING.
+Both reference entries remain pending. At00:32UTC, Kaggle quota28.72GPUhours remained.

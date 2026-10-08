@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-08, 00:22 UTC** (Europe/Istanbul). Read this first, then [README](README.md) and [AGENTS](AGENTS.md).
+Updated **2026-10-08, 00:33 UTC** (Europe/Istanbul). Read this first, then [README](README.md) and [AGENTS](AGENTS.md).
 
 ## Current snapshot
 
@@ -17,7 +17,7 @@ Updated **2026-10-08, 00:22 UTC** (Europe/Istanbul). Read this first, then [READ
 | All original 01 tasks; SUBMIT-02 | Done | Preserve the trained baseline, four-head ensemble, parity evidence and scored versions. Stop head-seed sweeps. |
 | REF-02 | Scoring | Standalone ConvNeXt and fixed ConvNeXt/Raptor blend passed offline checks and were submitted. Await scores; preserve versions and inputs. |
 | TRAIN-02 cache | Running | Complete the 712-study CPU cache within the explicit 2-hour cap and unchanged 2 GiB limit. Require complete coverage and hash checks. |
-| TRAIN-02 CUDA diagnostic | Implementation | At most 32 already-cached training studies / 10 GPU minutes, fresh ImageNet, no validation or gold selection. Check finite learning, memory and throughput before larger fitting. |
+| TRAIN-02 CUDA diagnostic | Running | At most 32 already-cached training studies / 10 GPU minutes, fresh ImageNet, no validation or gold selection. Check finite learning, memory and throughput before larger fitting. |
 | TRAIN-02 fit | Gated | Complete cache -> measured CUDA throughput gate -> at most 4 epochs / 90 minutes on 512 train and 200 weak validation. Select only by weak BCE; compare the exact same validation cohort. |
 | TRAIN-03 | Conditional | Scale only if actual learning and held-out improvement justify it. Benchmark transfer/hardware before Colab expansion; reserve >=8 Kaggle GPU hours for qualification. |
 
@@ -25,12 +25,14 @@ Updated **2026-10-08, 00:22 UTC** (Europe/Istanbul). Read this first, then [READ
 
 | Job | State and reproducibility |
 | --- | --- |
-| Entry **56924358** | PENDING at 00:22 UTC. `ozgung/knee-public-reader-submission-20261008` v1, submitted October 7 at 23:50:09 UTC. Standalone public ConvNeXt three-fold reader; notebook COMPLETE and exact visible parity. |
-| Entry **56925712** | PENDING at 00:22 UTC. `ozgung/knee-reference-blend-submission-20261008` v1, submitted October 8 at 00:13:49 UTC. Fixed 50/50 percentile-rank blend; notebook COMPLETE, source `50f2803`, internal 28,000s / external 28,800s. Four daily entries remained after submission. |
+| Entry **56924358** | PENDING at 00:33 UTC. `ozgung/knee-public-reader-submission-20261008` v1, submitted October 7 at 23:50:09 UTC. Standalone public ConvNeXt three-fold reader; notebook COMPLETE and exact visible parity. |
+| Entry **56925712** | PENDING at 00:33 UTC. `ozgung/knee-reference-blend-submission-20261008` v1, submitted October 8 at 00:13:49 UTC. Fixed 50/50 percentile-rank blend; notebook COMPLETE, source `50f2803`, internal 28,000s / external 28,800s. Four daily entries remained after submission. |
 | Full CPU cache | `ozgung/knee-fresh-cache-20261008` v1 launched **00:21 UTC**, source `ca6ff83`. Command: `kaggle kernels push -p outputs/kaggle/fresh-cache --timeout 7500`. Effective internal cap 7,200s; reuses CPU64 arrays. Build-contract source SHA `bd1a5733a89d5650e698555a05cb0ffab5a5b1eb37235d410bc329832b192e31`. Expected `fresh_reader_cache/cache-complete.json`, `cache-revised-gate.json`, private plan/index/arrays; early failure `fresh-reader-failure.json`. |
 
+| CUDA32 diagnostic | `ozgung/knee-fresh-cuda-probe-20261008` v1 launched **00:33 UTC**, source `bf2cbe5`. Command: `kaggle kernels push -p outputs/kaggle/fresh-cuda-probe --timeout 900`. Internal whole-stage cap 600s, 32 hash-selected cached training studies, up to64 successful updates /96 attempts, no saved weights. Only private CPU64 output attached; internet solely for generic ImageNet initialization. Expected `fresh_reader_probe/probe-report.json`; early failure `fresh-reader-failure.json`. Build source SHA `eb8556b5a206e80a671d58b8d87a647d713ecc1c9ac37a5a0ed8f9cedfbfe589`. |
+
 - Poll notebook status with `kaggle kernels status OWNER/SLUG`; live progress with `kaggle kernels logs -f OWNER/SLUG`; retrieve selective outputs with `kaggle kernels output --file-pattern`. Scoring: `kaggle competitions submissions rsna-knee-abnormality-detection --format json`. Stop remote jobs through notebook running-job controls if necessary. No recurring automation exists.
-- Kaggle CLI authentication works. Last quota check October 7 at 23:36 UTC: GPU 28.91 hours, TPU 20 hours; refresh October 10 at 00:00 UTC. Colab UI: 351.8 units, no sessions; historical October 18 expiry is unverified. No Colab/local training active and no CUDA training launched yet.
+- Kaggle CLI authentication works. Quota checked October 8 around 00:32 UTC: GPU 28.72 hours, TPU 20 hours; refresh October 10 at 00:00 UTC. Colab UI: 351.8 units, no sessions; historical October 18 expiry is unverified. No Colab/local training active. The bounded CUDA diagnostic is the only training job launched so far.
 - Mac free disk was 31 GiB; local project artifacts approximately 550 MiB before two small QA arrays. Keep large caches remote. The full raw corpus is outside the local workflow.
 
 ## Completed campaign checks
@@ -52,7 +54,7 @@ Updated **2026-10-08, 00:22 UTC** (Europe/Istanbul). Read this first, then [READ
 
 ## Latest verification and next action
 
-- **103/103 full ML tests pass**, with audited sources/receipts enabled; dependency-free smoke PASS. Log: `outputs/research/2026-10-08/tests-cache-budget.log`. Real CUDA training/resume remain unverified.
+- **108/108 full ML tests pass**, with audited sources/receipts enabled; dependency-free smoke PASS. Log: `outputs/research/2026-10-08/tests-probe-integrated.log`. Real CUDA training/resume remain unverified.
 - Fixed two observed packaging issues: mixed Python-ABI codec selection and a nested SIGALRM cleanup race. The latter passed 1,000 nested expirations across subprocesses. Current data-plan-preserving budget override is `ca6ff83`.
-- One implementation active: the cheap CUDA diagnostic in the `model-provenance` agent worktree. Other managed worktrees: `score-strategy`, `reference-rehearsal`. Preserve their ignored evidence before archive. Earlier 47 outputs are preserved under `outputs/agent-archives/20261008/`.
-- Next: inspect full-cache startup and revised gate; integrate/run the CUDA diagnostic; then launch bounded fitting only after complete cache checks. Continue score checks at sensible intervals. Target >0.950 remains unmet.
+- No implementation currently active; the CUDA diagnostic was integrated and independently reviewed. Managed worktrees: `model-provenance`, `score-strategy`, `reference-rehearsal`. Preserve their ignored evidence before archive. Earlier 47 outputs are preserved under `outputs/agent-archives/20261008/`.
+- Next: inspect the CUDA diagnostic and full-cache result/revised gate; launch bounded fitting only after complete cache checks. Full-cache log streaming returned two transient500 errors, while API/UI report RUNNING; do not infer completion or failure from missing logs. Continue score checks at sensible intervals. Target >0.950 remains unmet.
