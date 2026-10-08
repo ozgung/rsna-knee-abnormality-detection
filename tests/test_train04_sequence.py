@@ -8,6 +8,13 @@ seq=importlib.util.module_from_spec(spec);spec.loader.exec_module(seq)
 
 
 class SequenceTests(unittest.TestCase):
+    def test_completed_fit_above_old_cap_is_accepted(self):
+        report={'status':'PASS','completed_epochs':12,'elapsed_seconds':20000}
+        seq.require_training_complete(report)
+        for changes in ({'status':'PLATFORM_SESSION_STOP'},{'completed_epochs':11},
+                        {'elapsed_seconds':float('nan')},{'elapsed_seconds':0}):
+            with self.assertRaises(ValueError):seq.require_training_complete(report|changes)
+
     def test_status_and_quota_are_explicit(self):
         self.assertEqual(seq.kernel_state('has status "KernelWorkerStatus.COMPLETE"'),'COMPLETE')
         self.assertEqual(seq.gpu_remaining([{'resource':'GPU','remaining':'27.77h'}]),27.77)

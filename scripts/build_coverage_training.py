@@ -73,7 +73,8 @@ def build(sources,destination,slug,cache_receipts,*,cache_kernel,reference_resul
     contract={'revision':revision,'cache_kernel':cache_kernel,'cache_pins':pins,'reference_kernel':reference_kernel,
               'reference_pins':reference_pins,'reference_contract':reference_contract,
               'config':CONFIG,'sources':{n:hashlib.sha256(s.encode()).hexdigest() for n,s in own.items()},
-              'builder_sha256':file_sha256(__file__),'external':SOURCE_HASHES,'setup_seconds':300,'fit_seconds':10200}
+              'builder_sha256':file_sha256(__file__),'external':SOURCE_HASHES,
+              'notebook_seconds':CONFIG['seconds'],'time_policy':'platform_limit_only'}
     digest=hashlib.sha256(json.dumps(contract,sort_keys=True).encode()).hexdigest()
     license_text=(ROOT/'docs/licenses/fresh_reader_Apache-2.0.txt').read_text()
     entry=f'''import os,sys,time,json,hashlib
@@ -98,22 +99,21 @@ from knee.fresh_reader_setup import notebook_root,dataset_root,time_limit
 from knee.validation import file_sha256
 from knee.fresh_reader import write_json
 try:
-    with time_limit(10500,'entire TRAIN04 notebook'):
-        with time_limit(300,'TRAIN04 setup'):
-            inputs=Path('/kaggle/input')
-            cache=notebook_root(inputs,{cache_kernel!r},'coverage_cache',list(CONTRACT['cache_pins']))
-            for name,digest in CONTRACT['cache_pins'].items():
-                if file_sha256(cache/name)!=digest:raise ValueError('Cache attachment receipt changed')
-            initial=None;label_paths=None
-            if CONTRACT['reference_kernel']:
-                ref=notebook_root(inputs,CONTRACT['reference_kernel'],'coverage_training',list(CONTRACT['reference_pins']))
-                for name,digest in CONTRACT['reference_pins'].items():
-                    if file_sha256(ref/name)!=digest:raise ValueError('Reference artifact changed')
-                initial=ref/'initial.pt'
-                refs={{'steven':'stevenleehans/rsna-knee-llm-report-labels','pilkwang':'pilkwang/rsna-knee-llm-labels','lixin':'lixin73/rsna-knee-llm-report-labels-sol56','qwen':'laymond/rsna-knee-abnormality-qwen3-8b-weak-labels'}}
-                label_paths={{k:dataset_root(inputs,refs[k],[filename])/filename for k,(filename,digest) in LABEL_SOURCES.items()}}
-        with time_limit(10200,'TRAIN04 bounded execution'):
-            result=train(cache,sources,'/kaggle/working/coverage_training',source_paths=label_paths,initial=initial,reference_contract=CONTRACT['reference_contract'])
+    with time_limit(CONTRACT['notebook_seconds']-(time.monotonic()-STARTED),'Kaggle GPU session'):
+        inputs=Path('/kaggle/input')
+        cache=notebook_root(inputs,{cache_kernel!r},'coverage_cache',list(CONTRACT['cache_pins']))
+        for name,digest in CONTRACT['cache_pins'].items():
+            if file_sha256(cache/name)!=digest:raise ValueError('Cache attachment receipt changed')
+        initial=None;label_paths=None
+        if CONTRACT['reference_kernel']:
+            ref=notebook_root(inputs,CONTRACT['reference_kernel'],'coverage_training',list(CONTRACT['reference_pins']))
+            for name,digest in CONTRACT['reference_pins'].items():
+                if file_sha256(ref/name)!=digest:raise ValueError('Reference artifact changed')
+            initial=ref/'initial.pt'
+            refs={{'steven':'stevenleehans/rsna-knee-llm-report-labels','pilkwang':'pilkwang/rsna-knee-llm-labels','lixin':'lixin73/rsna-knee-llm-report-labels-sol56','qwen':'laymond/rsna-knee-abnormality-qwen3-8b-weak-labels'}}
+            label_paths={{k:dataset_root(inputs,refs[k],[filename])/filename for k,(filename,digest) in LABEL_SOURCES.items()}}
+        result=train(cache,sources,'/kaggle/working/coverage_training',source_paths=label_paths,initial=initial,
+                     reference_contract=CONTRACT['reference_contract'],session_deadline=STARTED+CONTRACT['notebook_seconds'])
         print(json.dumps({{'status':result,'elapsed_seconds':time.monotonic()-STARTED}}),flush=True)
 except BaseException as exc:
     write_json('/kaggle/working/train04-failure.json',{{'failure_type':type(exc).__name__,'elapsed_seconds':time.monotonic()-STARTED,'contract':CONTRACT}})

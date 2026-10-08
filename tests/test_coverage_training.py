@@ -14,11 +14,22 @@ except ImportError:
     np=torch=None
 
 
-class BudgetTests(unittest.TestCase):
-    def test_all_twelve_epochs_must_fit(self):
+class TimingTests(unittest.TestCase):
+    def test_resume_accepts_failed_informational_eta(self):
+        contract={'fingerprint':'same'}
+        state={'contract':contract,'epoch':5,'elapsed_seconds':43000,'gate':{'passed':False}}
+        ct.validate_resume_state(state,contract,43100)
+        with self.assertRaises(ValueError):ct.validate_resume_state(state,{'fingerprint':'changed'},43100)
+        with self.assertRaises(ValueError):ct.validate_resume_state(state|{'epoch':12},contract,43100)
+
+    def test_projection_is_informational_and_uses_session_limit(self):
         self.assertTrue(ct.timing_projection(.2,.1,100)['passed'])
-        self.assertFalse(ct.timing_projection(1.,.1,100)['passed'])
-        self.assertFalse(ct.timing_projection(.2,.1,10000)['passed'])
+        # Full-cohort timing that triggered the old artificial cap now fits.
+        self.assertTrue(ct.timing_projection(.6592,.2607,232)['passed'])
+        slow=ct.timing_projection(10.,.1,100)
+        self.assertFalse(slow['passed'])
+        self.assertEqual(slow['enforcement'],'informational_only')
+        self.assertEqual(ct.timing_projection(.2,.1,100,remaining_seconds=123)['remaining_seconds'],123)
         with self.assertRaises(ValueError):ct.timing_projection(float('nan'),.1,100)
 
     def test_pair_rejects_sampler_or_environment_drift(self):

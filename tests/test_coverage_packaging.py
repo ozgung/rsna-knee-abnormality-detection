@@ -40,7 +40,9 @@ class PackagingTests(unittest.TestCase):
             m=json.loads((root/'good/kernel-metadata.json').read_text());nb=json.loads((root/'good/notebook.ipynb').read_text())
             self.assertTrue(m['is_private']);self.assertTrue(m['enable_gpu']);self.assertFalse(m['competition_sources'])
             self.assertFalse(m['dataset_sources']);self.assertFalse(m['model_sources'])
-            self.assertEqual(c['fit_seconds'],10200);self.assertEqual(c['setup_seconds'],300)
+            self.assertEqual(c['notebook_seconds'],43200)
+            self.assertEqual(c['time_policy'],'platform_limit_only')
+            self.assertNotIn('fit_seconds',c);self.assertNotIn('setup_seconds',c)
             for cell in nb['cells']:
                 if cell['cell_type']=='code':compile(''.join(cell['source']),'bundle','exec')
             r['stage']='pilot';(receipts/'cache-report.json').write_text(json.dumps(r))

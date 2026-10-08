@@ -18,7 +18,10 @@ from knee.validation import file_sha256, evaluate_predictions
 CONFIG = dict(seed=42, backbone='convnext_tiny.fb_in22k_ft_in1k', image_size=256,
               train_windows=8, eval_windows=12, batch_size=2, epochs=12,
               lr_encoder=1e-4, lr_head=5e-4, weight_decay=.02, ema=.998,
-              seconds=10200, host_cache_bytes=256*1024**2)
+              seconds=12*3600, host_cache_bytes=256*1024**2)
+# Kaggle's GPU session limit, not an experiment spending budget. Timing estimates
+# are informational; reserve two minutes only to save state before termination.
+CHECKPOINT_SECONDS = 120
 INITIAL_ENCODER_SHA256='355cb8e236d6793f7ec440278ad14a59a5484663a99f9ed54d8b6ea105b8bf66'
 LABEL_SOURCES = {
  'steven': ('llm_labels_v4_blend.csv','eb4c2b29e7e84adbb4b5ccee825ca20ade6a43dbe295f13be442d549e4f5dca4'),
@@ -79,15 +82,22 @@ def weighted_terms(logits, targets, weights):
     return (torch.nn.functional.binary_cross_entropy_with_logits(logits.float(),targets.float(),reduction='none')*weights).sum(0),weights.sum(0)
 
 
-def timing_projection(train_batch, eval_batch, elapsed, *, diagnostic_batch=None, train_count=2000, dev_count=200, diagnostic_count=64):
+def timing_projection(train_batch, eval_batch, elapsed, *, diagnostic_batch=None, train_count=2000, dev_count=200, diagnostic_count=64, remaining_seconds=None):
     diagnostic_batch=eval_batch if diagnostic_batch is None else diagnostic_batch
     if any(not math.isfinite(x) or x<=0 for x in (train_batch,eval_batch,diagnostic_batch)) or not math.isfinite(elapsed) or elapsed<0:
         raise ValueError('Invalid throughput measurements')
     per_epoch=1.5*(math.ceil(train_count/2)*train_batch+math.ceil(dev_count/2)*eval_batch+math.ceil(diagnostic_count/2)*diagnostic_batch)
-    remaining=CONFIG['seconds']-elapsed-180
+    remaining=CONFIG['seconds']-elapsed-CHECKPOINT_SECONDS if remaining_seconds is None else remaining_seconds
     return dict(passed=CONFIG['epochs']*per_epoch<=remaining,epochs=CONFIG['epochs'],
+                enforcement='informational_only',
                 estimated_epoch_seconds_with_margin=per_epoch,remaining_seconds=remaining,
                 train_batch_seconds=train_batch,eval_batch_seconds=eval_batch,diagnostic_batch_seconds=diagnostic_batch,margin=1.5)
+
+
+def validate_resume_state(state, contract, elapsed_before):
+    if state['contract']!=contract or state['epoch']>=CONFIG['epochs'] or state['elapsed_seconds']>elapsed_before:
+        raise ValueError('Resume state/horizon differs')
+    # The previous session's ETA is evidence, never permission to resume.
 
 
 class VolumeCache:
@@ -120,10 +130,14 @@ def require_pair_invariants(current,reference,*,environment=True):
         raise ValueError('Controlled target comparison changed a non-label invariant')
 
 
-def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,reference_contract=None):
+def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,reference_contract=None,session_deadline=None):
     import numpy as np
     import torch
     started=time.monotonic();elapsed_before=0.
+    session_deadline=started+CONFIG['seconds'] if session_deadline is None else session_deadline
+    if not math.isfinite(session_deadline) or session_deadline<=started:
+        raise ValueError('Invalid platform session deadline')
+    def session_remaining():return session_deadline-time.monotonic()-CHECKPOINT_SECONDS
     cache,out=Path(cache),Path(out)
     if not torch.cuda.is_available():raise RuntimeError('TRAIN04 requires CUDA; no fallback')
     plan=json.loads((cache/'plan-private.json').read_text());validate_plan(plan)
@@ -154,21 +168,20 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
         previous=json.loads((Path(resume).parent/'training-report.json').read_text())
         if previous['contract']!=contract:raise ValueError('Resume contract changed')
         elapsed_before=previous['elapsed_seconds']
-        if not math.isfinite(elapsed_before) or not 0<=elapsed_before<CONFIG['seconds']-180:
-            raise ValueError('Resume budget exhausted')
+        if not math.isfinite(elapsed_before) or elapsed_before<0:
+            raise ValueError('Invalid resume elapsed time')
         # Only our private full-state checkpoint is loaded; never public pickle weights.
         state=torch.load(resume,map_location='cpu',weights_only=False)
-        if state['contract']!=contract or state['epoch']>=CONFIG['epochs'] or state['elapsed_seconds']>elapsed_before:
-            raise ValueError('Resume state/horizon differs')
+        validate_resume_state(state,contract,elapsed_before)
     def elapsed():return elapsed_before+time.monotonic()-started
-    def deadline(reserve=120):
-        if elapsed()>CONFIG['seconds']-reserve:raise TimeoutError('TRAIN04 budget exhausted')
+    def deadline():
+        if session_remaining()<=0:raise TimeoutError('Kaggle session ending; save checkpoint')
     rows=plan['records'];tr=[i for i,r in enumerate(rows) if r['split']=='train'];va=[i for i,r in enumerate(rows) if r['split']=='weak_validation']
     if (len(tr),len(va))!=(2000,200):raise ValueError('Training cohort differs')
     diagnostic=training_diagnostic_indices(rows)
     index=json.loads((cache/'index-private.json').read_text())
     progress('train04_cache_verify_begin',studies=len(rows))
-    with time_limit(CONFIG['seconds']-elapsed()-180,'TRAIN04 preparation'):
+    with time_limit(session_remaining(),'Kaggle session: preparation'):
         verify_index(cache,plan,index,complete=True)
     progress('train04_cache_verify_complete',seconds=elapsed())
     random.seed(42);np.random.seed(42);torch.manual_seed(42)
@@ -178,7 +191,7 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
     prior=np.clip((labels[tr]*weights[tr]).sum(0)/weights[tr].sum(0),1e-4,1-1e-4)
     original_prior=np.clip((original[tr]*weights[tr]).sum(0)/weights[tr].sum(0),1e-4,1-1e-4)
     if not np.isfinite(prior).all() or np.any(weights[tr].sum(0)<=0):raise ValueError('Training support missing')
-    with time_limit(min(300,CONFIG['seconds']-elapsed()-180),'TRAIN04 generic initialization'):
+    with time_limit(session_remaining(),'Kaggle session: initialization'):
         code=load_source(sources,'knee')
         model=code.KneeNet(CONFIG['backbone'],pretrained=initial is None and state is None,img_size=256)
         if initial:
@@ -223,7 +236,6 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
     best_checkpoint_sha=state['best_checkpoint_sha256'] if state else None
     best_evidence_sha=state['best_evidence_sha256'] if state else None
     if state:
-        if not state['gate']['passed']:raise ValueError('Resume has failed throughput gate')
         model.load_state_dict(state['model']);ema.load_state_dict(state['ema']);optimizer.load_state_dict(state['optimizer'])
         scaler.load_state_dict(state['scaler']);scheduler.load_state_dict(state['scheduler']);restore_rng(state['rng'])
         gate=state['gate'];shutil_best=Path(resume).parent/'best.pt'
@@ -254,11 +266,12 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
             tick=time.monotonic();evaluate(ema,diagnostic[:16],require_all=False);torch.cuda.synchronize();diagnostic_seconds=(time.monotonic()-tick)/8
         finally:
             optimizer.zero_grad(set_to_none=True);restore_rng(saved_rng)
-        gate=timing_projection(train_seconds,eval_seconds,elapsed(),diagnostic_batch=diagnostic_seconds)
+        gate=timing_projection(train_seconds,eval_seconds,elapsed(),diagnostic_batch=diagnostic_seconds,
+                               remaining_seconds=session_remaining())
         gate.update(validation_warmup_seconds=eval_warmup_seconds,diagnostic_warmup_seconds=diagnostic_warmup_seconds,
                     eval_warmup_batches=8,eval_timed_batches=8,diagnostic_warmup_batches=8,diagnostic_timed_batches=8)
         write_json(out/'gpu-gate.json',gate);progress('train04_gpu_gate',**gate)
-        if not gate['passed']:raise RuntimeError('Twelve-epoch throughput gate failed; no shortened run')
+        # Keep measured ETA in receipts; it must not veto the authorized fit.
     run={'contract':contract,'environment':environment(),'initial_encoder_sha256':init_hash,
          'initial_model_sha256':file_sha256(out/'initial.pt') if (out/'initial.pt').exists() else None,
          'pretrained_cfg':model.enc.pretrained_cfg,'training_prior':prior.tolist(),
@@ -279,7 +292,7 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
           best_checkpoint_sha256=best_checkpoint_sha,best_evidence_sha256=best_evidence_sha,
           overflow_total=overflow_total,consecutive=consecutive,elapsed_seconds=elapsed()))
     try:
-        with time_limit(CONFIG['seconds']-elapsed()-120,'TRAIN04 fit'):
+        with time_limit(session_remaining(),'Kaggle session: fit'):
             while epoch<12:
                 if order is None:order=np.random.permutation(tr).tolist()
                 model.train();progress('train04_epoch_begin',epoch=epoch+1)
@@ -314,7 +327,7 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
                 progress('train04_epoch_complete',epoch=epoch,weak_bce=metrics['weak_bce'],seconds=elapsed())
             status='PASS'
     except TimeoutError:
-        status='BUDGET_STOP';save_last()
+        status='PLATFORM_SESSION_STOP';save_last()
     except BaseException:
         status='FAIL';save_last();raise
     finally:

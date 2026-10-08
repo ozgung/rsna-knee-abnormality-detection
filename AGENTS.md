@@ -40,7 +40,7 @@ This is an offline-first Python scaffold for study-level knee MRI abnormality pr
 - Store large/generated artifacts in ignored `outputs/`, `data/`, or `checkpoints/`. Add a concise, non-sensitive experiment summary under `docs/experiments/` when the first real experiment exists; link it from `STATUS.md`.
 - Use the initial 2 GiB local cache budget in `configs/local.toml`; inspect free disk before expansion. Full-corpus downloads are outside the local starter workflow.
 - Start with bounded CPU/MPS checks locally; use CUDA/Kaggle for scale when authorized. Explicit unavailable devices should fail clearly. Do not silently enable CPU fallback or assume MPS/CUDA equivalence.
-- Use an agreed budget for long or paid runs. Do not provision paid compute, accept competition terms, or submit entries without user authorization.
+- The user has removed self-imposed experiment time budgets. Record runtime estimates and resource use, but do not abort authorized training because an estimate exceeds an assistant-chosen cap or GPU-hour reserve. Respect actual platform/account limits and explicit user constraints; checkpoint before platform termination. Do not provision paid compute, accept competition terms, or submit entries without user authorization.
 - Before submission, rehearse image-only inference offline with attached code/dependencies/weights; measure time, memory, and disk against verified limits.
 
 ## Checks and definition of done
