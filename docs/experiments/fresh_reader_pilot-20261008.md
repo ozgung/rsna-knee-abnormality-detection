@@ -123,3 +123,20 @@ Each completed epoch reports successful optimizer steps, AMP overflow skips, sta
 Training and probe notebooks attach only the needed private cache/resume outputs and skip competition-root resolution. Source compilation and focused synthetic checks cover evidence ordering/tampering, missing-sidecar resume, diagnostic cohort/trace preservation, and cache-only training attachments. These checks do not establish CUDA resume correctness or a held-out improvement; parent owns the gated launch.
 
 Evidence update verification:32/32 focused fresh-reader tests pass, including eight new evidence tests; full ML suite116/116 passes with audited source snapshots/receipts enabled. Dependency-free suite62 passes/54 optional skips; smoke and diff checks pass. A fresh training notebook built from the real audited source compiles (145,741bytes) with one private cache attachment and no competition/model/dataset attachments. Independent review reran the focused checks and found no launch blocker. No remote run was launched for this implementation.
+
+## Full cache and fresh fit launch, 01:45 UTC
+
+Full CPU cache v1 completed:712studies, zero failures,1,346,975,371bytes and
+3715.8619seconds. The648new studies used3407.5884decode seconds; the64pilot
+arrays were rehashed and reused. Combined selected-series count3442, missing
+slots830. The plan remains512train/200weak validation with the exact reviewed
+fingerprint. Local receipt check compared the complete index, original64 entries,
+plan equality, revised gate, storage and time limits; PASS. Remote fitting rehashes
+all712 arrays before any updates. No complete image cache was downloaded locally.
+
+Launched `ozgung/knee-fresh-train-20261008` v1 at01:44UTC from reviewed source
+`fa8082d`, buildSHA`5cc8fbbb4210f3d47a750888893945c9e30adae71bca560ae3c0d65394135620`.
+Internal5400s, external5700s. At most4epochs after measured throughput gate, same
+512/200 plan and prospective comparison thresholds; no gold evaluation.
+Small receipts: `outputs/kaggle/fresh-cache-result/fresh_reader_cache/`; aggregate
+local check: `outputs/analysis/fresh-pilot-baselines/full-cache-gate.json`.

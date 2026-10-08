@@ -190,7 +190,10 @@ Declared at00:46UTC before observing the fresh model's validation results. The e
 512-training-row prevalence baseline is weak BCE **0.59717834** on the fixed200 rows.
 The stronger frozen baseline used2,000 training rows: BCE **0.44628505**, weak AUC
 **0.86033998**. The following thresholds govern spending, not statistical significance
-or expected public score. Epoch selection remains exclusively weak BCE.
+or expected public score. Apply both metrics to the same BCE-selected EMA checkpoint,
+after confirming four completed epochs and actual successful updates. Epoch selection
+remains exclusively weak BCE; an improving EMA curve can reflect delayed averaging
+and does not alone prove underfitting.
 
 - Near-reference performance from512 rows (selected-best BCE≤0.456285 and all-target
   weak AUC≥0.850340) supports one larger-data pilot with the recipe otherwise fixed.
@@ -198,7 +201,9 @@ or expected public score. Epoch selection remains exclusively weak BCE.
   epoch2-to4 BCE gain≥0.01, and improving fixed-training diagnostic) supports one
   newly declared12-epoch experiment on the same512/200 split, capped at90 minutes
   after throughput measurement. The completed four-epoch cosine schedule must not
-  be silently extended or reset through resume.
+  be silently extended or reset through resume. Use a fresh identical generic encoder
+initialization, optimizer and EMA, with a distinct reviewed training contract bound
+to the existing immutable cache fingerprint; do not rewrite its embedded four-epoch plan.
 - Numerical failure, failure to beat prevalence, or falling training loss with
   flat/worsening validation calls for diagnosis before scale. Four epochs alone
   cannot establish that the architecture is unsuitable.
@@ -206,8 +211,12 @@ or expected public score. Epoch selection remains exclusively weak BCE.
 Compare selected predictions with both frozen baselines using aligned study groups,
 paired uncertainty and per-target support. This is a reused development cohort with
 report-derived labels, not an independent clinical test. Before larger-data training,
-reserve approximately300 eligible previously unused groups outside the entire original
-2,000/300 cohort as a sealed weak proxy. No candidate evaluation on that proxy until
+reserve approximately300 previously unused **studies in whole report/patient components**
+outside the entire original2,000/300 cohort as a sealed weak proxy. Exclude transitive
+components touching gold58, known or newly discovered gold relatives, or any original
+cohort member. Audit identities against the entire original cohort before freezing
+the salt-selected manifest. Preserve the original300 development assignment; shrinking
+the development limit must never move its remaining100 rows into training. No candidate evaluation on that proxy until
 the modeling choices are fixed. Larger remote caches need a measured allowance beyond
 2GiB; the local2GiB limit and at least8Kaggle GPU hours reserved for qualification stay.
 
