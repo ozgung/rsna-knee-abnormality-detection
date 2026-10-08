@@ -165,7 +165,19 @@ Private; only the CPU64 notebook output attached. Fresh generic ImageNet initial
 checkpoint persistence or reuse. Initial/final unaugmented training loss is a numerical
 diagnostic, not evidence of generalization. Report includes actual encoder state SHA,
 AMP skips, finite gradients, timing and peak memory. Independent source review found
-no launch blocker; parent integrated suite **108/108 PASS**. Real CUDA results pending.
+no launch blocker; parent integrated suite **108/108 PASS**.
+
+The saved receipt confirms **PASS** in98.21seconds:65attempts,64successful updates,
+one AMP overflow safely skipped. Same32training-row macroBCE fell from0.73460954
+to0.46728107, and sampled encoder/head parameters both changed. Peak allocated CUDA
+memory3,405,646,848bytes; reserved4,473,225,216bytes. Actual worker had two TeslaT4s;
+device0 was used. Python3.12.13, torch2.10.0+cu128, timm1.0.26. The initial generic
+ImageNet encoder SHA is`b1d4d0986c66bb1d02eddf7bf4bceea7fde12aced5def666c28d3b89951b569e`.
+Initial cold evaluation took31.03s versus1.75s warm; later optimizer steps were
+approximately0.24s, so these short warm-cache timings do not replace the full-run
+throughput gate. Receipt and full log:
+`outputs/kaggle/fresh-cuda-probe-result/fresh_reader_probe/probe-report.json`.
+This establishes trainability only, with no saved diagnostic weights or held-out result.
 
 Full CPU cache `ozgung/knee-fresh-cache-20261008` v1 remains running since00:21UTC,
 source`ca6ff83`, internal7200s/external7500s. Two log-stream requests returned transient
