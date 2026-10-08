@@ -23,6 +23,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 ASSETS = OUT / 'figures'
 ASSETS.mkdir(exist_ok=True)
 SOURCE = ROOT / 'outputs/kaggle/reference-blend-submission-v2/notebook.ipynb'
+assert hashlib.sha256(SOURCE.read_bytes()).hexdigest() == 'fe8c186965f9e9171b61cec7b5c583ac311be7791466561dbee3b0160dead6fe', 'Scored source notebook changed'
 original = json.loads(SOURCE.read_text())
 score_receipt = json.loads((ROOT / 'outputs/research/2026-10-08/blend-v2-scored-1257.json').read_text())
 entry = next(x for x in score_receipt['submissions'] if x['ref'] == 56929332)
@@ -506,6 +507,7 @@ nb['metadata']['description']='Illustrated private research notebook; exact scor
 original_code=''.join(''.join(c['source']) for c in original['cells'] if c['cell_type']=='code')
 new_code=''.join(''.join(c['source']) for c in cells if c['cell_type']=='code')
 assert original_code==new_code
+assert hashlib.sha256(new_code.encode()).hexdigest() == 'e79746f4ee1d8f296c2cae8c0adc38f1a6130c7434ec9faa0b3f5ad6e718e095', 'Scored executable changed'
 compile(new_code,'<preserved-scored-v2>','exec')
 path=OUT/'rsna-knee-0936-explained.ipynb'
 path.write_text(json.dumps(nb,ensure_ascii=False,indent=1)+'\n')
