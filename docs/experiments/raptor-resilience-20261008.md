@@ -88,3 +88,20 @@ or real-image decoding was performed during this implementation task.
 Independent review passed six Raptor and 23 reference/blend checks. It reproduced
 fatal geometry errors and injected MemoryError/TimeoutError at the actual compiled
 append line; both propagated with reader globals restored. No blocker remained.
+
+## Parent integration and launch, 02:03UTC
+
+Integrated as`2d8bf13`. Parent reran142/142ML checks with pinned source/receipt
+fixtures enabled; dependency-free smoke and diff checks PASS. Independent reviewer
+reran29focused checks, including actual compiled append-line and geometry fatal
+injections. Local OpenCV fixtures are synthetic; real decoding/CUDA remain pending.
+
+Launched `ozgung/knee-raptor-production-rehearsal-v2-20261008` v1 at02:01:51UTC:
+64label-blind train+3visible,16synthetic cases,1800s hardtimer including setup and
+2100s external cap. BundleSHA
+`51156b9db4f5f83cf6cdf4d9bb38c7ddcafb7792c32ab2bc8f893002247764af`; contractSHA
+`f9ddd61622d466c35c2e27a0da9bf450eeed9fae6f8565a1f8deb1d269707e11`.
+Original publicsourceSHA and checkpointSHA remain fixed; exception-only transformed
+sourceSHA`c5138d998ca1a80d732cfc169d346b19129afafb9bddb5a94d01837127fe2ebc`.
+No corrected blend entry yet: require this actual report, visible prediction parity
+and new common-environment blend qualification.

@@ -90,3 +90,29 @@ Source-only snapshots and a SHA256 manifest are under ignored `outputs/research/
 The reviewed 0.949 checkpoint identity is `7e5315dad125b99fc65b340b3de41de628e9be51ff5835355dd61c86472244ef`; no bytes of that checkpoint were downloaded here. Its [published weights dataset](https://www.kaggle.com/datasets/nartaa/rsna-knee-publication-swa-weights-20261007) is evidence of distribution, not a resolution of the OAI eligibility question.
 
 Acceptance for this review: primary code inspected, limitations distinguished from measured defects, a ranked bounded plan with honest validation available to the parent, Markdown content/link checks and `git diff --check`. No training or inference accuracy claim is made by this document. The parent owns implementation, eligibility decisions and STATUS integration.
+
+## Additional public scan, October8 01:55UTC
+
+A bounded scan of100 score-sorted and100 recently run competition notebooks,
+six source notebooks, four model cards and three discussions did not establish a
+stronger reproducible non-OAI checkpoint. API notebook lists expose no numeric
+score, so list ordering is not leaderboard-score evidence. Raptor student and PJ D4
+extra student inputs were inaccessible in this audit; several other notebooks reuse
+known/OAI arms. No new weights or images were downloaded and no extra job was allocated.
+Evidence and hashes: `outputs/research/2026-10-08/complement-scan/audit-summary.json`.
+
+[CoolinLai claims0.954 with fivefold ResNet50 at224px](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/735304#3529410);
+[Tanuki claims0.955 with fivefold single-model CV](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/735304#3533599).
+Neither comment supplies a reproducible recipe, weights or training-data provenance.
+These are author claims, not verified notebook results or proof of non-OAI training.
+They support testing training/data coverage before increasing backbone size, without
+supporting a forecast for our own score.
+
+After the current Tiny pilot's predeclared spending gates, the next complementary
+hypothesis is fresh generic DINOv2-Small, adapting its last six blocks and final norm
+on the same six-slot cache/head/split. It needs a CUDA diagnostic and a declared
+<=90minute run contract. The user has authorized such experiments, but none has
+started; progression remains gated by actual pilot results. A future
+comparison would predeclare one equal probability blend with our own ConvNeXt and
+require useful held-out improvement rather than low correlation alone. Avoid public
+knee teachers in independent holdout claims because they may have seen those studies.
