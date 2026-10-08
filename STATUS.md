@@ -1,12 +1,12 @@
 # Project status and session handoff
 
-Updated **2026-10-08, 02:22 UTC** (Europe/Istanbul). Read this first, then [README](README.md) and [AGENTS](AGENTS.md).
+Updated **2026-10-08, 02:38 UTC** (Europe/Istanbul). Read this first, then [README](README.md) and [AGENTS](AGENTS.md).
 
 ## Current snapshot
 
 - Target: public macro AUC **strictly above 0.950**. Not achieved. Best actually scored entry remains **0.757**. Two corrected stronger entries are scoring; their original versions failed hidden reruns with generic exceptions and no traceback.
 - User authorizes autonomous research, subagents, long/concurrent local/Kaggle/Colab training and promising submissions. Use small pilots and measured budgets first; existing credits only, no purchases or questions for this run.
-- Branch `codex/first-submission`; local Git only, no remote. Original 01 tasks and second baseline submission are complete. No implementation task is currently active.
+- Branch `codex/first-submission`; local Git only, no remote. Original 01 tasks and second baseline submission are complete. Sole active implementation: aggregate progress logging for future training runs; current saved fit and submitted notebooks remain immutable.
 - Competition: 4,407 training studies, 24,371 series, 58 fully labeled studies, 12 targets. Four nongold report duplicates of gold excluded. Private/generated data and weights remain ignored. No full raw-corpus download.
 - Official rules checked October 8: five entries/day; entry/merge deadline October 15 and final October 22 at 23:59 UTC; offline inference <=9 hours, hidden test approximately 1,300 studies. Recheck before later calendar planning. **Two entries remain today** after the 02:18 submission.
 - Main records: [current campaign](docs/experiments/20261008-audited-readers.md), [fresh pilot](docs/experiments/fresh_reader_pilot-20261008.md), [strategy](docs/experiments/score-strategy-20261008.md), [provenance](docs/experiments/provenance-audit-20261008.md), [original baseline](docs/experiments/20261008-first-baseline.md).
@@ -17,6 +17,7 @@ Updated **2026-10-08, 02:22 UTC** (Europe/Istanbul). Read this first, then [READ
 | --- | --- | --- |
 | REF-02 | Audit and corrected submissions complete; scoring pending | Check both entry scores **and error_description**. Blank COMPLETE can mean failed hidden rerun. Do not change submitted version 2 notebooks/inputs while pending. |
 | TRAIN-02 fit | Running; no metrics available yet | Retrieve the selected checkpoint/evidence and complete report. Verify actual four epochs, successful updates, initial encoder hash, split and finite metrics; run paired comparison. No larger training before this result. |
+| TRAIN-02 observability | In implementation/review | Add flushed aggregate cache/gate/step/checkpoint timing for future runs, with no recipe, RNG, tensor, checkpoint payload or prediction changes. V1 resumes must retain the original runner bytes. |
 | TRAIN-03 | Conditional | Follow the prospective spending gates below. Diagnose before expansion on weak/numerically failed learning. Reserve a sealed cohort before larger-data fitting. |
 | Cleanup | Deferred while worktrees remain useful | Preserve each worktree's ignored evidence before archive. Existing archives are under `outputs/agent-archives/20261008/`. |
 
@@ -28,7 +29,7 @@ Updated **2026-10-08, 02:22 UTC** (Europe/Istanbul). Read this first, then [READ
 | **Standalone entry 56927932** | PENDING/scoring, submitted **01:37:10 UTC**. `ozgung/knee-public-reader-submission-20261008` v2, source `f28dfd2`. Final visible run PASS 48.12s; CSV SHA `e2598d9ab64915e6fecc85b53dc1864921f27c17cb30297ed92a04c12e1091e4`. Receipts: `outputs/kaggle/public-reader-submission-v2-result/`. |
 | **Fixed-blend entry 56929332** | PENDING, submitted **02:18:01 UTC**. `ozgung/knee-reference-blend-submission-20261008` v2, source `962ab80`. Final visible run PASS 61.77s, peak CUDA 8.181GB; CSV SHA `2aa5bde70b03e720b21435b9137d9b7560ff4256c4b6ae7059e12538f1fb9d25`. Qualification SHA `1dee9b7992a4e0e0af350c62cbef29a4f8b4615eb310ccb326872eda363360ca`. Receipts: `outputs/kaggle/reference-blend-submission-v2-result/`. |
 
-Fresh training observability: repeated CLI stream HTTP500; API and UI still report saved version 1 running. No application failure or metrics are exposed. Independent read-only checks confirmed exact remote source, all 712 published arrays and matching completion/plan receipts; worker mount readiness is not exposed. **Do not infer failure from 0B persisted outputs or start a duplicate.** Receipt: `outputs/research/2026-10-08/fresh-train-worker-investigation.json`. Latest local stream session `75904` was started 02:20 UTC; poll it once before creating another. Previous streams ended. A temporary editor inspection showed draft off and an already-cancelled interactive event; no cell was executed. Temporary browser tabs were closed.
+Fresh training observability: repeated CLI stream HTTP500; API (02:35 UTC) and earlier UI still report saved version 1 running. No application failure or metrics are exposed. Independent read-only checks confirmed exact remote source, all 712 published arrays and matching completion/plan receipts; worker mount readiness is not exposed. **Do not infer failure from 0B persisted outputs or start a duplicate.** Receipt: `outputs/research/2026-10-08/fresh-train-worker-investigation.json`. All log streams through session `76837` ended with HTTP500; retry only with backoff. A temporary editor inspection showed draft off and an already-cancelled interactive event; no cell was executed. Temporary browser tabs were closed.
 
 Use `/Users/ozgun/miniconda3/bin/kaggle kernels status OWNER/SLUG`, `kernels logs -f`, and selective `kernels output --file-pattern`. Submission helper `outputs/research/2026-10-08/check-submissions.py` uses the authenticated SDK and includes error fields. Stop remote work through the notebook's running-version controls if needed; do not guess a cancellation session ID from the version ID. No recurring automation exists.
 
@@ -55,7 +56,7 @@ Use `/Users/ozgun/miniconda3/bin/kaggle kernels status OWNER/SLUG`, `kernels log
 
 ## Resources and working decisions
 
-- Kaggle quota last unambiguously measured 00:32UTC: 28.72 GPU hours and 20 TPU hours available; refresh October10 00:00UTC. Session-options UI at02:17 displayed `02:07 / 30 hrs`; preserve the raw reading rather than infer its direction. Recheck available quota before larger allocation; reserve >=8 GPU hours for qualification.
+- Kaggle quota verified **02:24:19 UTC: 27.7224 GPU hours remaining**, 2.2776/30 used, no reserved time; TPU20h unused. Refresh October10 00:00UTC. Recheck with `/Users/ozgun/miniconda3/bin/kaggle quota --format json`; preserve >=8 GPU hours for qualification. Receipt: `outputs/research/2026-10-08/kaggle-quota-check.json`.
 - Colab last showed 351.8 existing units and no active sessions; historical October18 expiry unverified. No current Colab/local training. CLI0.6.0 transfer workaround is recorded in the first-baseline document. No purchases. Mac had31GiB free; cache arrays remain remote.
 - Defer OAI-derived 0.949 weights while accessibility/model eligibility remains unresolved; no explicit host prohibition found. Public ConvNeXt is Apache-2.0; plain Raptor is CC0. Their training histories preclude independent local validation claims here.
 - Fixed blend was declared before metrics: equal per-target percentile ranks with average ties. No gold/LB tuning. Stop old frozen-head seed sweeps; their public gain was only0.001. `knee/model.py` remains an unrelated untrained toy.
