@@ -124,11 +124,12 @@ Only submit a completed, successfully rehearsed version. Inspect its actual vers
 
 The [prospective TRAIN04 protocol](docs/experiments/train04-protocol-20261008.md) defines the new 2,000-training/unchanged-200-development reference. `knee.coverage_cache` stores variable-length selected series so training can draw new within-series triplets each epoch. `knee.coverage_training` retains original observation/confidence masks and compares alternate soft targets only after a useful reference completes. Both the old fixed-view pilot and scored public readers remain separate.
 
-After the full remote cache completes, download its JSON receipts only, then build the first private training notebook:
+After the full remote cache completes, download its JSON receipts only, then build the first private training notebook. The helper uses 100-file pages with two-second pacing, stops when all requested reports arrive, and resumes from `.report-download-state.json` after a bounded rate-limit failure. Completed downloads are hash-checked on reuse; changing the requested kernel/report set requires a separate destination. Use the Python environment containing the Kaggle SDK:
 
 ```bash
-kaggle kernels output ozgung/knee-train04-cache-full-20261008 \
-  -p outputs/kaggle/train04-cache-full-v2-result --file-pattern '.*\.json$'
+/Users/ozgun/miniconda3/bin/python scripts/download_kaggle_reports.py \
+  ozgung/knee-train04-cache-full-20261008 outputs/kaggle/train04-cache-full-v2-result \
+  --required coverage_cache/plan-private.json coverage_cache/cache-report.json coverage_cache/index-private.json
 .venv/bin/python scripts/build_coverage_training.py \
   outputs/research/2026-10-08/convnext-audit \
   outputs/kaggle/train04-reference knee-train04-reference-20261008 \

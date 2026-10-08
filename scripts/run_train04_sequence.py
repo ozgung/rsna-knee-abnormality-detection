@@ -1,4 +1,4 @@
-"""One bounded TRAIN04 run sequence. No scheduling, retries, purchases or submissions.
+"""One bounded TRAIN04 run sequence. No scheduling, purchases or submissions.
 
 Wait for existing CPU/probe jobs, verify receipts, run one reference and at most
 one gated target comparison. State/logs remain ignored; source drift stops work.
@@ -17,6 +17,7 @@ import time
 ROOT=Path(__file__).resolve().parents[1]
 KAGGLE='/Users/ozgun/miniconda3/bin/kaggle'
 PYTHON=ROOT/'.venv/bin/python'
+KAGGLE_PYTHON='/Users/ozgun/miniconda3/bin/python'
 CACHE='ozgung/knee-train04-cache-full-20261008'
 PROBE='ozgung/knee-train04-coverage-probe-warm-20261008'
 REFERENCE='ozgung/knee-train04-reference-20261008'
@@ -24,7 +25,8 @@ ALTERNATE='ozgung/knee-train04-consensus-20261008'
 PLAN='3f4f0230aff05c8ade9b78ff6e898571839349e3cca41a86c6ded491c7408a32'
 FILES=('knee/coverage_training.py','knee/coverage_cache.py','knee/fresh_reader.py',
        'knee/fresh_reader_setup.py','knee/validation.py','knee/features.py','knee/experiment.py',
-       'scripts/build_coverage_training.py','scripts/run_train04_sequence.py','scripts/probe_coverage_entry.py')
+       'scripts/build_coverage_training.py','scripts/run_train04_sequence.py','scripts/probe_coverage_entry.py',
+       'scripts/download_kaggle_reports.py')
 
 
 def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
@@ -82,9 +84,17 @@ def run(out):
             if status=='COMPLETE':return
             if status not in ('QUEUED','RUNNING'):raise RuntimeError(label+' terminal state '+status)
             time.sleep(60)
-    def download(kernel,label,pattern='.*\\.json$'):
+    def download(kernel,label):
         destination=ROOT/'outputs/kaggle'/(label+'-result')
-        command([KAGGLE,'kernels','output',kernel,'-p',str(destination),'--file-pattern',pattern],label+'-download',timeout=300)
+        if kernel==CACHE:
+            required=['coverage_cache/'+n for n in ('plan-private.json','cache-report.json','index-private.json')]
+        elif kernel==PROBE:
+            required=['coverage_probe/probe-report.json']
+        else:
+            required=['coverage_training/'+n for n in ('training-report.json','run-contract.json',
+                      'best-weak-validation-private.json','gpu-gate.json')]
+        command([KAGGLE_PYTHON,'scripts/download_kaggle_reports.py',kernel,str(destination),
+                 '--required',*required],label+'-download',timeout=300)
         return destination
     def quota(label):
         rows=json.loads(command([KAGGLE,'quota','--format','json'],label+'-quota'))
