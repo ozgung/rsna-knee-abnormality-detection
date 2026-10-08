@@ -3,6 +3,8 @@ import json
 import os
 from pathlib import Path
 import signal
+import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -90,6 +92,35 @@ class FreshReaderSetupTests(unittest.TestCase):
                 time.sleep(.2)
         self.assertEqual(signal.getsignal(signal.SIGALRM), before)
         self.assertEqual(signal.getitimer(signal.ITIMER_REAL)[0], 0.)
+
+    @unittest.skipUnless(hasattr(signal, 'setitimer'), 'Requires POSIX timer')
+    def test_expired_nested_deadlines_unwind_safely_in_repeated_subprocesses(self):
+        # A pending rearmed SIGALRM can kill the interpreter, so exercise the
+        # real process exit path repeatedly rather than only asserting a class.
+        script = """
+import signal, time
+from knee.fresh_reader_setup import time_limit
+signal.signal(signal.SIGALRM, signal.SIG_DFL)
+for repeat in range(200):
+    try:
+        with time_limit(.0005, 'outer'):
+            with time_limit(60, 'inner'):
+                time.sleep(.002)
+    except TimeoutError:
+        pass
+    else:
+        raise AssertionError('The expired outer deadline did not propagate')
+    assert signal.getitimer(signal.ITIMER_REAL)[0] == 0
+    assert signal.getsignal(signal.SIGALRM) == signal.SIG_DFL
+    time.sleep(.00001)
+print('200 clean nested deadline unwinds')
+"""
+        for repetition in range(5):
+            result = subprocess.run([sys.executable, '-B', '-c', script],
+                                    cwd=Path(__file__).resolve().parents[1],
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, f'Child {repetition}: {result.stderr}')
+            self.assertIn('200 clean nested deadline unwinds', result.stdout)
 
     @unittest.skipUnless(hasattr(signal, 'setitimer'), 'Requires POSIX timer')
     def test_nested_setup_does_not_extend_stage_deadline(self):

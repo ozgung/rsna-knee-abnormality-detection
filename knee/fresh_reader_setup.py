@@ -87,5 +87,11 @@ def time_limit(seconds, label):
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, previous_handler)
         if previous_timer[0] > 0:
-            remaining = max(1e-6, previous_timer[0] - (time.monotonic() - started))
+            remaining = previous_timer[0] - (time.monotonic() - started)
+            if remaining <= 0:
+                # Raising synchronously lets enclosing contexts unwind before
+                # SIG_DFL is restored. Never schedule a new expired alarm: it
+                # can arrive after the outer context restores SIG_DFL and kill
+                # the notebook instead of producing a recorded TimeoutError.
+                raise TimeoutError(f'Enclosing deadline expired during {label}')
             signal.setitimer(signal.ITIMER_REAL, remaining, previous_timer[1])
