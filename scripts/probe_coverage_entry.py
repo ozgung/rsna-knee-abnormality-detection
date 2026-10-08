@@ -13,7 +13,7 @@ out=Path('/kaggle/working/coverage_probe');out.mkdir()
 report={'status':'RUNNING','optimizer_updates':0,'fitted_weights_saved':False,'environment':environment(),
         'probe_entry_sha256':PROBE_SOURCE_SHA256}
 try:
-    with time_limit(580-(time.monotonic()-STARTED),'coverage CUDA timing probe'):
+    with time_limit(PROBE_SECONDS-20-(time.monotonic()-STARTED),'coverage CUDA timing probe'):
         import numpy as np
         import torch
         if not torch.cuda.is_available():raise RuntimeError('CUDA required')
@@ -51,14 +51,19 @@ try:
             if not torch.isfinite(loss):raise ValueError('Nonfinite probe loss')
             (loss*65536).backward()  # No optimizer, scheduler or EMA update.
         torch.cuda.synchronize();train_seconds=(time.monotonic()-tick)/48
-        model.zero_grad(set_to_none=True);model.eval();tick=time.monotonic()
+        model.zero_grad(set_to_none=True);model.eval();eval_passes=[]
         with torch.inference_mode(),torch.autocast('cuda',dtype=torch.float16):
-            for i in range(8):
-                x,m,p,y,w=batch(i,False);z=model(x,m,p,res=256,train=False)
-                if not torch.isfinite(z).all():raise ValueError('Nonfinite probe predictions')
-        torch.cuda.synchronize();eval_seconds=(time.monotonic()-tick)/8
+            for repeat in range(2):
+                timings=[]
+                for i in range(8):
+                    torch.cuda.synchronize();tick=time.monotonic()
+                    x,m,p,y,w=batch(i,False);z=model(x,m,p,res=256,train=False)
+                    if not torch.isfinite(z).all():raise ValueError('Nonfinite probe predictions')
+                    torch.cuda.synchronize();timings.append(time.monotonic()-tick)
+                eval_passes.append(timings)
+        eval_seconds=sum(eval_passes[1])/8
         report.update(status='PASS',training_rows=len(rows),warmup_batches=16,timed_batches=48,
-            train_batch_seconds=train_seconds,eval_batch_seconds=eval_seconds,
+            train_batch_seconds=train_seconds,eval_batch_seconds=eval_seconds,eval_batch_timing_passes=eval_passes,
             projection=timing_projection(train_seconds,eval_seconds,time.monotonic()-STARTED),
             peak_cuda_bytes=torch.cuda.max_memory_allocated(),
             limitation='Repeated pilot training rows, cached I/O and generic model only; full2000 timing gate remains mandatory')

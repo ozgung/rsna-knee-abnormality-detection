@@ -18,7 +18,7 @@ ROOT=Path(__file__).resolve().parents[1]
 KAGGLE='/Users/ozgun/miniconda3/bin/kaggle'
 PYTHON=ROOT/'.venv/bin/python'
 CACHE='ozgung/knee-train04-cache-full-20261008'
-PROBE='ozgung/knee-train04-coverage-probe-20261008'
+PROBE='ozgung/knee-train04-coverage-probe-warm-20261008'
 REFERENCE='ozgung/knee-train04-reference-20261008'
 ALTERNATE='ozgung/knee-train04-consensus-20261008'
 PLAN='3f4f0230aff05c8ade9b78ff6e898571839349e3cca41a86c6ded491c7408a32'
@@ -120,10 +120,10 @@ def run(out):
     save('sequence_started')
     try:
         wait(PROBE,'train04-coverage-probe')
-        probe_dir=download(PROBE,'train04-coverage-probe')
+        probe_dir=download(PROBE,'train04-coverage-probe-warm')
         probe=json.loads((probe_dir/'coverage_probe/probe-report.json').read_text())
         if (probe['status']!='PASS' or probe['optimizer_updates']!=0 or probe['fitted_weights_saved'] or
-                not probe['projection']['passed'] or not 0<probe['elapsed_seconds']<=600):
+                not probe['projection']['passed'] or not 0<probe['elapsed_seconds']<=400):
             raise ValueError('No-update CUDA probe failed; revise prospectively before fitting')
         save('probe_verified',probe_seconds=probe['elapsed_seconds'])
         wait(CACHE,'train04-cache-full-v2')

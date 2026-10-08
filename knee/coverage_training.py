@@ -19,6 +19,7 @@ CONFIG = dict(seed=42, backbone='convnext_tiny.fb_in22k_ft_in1k', image_size=256
               train_windows=8, eval_windows=12, batch_size=2, epochs=12,
               lr_encoder=1e-4, lr_head=5e-4, weight_decay=.02, ema=.998,
               seconds=10200, host_cache_bytes=256*1024**2)
+INITIAL_ENCODER_SHA256='355cb8e236d6793f7ec440278ad14a59a5484663a99f9ed54d8b6ea105b8bf66'
 LABEL_SOURCES = {
  'steven': ('llm_labels_v4_blend.csv','eb4c2b29e7e84adbb4b5ccee825ca20ade6a43dbe295f13be442d549e4f5dca4'),
  'pilkwang': ('report_labels_v2.csv','6f704a7bdb2f894cc49445b19ba7c4378c3f548d3449e00361e10044bee40920'),
@@ -189,6 +190,7 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
             model.cls_b.data.copy_(torch.tensor(np.log(original_prior/(1-original_prior))))
         model=model.cuda().to(memory_format=torch.channels_last)
         init_hash=tensor_state_sha256(model.enc.state_dict()) if state is None else state['initial_encoder_sha256']
+        if init_hash!=INITIAL_ENCODER_SHA256:raise ValueError('Generic ImageNet encoder changed after CUDA probe')
         if initial and init_hash!=init['initial_encoder_sha256']:raise ValueError('Initial encoder tensors differ')
         if state is None:
             save_checkpoint(out/'initial.pt',dict(model={k:v.detach().cpu() for k,v in model.state_dict().items()},
@@ -246,11 +248,15 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
                 if not torch.isfinite(n).all():raise ValueError('Nonfinite timing supervision')
                 scaler.scale(macro_loss(n,d)).backward()
             torch.cuda.synchronize();train_seconds=(time.monotonic()-tick)/48
+            tick=time.monotonic();evaluate(ema,va[:16],require_all=False);torch.cuda.synchronize();eval_warmup_seconds=time.monotonic()-tick
             tick=time.monotonic();evaluate(ema,va[:16],require_all=False);torch.cuda.synchronize();eval_seconds=(time.monotonic()-tick)/8
+            tick=time.monotonic();evaluate(ema,diagnostic[:16],require_all=False);torch.cuda.synchronize();diagnostic_warmup_seconds=time.monotonic()-tick
             tick=time.monotonic();evaluate(ema,diagnostic[:16],require_all=False);torch.cuda.synchronize();diagnostic_seconds=(time.monotonic()-tick)/8
         finally:
             optimizer.zero_grad(set_to_none=True);restore_rng(saved_rng)
         gate=timing_projection(train_seconds,eval_seconds,elapsed(),diagnostic_batch=diagnostic_seconds)
+        gate.update(validation_warmup_seconds=eval_warmup_seconds,diagnostic_warmup_seconds=diagnostic_warmup_seconds,
+                    eval_warmup_batches=8,eval_timed_batches=8,diagnostic_warmup_batches=8,diagnostic_timed_batches=8)
         write_json(out/'gpu-gate.json',gate);progress('train04_gpu_gate',**gate)
         if not gate['passed']:raise RuntimeError('Twelve-epoch throughput gate failed; no shortened run')
     run={'contract':contract,'environment':environment(),'initial_encoder_sha256':init_hash,
