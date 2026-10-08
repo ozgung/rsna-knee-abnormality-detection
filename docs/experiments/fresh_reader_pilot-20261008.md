@@ -90,3 +90,26 @@ python3.12 scripts/build_fresh_reader.py \
 The following GPU stage consumes the completed cache under the same fingerprint and retains its original5400s training limit. Synthetic regression checks verify the failed receipt and plan bytes are preserved, cached arrays are reused, the builder exposes its effective7200s timer, and invalid-stage/time/disk overrides are rejected. No remote job was launched by this implementation task.
 
 Override verification:79/79 ML-environment tests pass; dependency-free40 pass/39 optional skips; smoke and `git diff --check` pass.
+
+
+## Disposable CUDA32 diagnostic
+
+Before the full cache finishes, the separate `probe` stage reads only32 training studies already present in the CPU64 cache. Selection is the first32 cached training rows in the existing label-blind hash order; all validation arrays are excluded. The recomputed complete plan fingerprint, external source hashes, pilot receipt, selected array sizes/hashes, shapes, masks, finite positions and labels must pass. The original failed full-cache time gate is retained as evidence; no cache expansion occurs.
+
+Fresh generic ImageNet ConvNeXt-Tiny initialization, seed42, batch2, the same confidence-masked macro BCE, augmentation, AdamW, FP16 GradScaler, gradient clipping and EMA memory footprint exercise the intended CUDA path. The fresh source head has zero bias; it fits no prior outside these32 studies. At most64 successful updates (96 attempts including scaler warmup skips) run inside a600-second total stage cap, including setup and initialization. The loop reserves time for a final diagnostic. Initial and final losses use the same32 unaugmented training studies and online weights; a loss reduction is not a quality score or selection criterion. PASS means at least8 successful updates and changed encoder/head parameters; PARTIAL records insufficient updates, and failures retain their error.
+
+`fresh_reader_probe/probe-report.json` records the selected-set fingerprint, full config, source/revision/package/device details, initial and final per-target training BCE and confidence support, finite gradients, AMP overflow/skips, forward/backward and complete-step durations, parameter changes, peak CUDA memory and wall time. No checkpoint or trained weights are saved or reused. The notebook is private and attaches only `ozgung/knee-fresh-cache-pilot-20261008`; internet is enabled for generic ImageNet initialization. It attaches no competition data or public knee checkpoint.
+
+The probe and main training now hash the actual loaded generic encoder tensors using scheme `fresh-encoder-state-v1`: sorted names; length-prefixed JSON name/dtype/shape; length-prefixed contiguous CPU bytes. This produces a deterministic SHA256 without another weight file or network request. Main training preserves that initialization digest in its run contract and checkpoints.
+
+```bash
+python3.12 scripts/build_fresh_reader.py \
+  outputs/research/2026-10-08/convnext-audit \
+  outputs/kaggle/fresh-cuda-probe knee-fresh-cuda-probe-20261008 --stage probe \
+  --cache-kernel ozgung/knee-fresh-cache-pilot-20261008 \
+  --plan-fingerprint 1bd346c05c0aac20f54b82b790e356d3d6c1b95606accaa4a5d1da7e3e421942
+```
+
+Build only; parent launches after review. CUDA is unavailable locally, so unit checks establish selection, hash/mask/attachment boundaries and error reporting, not GPU trainability or throughput.
+
+Probe verification:84/84 ML-environment tests pass; dependency-free42 pass/42 optional skips; both dependency-free smoke invocations and `git diff --check` pass. Five probe regressions cover label-independent training-only selection, private attachment settings, deterministic tensor hashing, selected-array integrity without reading validation arrays, and explicit CUDA-unavailable failure reporting.

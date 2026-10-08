@@ -401,6 +401,37 @@ def save_checkpoint(path, payload):
     os.replace(path.with_suffix('.tmp'), path)
 
 
+def tensor_state_sha256(state):
+    """Hash actual tensors deterministically without saving another weight file.
+
+    v1: sorted state names; length-prefixed JSON name/dtype/shape, then raw
+    contiguous CPU bytes viewed as uint8 (including dtypes NumPy cannot decode).
+    One tensor is copied at a time, keeping peak memory bounded.
+    """
+    import torch
+    digest = hashlib.sha256(b'fresh-encoder-state-v1\0')
+    for name, tensor in sorted(state.items()):
+        metadata = json.dumps([name, str(tensor.dtype), list(tensor.shape)], separators=(',', ':')).encode()
+        digest.update(len(metadata).to_bytes(8, 'big')); digest.update(metadata)
+        raw = tensor.detach().cpu().contiguous().reshape(-1).view(torch.uint8).numpy().tobytes()
+        digest.update(len(raw).to_bytes(8, 'big')); digest.update(raw)
+    return digest.hexdigest()
+
+
+def load_cached_batch(records, index, cache_dir, indices, *, device='cuda'):
+    import numpy as np
+    import torch
+    arrays = []
+    for i in indices:
+        with np.load(Path(cache_dir) / 'arrays' / index[records[i]['uid']]['file'], allow_pickle=False) as z:
+            if not z['mask'].any():
+                raise ValueError('Empty study in training cache')
+            arrays.append(tuple(z[key].copy() for key in ('x', 'mask', 'pos')))
+    x, mask, pos = [torch.from_numpy(np.stack([a[j] for a in arrays])).to(device) for j in range(3)]
+    y = torch.tensor([records[i]['labels'] for i in indices], dtype=torch.float32, device=device)
+    return x, mask, pos, y
+
+
 def train(cache_dir, source_dir, output_dir, *, resume=None):
     import copy
     import numpy as np
@@ -443,6 +474,7 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
     with time_limit(300, 'ImageNet model initialization'):
         code = load_source(source_dir, 'knee')
         model = code.KneeNet(BACKBONE, pretrained=resume is None, img_size=config['image_size']).cuda()
+    initial_encoder_sha256 = tensor_state_sha256(model.enc.state_dict()) if resume is None else None
     progress('model_initialization_complete', elapsed_seconds=time.monotonic() - started)
     model.cls_b.data.copy_(torch.as_tensor(np.log(prior / (1 - prior)), device='cuda'))
     ema = copy.deepcopy(model).eval().requires_grad_(False)
@@ -454,15 +486,7 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
     batch_size = config['batch_size']
 
     def batch(indices):
-        arrays = []
-        for i in indices:
-            with np.load(cache_dir / 'arrays' / index[records[i]['uid']]['file'], allow_pickle=False) as z:
-                if not z['mask'].any():
-                    raise ValueError('Empty study in training cache')
-                arrays.append(tuple(z[key].copy() for key in ('x', 'mask', 'pos')))
-        x, mask, pos = [torch.from_numpy(np.stack([a[j] for a in arrays])).cuda() for j in range(3)]
-        y = torch.tensor([records[i]['labels'] for i in indices], dtype=torch.float32, device='cuda')
-        return x, mask, pos, y
+        return load_cached_batch(records, index, cache_dir, indices)
 
     @torch.inference_mode()
     def validate(current, indices):
@@ -506,6 +530,7 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
         model.load_state_dict(state['model']); ema.load_state_dict(state['ema'])
         optimizer.load_state_dict(state['optimizer']); scaler.load_state_dict(state['scaler'])
         epochs, gate = state['planned_epochs'], state['gate']
+        initial_encoder_sha256 = state['initial_encoder_sha256']
     else:
         # Forward/backward timing only; no optimizer updates. Restore RNG afterward.
         before_gate = rng_state()
@@ -559,7 +584,8 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
     step = state['step'] if state else 0
     run_contract = {'plan_fingerprint': plan['fingerprint'], 'source_hashes': SOURCE_HASHES,
                     'backbone': BACKBONE, 'config': config, 'environment': environment(),
-                    'pretrained_cfg': model.enc.pretrained_cfg, 'targets': plan['targets'],
+                    'pretrained_cfg': model.enc.pretrained_cfg, 'initial_encoder_sha256': initial_encoder_sha256,
+                    'encoder_hash_scheme': 'fresh-encoder-state-v1', 'targets': plan['targets'],
                     'train_studies': len(tr), 'validation_studies': len(va), 'training_prior': prior.tolist(),
                     'training_confidence_support': support.tolist(), 'gate': gate,
                     'normalization': 'Fixed ImageNet mean/std; no fitted image statistics.',
@@ -581,7 +607,7 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
             'epoch': epoch, 'cursor': cursor, 'order': order, 'history': history, 'best_loss': best,
             'step': step, 'planned_epochs': epochs, 'gate': gate, 'backbone': BACKBONE,
             'plan_fingerprint': plan['fingerprint'], 'source_hashes': SOURCE_HASHES,
-            'runner_sha256': file_sha256(__file__),
+            'runner_sha256': file_sha256(__file__), 'initial_encoder_sha256': initial_encoder_sha256,
             'elapsed_seconds': elapsed_before + time.monotonic() - started})
 
     status = 'RUNNING'
@@ -626,7 +652,7 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
                 save_checkpoint(output_dir / 'best.pt', {'model': ema.state_dict(), 'backbone': BACKBONE,
                     'targets': plan['targets'], 'source_hashes': SOURCE_HASHES, 'config': config,
                     'plan_fingerprint': plan['fingerprint'], 'epoch': epoch + 1, 'weak_bce': score,
-                    'training_prior': prior.tolist()})
+                    'training_prior': prior.tolist(), 'initial_encoder_sha256': initial_encoder_sha256})
             epoch += 1; cursor = 0; order = None
             checkpoint()
             print(json.dumps({'event': 'epoch', 'epoch': epoch, 'weak_bce': score, 'prevalence_weak_bce': prior_bce}), flush=True)

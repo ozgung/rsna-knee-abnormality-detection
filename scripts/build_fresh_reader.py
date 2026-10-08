@@ -18,11 +18,11 @@ DOCKER = 'gcr.io/kaggle-private-byod/python@sha256:37c64f7dd9c54116ecd1bcc88817c
 def build(source_dir, destination, slug, stage, *, cache_kernel=None, plan_fingerprint=None, resume_kernel=None, cache_seconds=None):
     source_dir, destination = Path(source_dir), Path(destination)
     check_sources(source_dir)
-    if stage not in ('cache-pilot', 'cache', 'train'):
+    if stage not in ('cache-pilot', 'cache', 'train', 'probe'):
         raise ValueError('Unknown stage')
     effective_cache_seconds = cache_time_budget(stage, cache_seconds)
     stage_seconds = (CONFIG['pilot_seconds'] if stage == 'cache-pilot' else
-                     effective_cache_seconds if stage == 'cache' else CONFIG['training_seconds'])
+                     effective_cache_seconds if stage == 'cache' else 600 if stage == 'probe' else CONFIG['training_seconds'])
     if stage != 'cache-pilot' and (not cache_kernel or not plan_fingerprint):
         raise ValueError('Expansion/training requires a cache kernel and its reviewed plan fingerprint')
     if resume_kernel and stage != 'train':
@@ -32,7 +32,8 @@ def build(source_dir, destination, slug, stage, *, cache_kernel=None, plan_finge
             reference_parts(reference, owner='ozgung')
     own = {str(p.relative_to(ROOT)): p.read_text() for p in
            [ROOT/'knee/__init__.py', ROOT/'knee/validation.py', ROOT/'knee/features.py',
-            ROOT/'knee/experiment.py', ROOT/'knee/fresh_reader.py', ROOT/'knee/fresh_reader_setup.py']}
+            ROOT/'knee/experiment.py', ROOT/'knee/fresh_reader.py', ROOT/'knee/fresh_reader_setup.py',
+            ROOT/'knee/fresh_reader_probe.py']}
     external = {name: (source_dir/name).read_text() for name in SOURCE_HASHES}
     license_text = (ROOT/'docs/licenses/fresh_reader_Apache-2.0.txt').read_text()
     for name, content in {**own, **external}.items():
@@ -71,14 +72,16 @@ sys.path.insert(0, str(base))
 os.environ['KNEE_CODE_REVISION'] = {revision!r}
 os.environ['KNEE_SOURCE_SHA256'] = {source_hash!r}
 from knee.fresh_reader import prepare_cache, train
+from knee.fresh_reader_probe import probe
 from knee.fresh_reader_setup import dataset_root, exact_root, cache_root, resume_checkpoint, progress, time_limit
 with time_limit(STAGE_BUDGET - (time.monotonic() - _stage_started), 'whole ' + STAGE + ' stage'):
     with time_limit(300, 'attachment and decoder setup'):
         progress('setup_begin', stage=STAGE)
         inputs = Path('/kaggle/input')
-        data = exact_root([inputs/'competitions/rsna-knee-abnormality-detection',
-                           inputs/'rsna-knee-abnormality-detection'], ['train.csv', 'train_series.csv'])
-        if STAGE != 'train':
+        if STAGE != 'probe':
+            data = exact_root([inputs/'competitions/rsna-knee-abnormality-detection',
+                               inputs/'rsna-knee-abnormality-detection'], ['train.csv', 'train_series.csv'])
+        if STAGE not in ('train', 'probe'):
             if sys.version_info[:2] not in ((3,11), (3,12)):
                 raise RuntimeError('Pinned decoder bundle requires Python 3.11/3.12')
             assets = dataset_root(inputs, 'goodpjw2008/rsna-knee-2-5d-convnext-reader',
@@ -106,7 +109,9 @@ with time_limit(STAGE_BUDGET - (time.monotonic() - _stage_started), 'whole ' + S
         resume = resume_checkpoint(inputs, RESUME_KERNEL, EXPECTED_PLAN) if RESUME_KERNEL else None
         progress('setup_complete', elapsed_seconds=time.monotonic() - _stage_started)
     progress('stage_execution_begin', stage=STAGE)
-    if STAGE == 'train':
+    if STAGE == 'probe':
+        result = probe(cache, sources, '/kaggle/working/fresh_reader_probe', EXPECTED_PLAN)
+    elif STAGE == 'train':
         result = train(cache, sources, '/kaggle/working/fresh_reader_training', resume=resume)
     else:
         result = prepare_cache(data, weak, sources, cache, pilot=STAGE == 'cache-pilot', cache_seconds=CACHE_SECONDS_OVERRIDE)
@@ -126,18 +131,19 @@ with time_limit(STAGE_BUDGET - (time.monotonic() - _stage_started), 'whole ' + S
             '# Fresh ImageNet ConvNeXt 2.5D pilot\n',
             'Public architecture/preprocessing by goodpjw2008 (Apache-2.0): https://www.kaggle.com/datasets/goodpjw2008/rsna-knee-2-5d-convnext-reader\n',
             'Own split, compact cache, confidence-masked supervision, resource gates and resumable training. No public knee checkpoint loaded. No gold evaluation.\n',
-            'Predeclared: 224px, six slots × four fixed windows, ≤512 training/200 weak validation, ≤4 epochs/90 GPU minutes.\n']},
+            ('Diagnostic: cached training32 only, ≤64 updates/600 seconds, no saved weights or model selection.\n' if stage == 'probe' else
+             'Predeclared: 224px, six slots × four fixed windows, ≤512 training/200 weak validation, ≤4 epochs/90 GPU minutes.\n')]},
         {'cell_type': 'code', 'id': 'pilot', 'metadata': {}, 'execution_count': None, 'outputs': [],
          'source': setup.splitlines(True)}]}
     metadata = {'id': 'ozgung/' + slug, 'title': slug.replace('-', ' ').title(), 'code_file': 'notebook.ipynb',
                 'language': 'python', 'kernel_type': 'notebook', 'is_private': True,
-                'enable_gpu': stage == 'train', 'enable_tpu': False, 'enable_internet': stage == 'train',
-                'dataset_sources': [] if stage == 'train' else
+                'enable_gpu': stage in ('train', 'probe'), 'enable_tpu': False, 'enable_internet': stage in ('train', 'probe'),
+                'dataset_sources': [] if stage in ('train', 'probe') else
                     ['stevenleehans/rsna-knee-llm-report-labels', 'goodpjw2008/rsna-knee-2-5d-convnext-reader'],
-                'competition_sources': ['rsna-knee-abnormality-detection'],
+                'competition_sources': [] if stage == 'probe' else ['rsna-knee-abnormality-detection'],
                 'kernel_sources': [x for x in (cache_kernel, resume_kernel) if x], 'model_sources': [],
                 'docker_image': DOCKER}
-    if stage == 'train':
+    if stage in ('train', 'probe'):
         metadata['machine_shape'] = 'NvidiaTeslaT4'
     destination.mkdir(parents=True, exist_ok=True)
     (destination/'notebook.ipynb').write_text(json.dumps(notebook, indent=2))
@@ -149,7 +155,7 @@ with time_limit(STAGE_BUDGET - (time.monotonic() - _stage_started), 'whole ' + S
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('source_dir'); ap.add_argument('destination'); ap.add_argument('slug')
-    ap.add_argument('--stage', required=True, choices=('cache-pilot', 'cache', 'train'))
+    ap.add_argument('--stage', required=True, choices=('cache-pilot', 'cache', 'train', 'probe'))
     ap.add_argument('--cache-seconds', type=int)
     ap.add_argument('--cache-kernel'); ap.add_argument('--plan-fingerprint'); ap.add_argument('--resume-kernel')
     args = ap.parse_args()
