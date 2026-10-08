@@ -210,3 +210,25 @@ reserve approximately300 eligible previously unused groups outside the entire or
 2,000/300 cohort as a sealed weak proxy. No candidate evaluation on that proxy until
 the modeling choices are fixed. Larger remote caches need a measured allowance beyond
 2GiB; the local2GiB limit and at least8Kaggle GPU hours reserved for qualification stay.
+
+## Hidden-rerun failures and repair audit — 01:05 UTC
+
+Entries56924358 and56925712 both changed to API `COMPLETE` with blank scores. The
+submissions UI and API `error_description` confirm **Notebook Threw Exception**,
+not successful scoring. No hidden traceback or failing study is exposed. The visible
+notebook results remain valid but did not establish hidden-corpus robustness. Current
+best scored entry remains0.757. Error receipt:
+`outputs/research/2026-10-08/submission-errors-0107.json`.
+
+Read-only pin audit verified the CLI transmits `docker_image` and both saved v1
+metadata retain the expected37c64 digest; hidden environment differences are unproven.
+Receipt: `outputs/research/2026-10-08/submission-image-pin-audit.json`.
+
+A concrete shared defect is reproduced synthetically: the public ConvNeXt loader can
+return8 valid slices plus one unreadable directory item, and public inference uses
+those slices. Our standalone wrapper and the blend's extracted copy instead raise
+on any `n_bad`. Likewise, public inference masks a failed/short series while our
+wrapper aborts even when other planes are valid. This is a plausible common cause,
+not a confirmed hidden traceback. Repair must preserve public preprocessing and
+healthy-input probabilities, expose aggregate degraded-input counts and pass new
+stress fixtures and offline qualification before another submission.
