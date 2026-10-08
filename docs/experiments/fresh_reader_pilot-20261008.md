@@ -124,6 +124,14 @@ Training and probe notebooks attach only the needed private cache/resume outputs
 
 Evidence update verification:32/32 focused fresh-reader tests pass, including eight new evidence tests; full ML suite116/116 passes with audited source snapshots/receipts enabled. Dependency-free suite62 passes/54 optional skips; smoke and diff checks pass. A fresh training notebook built from the real audited source compiles (145,741bytes) with one private cache attachment and no competition/model/dataset attachments. Independent review reran the focused checks and found no launch blocker. No remote run was launched for this implementation.
 
+## Future-run progress events
+
+New training builds flush aggregate JSON events: `train_cache_verification_begin`, `train_cache_verification_progress` every64 successfully hashed studies, and `train_cache_verification_complete` (counts, elapsed seconds and cache-index bytes for verified arrays); `gpu_gate_begin` / `gpu_gate_complete` (timing and existing scalar gate results); `train_epoch_begin`; `train_batch_progress` every32 supervised batch attempts (existing trace counts, overflow skips and mean online batch loss); and `checkpoint_save_begin` / `checkpoint_save_complete` for fixed kinds `best` and `last`. Supervised attempts include AMP overflows and exclude batches with no known labels. GPU timing is logged outside the existing measured regions. No IDs, paths, label values, tensor reads, extra GPU synchronization, forward pass, RNG call or new checkpoint fields are added. These events do not repair or guarantee delivery through Kaggle's HTTP500 log service.
+
+This is future code only. Running `knee-fresh-train-20261008` v1 at `fa8082d` is immutable; no job was modified or relaunched. Its original `knee/fresh_reader.py` SHA is `072bcd102f3ac231dfe5e19b13f653f9e23c4538b6718c4f298182e9bc38c8ac`, preserved in `outputs/kaggle/fresh-train/notebook.ipynb`. The progress runner SHA is `1f53d1c7e9f7654093345ae9d5262f718e1d55cc4d060037ba016272220d05d4`. Resume still requires the exact original runner SHA, matching checkpoint pair and existing contract; v1 checkpoints must use the preserved original runner. No checksum exception or resume redesign was introduced.
+
+Checks:146/146 full ML tests pass; dependency-free146 checks pass with76 optional skips. Four focused checks exercise the actual logging blocks, JSON flushing, aggregate cadence/privacy, scalar-only trace reads and unchanged RNG/state, and actual rejection of the original runner SHA by the new resume guard. Source compilation, both default smoke runs and diff checks pass. No remote run was exercised.
+
 ## Full cache and fresh fit launch, 01:45 UTC
 
 Full CPU cache v1 completed:712studies, zero failures,1,346,975,371bytes and

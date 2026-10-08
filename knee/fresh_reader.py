@@ -550,6 +550,7 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
     import copy
     import numpy as np
     import torch
+    from knee.fresh_reader_setup import progress, time_limit
     if not torch.cuda.is_available():
         raise RuntimeError('CUDA required for fresh training; no CPU fallback')
     cache_dir, output_dir = Path(cache_dir), Path(output_dir)
@@ -568,9 +569,20 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
         raise ValueError('Pilot exceeds its authorized four-epoch/90-minute budget')
     records = plan['records']
     index = json.loads((cache_dir / 'cache-index-private.json').read_text())
-    for row in records:
+    cache_verification_started = time.monotonic()
+    verified_bytes = 0
+    progress('train_cache_verification_begin', verified_studies=0, total_studies=len(records),
+             verified_bytes=0, elapsed_seconds=0.)
+    for verified_studies, row in enumerate(records, 1):
         if file_sha256(cache_dir / 'arrays' / index[row['uid']]['file']) != index[row['uid']]['sha256']:
             raise ValueError('Training cache hash mismatch')
+        verified_bytes += index[row['uid']]['bytes']
+        if verified_studies % 64 == 0:
+            progress('train_cache_verification_progress', verified_studies=verified_studies,
+                     total_studies=len(records), verified_bytes=verified_bytes,
+                     elapsed_seconds=time.monotonic() - cache_verification_started)
+    progress('train_cache_verification_complete', verified_studies=len(records), total_studies=len(records),
+             verified_bytes=verified_bytes, elapsed_seconds=time.monotonic() - cache_verification_started)
     tr = [i for i, row in enumerate(records) if row['split'] == 'train']
     va = [i for i, row in enumerate(records) if row['split'] == 'weak_validation']
     if not tr or not va or {records[i]['group'] for i in tr} & {records[i]['group'] for i in va}:
@@ -585,7 +597,6 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.set_num_threads(2)
     prior, support = training_prior([records[i]['labels'] for i in tr])
-    from knee.fresh_reader_setup import progress, time_limit
     progress('model_initialization_begin', backbone=BACKBONE, resume=resume is not None)
     # Fixed network timeouts plus the POSIX deadline bound fresh ImageNet loading.
     os.environ.setdefault('HF_HUB_DOWNLOAD_TIMEOUT', '120')
@@ -648,6 +659,9 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
         initial_encoder_sha256 = state['initial_encoder_sha256']
     else:
         # Forward/backward timing only; no optimizer updates. Restore RNG afterward.
+        gate_started = time.monotonic()
+        progress('gpu_gate_begin', train_studies=len(tr), validation_studies=len(va),
+                 diagnostic_studies=len(diagnostic_indices), elapsed_seconds=0.)
         before_gate = rng_state()
         torch.cuda.synchronize(); tick = time.monotonic()
         model.train()
@@ -690,6 +704,11 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
                 'training_diagnostic_studies': len(diagnostic_indices),
                 'planned_epochs': epochs}
         write_json(output_dir / 'gpu-gate.json', gate)
+        progress('gpu_gate_complete', elapsed_seconds=time.monotonic() - gate_started,
+                 passed=gate['passed'], measured_training_steps=measured, planned_epochs=epochs,
+                 train_batch_seconds=train_batch_seconds, validation_batch_seconds=val_batch_seconds,
+                 diagnostic_batch_seconds=diagnostic_batch_seconds,
+                 estimated_epoch_seconds_with_margin=epoch_seconds)
         if epochs < 1:
             raise RuntimeError('GPU throughput gate predicts no complete epoch within budget')
     steps_per_epoch = math.ceil(len(tr) / batch_size)
@@ -726,6 +745,9 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
     write_json(output_dir / 'run-contract.json', run_contract)
 
     def checkpoint():
+        checkpoint_started = time.monotonic()
+        progress('checkpoint_save_begin', kind='last', epoch=epoch,
+                 elapsed_seconds=elapsed_before + time.monotonic() - started)
         save_checkpoint(output_dir / 'last.pt', {
             'model': model.state_dict(), 'ema': ema.state_dict(), 'optimizer': optimizer.state_dict(),
             'scheduler': scheduler.state_dict(), 'scaler': scaler.state_dict(), 'rng': rng_state(),
@@ -736,6 +758,9 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
             'plan_fingerprint': plan['fingerprint'], 'source_hashes': SOURCE_HASHES,
             'runner_sha256': file_sha256(__file__), 'initial_encoder_sha256': initial_encoder_sha256,
             'elapsed_seconds': elapsed_before + time.monotonic() - started})
+        progress('checkpoint_save_complete', kind='last', epoch=epoch,
+                 save_seconds=time.monotonic() - checkpoint_started,
+                 elapsed_seconds=elapsed_before + time.monotonic() - started)
 
     status = 'RUNNING'
     try:
@@ -746,6 +771,10 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
                 epoch_training_trace = {'successful_optimizer_steps': 0, 'amp_overflow_skips': 0,
                     'online_training_batches': 0, 'online_loss_sum': 0.,
                     'lr_start': [group['lr'] for group in optimizer.param_groups]}
+            progress('train_epoch_begin', epoch=epoch + 1, planned_epochs=epochs,
+                     attempted_supervised_batches=epoch_training_trace['online_training_batches'],
+                     successful_optimizer_steps=epoch_training_trace['successful_optimizer_steps'],
+                     elapsed_seconds=elapsed_before + time.monotonic() - started)
             model.train()
             while cursor < len(order):
                 if elapsed_before + time.monotonic() - started > config['training_seconds'] - 120:
@@ -768,6 +797,13 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
                 cursor += batch_size
                 overflow = scaler.get_scale() < old_scale
                 record_training_step(epoch_training_trace, float(batch_loss.detach()), overflow=overflow)
+                if epoch_training_trace['online_training_batches'] % 32 == 0:
+                    progress('train_batch_progress', epoch=epoch + 1,
+                             attempted_supervised_batches=epoch_training_trace['online_training_batches'],
+                             successful_optimizer_steps=epoch_training_trace['successful_optimizer_steps'],
+                             amp_overflow_skips=epoch_training_trace['amp_overflow_skips'],
+                             online_training_batch_loss_mean=epoch_training_trace['online_loss_sum'] / epoch_training_trace['online_training_batches'],
+                             elapsed_seconds=elapsed_before + time.monotonic() - started)
                 if overflow:
                     continue  # FP16 overflow: no optimizer/scheduler/EMA update occurred.
                 scheduler.step()
@@ -794,7 +830,13 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
                     'plan_fingerprint': plan['fingerprint'], 'epoch': epoch + 1, 'weak_bce': score,
                     'training_prior': prior.tolist(), 'initial_encoder_sha256': initial_encoder_sha256,
                     'weak_validation_evidence': evidence}
+                checkpoint_started = time.monotonic()
+                progress('checkpoint_save_begin', kind='best', epoch=epoch + 1,
+                         elapsed_seconds=elapsed_before + time.monotonic() - started)
                 save_checkpoint(output_dir / 'best.pt', best_payload)
+                progress('checkpoint_save_complete', kind='best', epoch=epoch + 1,
+                         save_seconds=time.monotonic() - checkpoint_started,
+                         elapsed_seconds=elapsed_before + time.monotonic() - started)
                 best, best_evidence_fingerprint = score, evidence['fingerprint']
                 best_evidence_receipt = None
                 best_evidence_receipt = write_best_evidence(output_dir, plan, best_payload)
