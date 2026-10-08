@@ -34,6 +34,12 @@ CONVNEXT_SOURCE_HASHES = {
 CONVNEXT_ENTRY_SHA256 = "0efbc7cb3271c2f394228466b5c5c47889d5ea8a6dbd2341d08dbb138fdfbadc"
 RAPTOR_PLAIN_SHA256 = "89606f05849838529e1b4658d28fb049623205d9853371548403bca460361ded"
 DOCKER_IMAGE = "gcr.io/kaggle-private-byod/python@sha256:37c64f7dd9c54116ecd1bcc88817c5469b88387388fade02bfa8bf3fc647d461"
+# Exact successful Python 3.12 install from the standalone ConvNeXt rehearsal log.
+CODEC_WHEELS = (
+    "pylibjpeg-2.1.0-py3-none-any.whl",
+    "pylibjpeg_libjpeg-2.4.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+    "pylibjpeg_openjpeg-2.6.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+)
 RECIPE = {"version": 1, "components": ["convnext-three-fold-mean-probability", "plain-raptor"],
           "weights": [0.5, 0.5], "ranking": "per target over all actual test IDs; average ties; rank/n",
           "selection": "predeclared; no labels or leaderboard-based weight choice", "tta": "none"}
@@ -41,6 +47,22 @@ RECIPE = {"version": 1, "components": ["convnext-three-fold-mean-probability", "
 
 def _digest(value):
     return isinstance(value, str) and len(value) == 64 and all(c in "0123456789abcdef" for c in value)
+
+
+def select_codec_wheels(directory):
+    """Select the pinned cp312/pure-Python codecs, ignoring other Python ABIs.
+
+    Reject another compatible wheel for any codec, including a second version or
+    platform build. Only these three paths are ever passed to offline pip.
+    """
+    compatible = {}
+    for path in Path(directory).glob("pylibjpeg*.whl"):
+        parts = path.name[:-4].split("-")
+        if path.is_file() and len(parts) >= 5 and {"py3", "cp312"}.intersection(parts[-3].split(".")):
+            compatible[path.name] = path
+    if set(compatible) != set(CODEC_WHEELS):
+        raise ValueError("Missing, duplicate or unexpected compatible ConvNeXt codec wheel")
+    return [compatible[name] for name in CODEC_WHEELS]
 
 
 def extract_reader(entry):

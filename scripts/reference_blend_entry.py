@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 from knee.reference import canonical_bytes, sha256
-from knee.reference_blend import CONVNEXT_DATASET, RAPTOR_WEIGHT_DATASET, run_blend
+from knee.reference_blend import CONVNEXT_DATASET, RAPTOR_WEIGHT_DATASET, run_blend, select_codec_wheels
 
 os.environ.update(HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", HF_HUB_DISABLE_TELEMETRY="1")
 qualification = BLEND_CONTRACT["qualification"]
@@ -45,9 +45,7 @@ if len(roots) != 1:
     raise ValueError("Competition attachment missing or ambiguous")
 # Same three offline codecs as the passing ConvNeXt entry. Qualification records
 # their hashes; full entry requires the exact same payloads before pip executes.
-wheels = sorted(cnn.glob("pylibjpeg*.whl"))
-if len(wheels) != 3 or any("cp313" in path.name or not ("cp312" in path.name or "py3-none-any" in path.name) for path in wheels):
-    raise ValueError("Expected exactly three compatible ConvNeXt codec wheels")
+wheels = select_codec_wheels(cnn)
 codec_hashes = {path.name: hashlib.file_digest(path.open("rb"), "sha256").hexdigest() for path in wheels}
 if BLEND_CONTRACT["expected_codec_hashes"] and codec_hashes != BLEND_CONTRACT["expected_codec_hashes"]:
     raise ValueError("Offline codec payload differs from common-environment rehearsal")

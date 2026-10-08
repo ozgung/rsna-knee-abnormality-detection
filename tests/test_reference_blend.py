@@ -11,10 +11,10 @@ import unittest
 from unittest.mock import patch
 
 from knee.reference import canonical_bytes, sha256
-from knee.reference_blend import (CONVNEXT_ENTRY_SHA256, CONVNEXT_SOURCE_HASHES,
+from knee.reference_blend import (CODEC_WHEELS, CONVNEXT_ENTRY_SHA256, CONVNEXT_SOURCE_HASHES,
     RAPTOR_PLAIN_SHA256, RAPTOR_WEIGHT_DATASET, RAPTOR_WEIGHT_NAME, RECIPE,
     equal_rank_blend, extract_reader, qualify_components, read_test_contract,
-    run_blend, write_probabilities)
+    run_blend, select_codec_wheels, write_probabilities)
 
 
 def component_receipts():
@@ -53,6 +53,27 @@ def schema_fixture(root, ids=("test-z", "test-a", "test-m")):
 
 
 class BlendContractTests(unittest.TestCase):
+    def test_codec_selection_ignores_cp311_but_rejects_missing_or_duplicate_cp312(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in CODEC_WHEELS:
+                (root / name).write_bytes(b"synthetic wheel")
+                if "cp312" in name:
+                    (root / name.replace("cp312", "cp311")).write_bytes(b"different ABI")
+            self.assertEqual(len(list(root.glob("*.whl"))), 5)
+            selected = select_codec_wheels(root)
+            self.assertEqual([p.name for p in selected], list(CODEC_WHEELS))
+            self.assertTrue(all("cp311" not in p.name for p in selected))
+            # A second compatible version must not be silently chosen by pip.
+            duplicate = root / CODEC_WHEELS[1].replace("2.4.0", "2.5.0")
+            duplicate.write_bytes(b"unexpected compatible version")
+            with self.assertRaisesRegex(ValueError, "duplicate"):
+                select_codec_wheels(root)
+            duplicate.unlink()
+            (root / CODEC_WHEELS[2]).unlink()
+            with self.assertRaisesRegex(ValueError, "Missing"):
+                select_codec_wheels(root)
+
     def test_both_rehearsals_required_with_exact_sources_plain_weight_and_runtime(self):
         qualified = qualify_components(*component_receipts())
         self.assertEqual(qualified["estimated_1300_seconds_with_margin"], 15000)
@@ -155,7 +176,7 @@ class BlendReceiptTests(unittest.TestCase):
                   "test_studies": 3, "prediction_fallbacks": 0, "blend_repeat_max_abs_error": 0,
                   "estimated_1300_seconds_mean_with_margin": 17000,
                   "components": {"convnext": component, "raptor": component},
-                  "codec_hashes": {f"wheel-{i}": str(i) * 64 for i in range(3)}}
+                  "codec_hashes": {name: str(i) * 64 for i, name in enumerate(CODEC_WHEELS)}}
         self.assertEqual(builder.require_blend_rehearsal(report, "a" * 64), report["codec_hashes"])
         with self.assertRaisesRegex(ValueError, "matching"):
             builder.require_blend_rehearsal(report, "b" * 64)
