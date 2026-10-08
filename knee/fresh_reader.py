@@ -30,6 +30,12 @@ CONFIG = {'seed': 42, 'image_size': 224, 'windows': 4, 'train_limit': 512,
           'cache_bytes': 2 * 1024**3, 'disk_reserve_bytes': 1024**3,
           'training_seconds': 5400, 'max_epochs': 4, 'batch_size': 2,
           'lr_encoder': 1e-4, 'lr_head': 5e-4, 'weight_decay': .02, 'ema': .998}
+DURATION_PROFILE = 'same512-duration12-v1'
+DURATION_PLAN = '1bd346c05c0aac20f54b82b790e356d3d6c1b95606accaa4a5d1da7e3e421942'
+INITIAL_ENCODER_SHA256 = 'b1d4d0986c66bb1d02eddf7bf4bceea7fde12aced5def666c28d3b89951b569e'
+TRAINING_SOURCE_FILES = ('knee/__init__.py', 'knee/validation.py', 'knee/features.py', 'knee/experiment.py',
+                        'knee/fresh_reader.py', 'knee/fresh_reader_setup.py', 'knee/fresh_reader_probe.py',
+                        'scripts/build_fresh_reader.py')
 
 
 def fingerprint(value):
@@ -41,6 +47,145 @@ def validate_plan(plan):
     if plan.get('fingerprint') != actual:
         raise ValueError('Plan contents do not match their fingerprint')
     return actual
+
+
+def duration_experiment(plan_fingerprint, config, *, runner_sha256=None, own_sources=None):
+    """One named duration comparison; never rewrite the immutable cache plan."""
+    if plan_fingerprint != DURATION_PLAN or config != CONFIG:
+        raise ValueError('Duration experiment requires the exact original512/200 cache plan/config')
+    runner_sha256 = file_sha256(__file__) if runner_sha256 is None else runner_sha256
+    if not isinstance(runner_sha256, str) or len(runner_sha256) != 64 or any(c not in '0123456789abcdef' for c in runner_sha256):
+        raise ValueError('Invalid experiment runner hash')
+    own_sources = ({name: file_sha256(Path(__file__).resolve().parents[1] / name) for name in TRAINING_SOURCE_FILES}
+                   if own_sources is None else own_sources)
+    if (set(own_sources) != set(TRAINING_SOURCE_FILES) or own_sources['knee/fresh_reader.py'] != runner_sha256 or
+            any(not isinstance(v, str) or len(v) != 64 or any(c not in '0123456789abcdef' for c in v)
+                for v in own_sources.values())):
+        raise ValueError('Invalid experiment build/runtime source hashes')
+    contract = {'profile': DURATION_PROFILE, 'plan_fingerprint': plan_fingerprint,
+        'config': config | {'max_epochs': 12}, 'runner_sha256': runner_sha256,
+        'source_hashes': SOURCE_HASHES, 'own_sources': own_sources, 'backbone': BACKBONE,
+        'initial_encoder_sha256': INITIAL_ENCODER_SHA256,
+        'initialization': 'fresh generic ImageNet; new optimizer, EMA and12epoch cosine; no warm start',
+        'selection': 'minimum confidence-weighted macro weak-validation BCE; EMA; no gold',
+        'gate': {'warmup_batches': 16, 'timed_batches': 48, 'batch_size': 2,
+                 'warmup_backward_batches': 16, 'timed_backward_batches': 48,
+                 'optimizer_updates': 0, 'safety_factor': 1.5, 'checkpoint_reserve_seconds': 180,
+                 'require_all_epochs': 12, 'seconds_limit': 5400}}
+    return contract | {'fingerprint': fingerprint(contract)}
+
+
+def validate_experiment(plan, experiment, *, current_runner=True):
+    if experiment is None:
+        return
+    expected = duration_experiment(plan['fingerprint'], plan['config'],
+        runner_sha256=None if current_runner else experiment.get('runner_sha256'),
+        own_sources=None if current_runner else experiment.get('own_sources'))
+    if experiment != expected:
+        raise ValueError('Named training experiment differs from its immutable contract')
+
+
+def duration_gate_budget(train_seconds, validation_seconds, diagnostic_seconds, elapsed_seconds):
+    values = (train_seconds, validation_seconds, diagnostic_seconds, elapsed_seconds)
+    if any(not math.isfinite(x) or x < 0 for x in values) or min(values[:3]) <= 0:
+        raise ValueError('Invalid duration timing measurements')
+    epoch_seconds = (256 * train_seconds + 100 * validation_seconds + 32 * diagnostic_seconds) * 1.5
+    remaining = 5400 - elapsed_seconds - 180
+    return {'passed': 12 * epoch_seconds <= remaining, 'planned_epochs': 12,
+            'estimated_epoch_seconds_with_margin': epoch_seconds,
+            'estimated_training_seconds_with_margin': 12 * epoch_seconds,
+            'elapsed_before_fit_seconds': elapsed_seconds, 'remaining_after_checkpoint_reserve_seconds': remaining,
+            'checkpoint_reserve_seconds': 180, 'safety_factor': 1.5}
+
+
+def duration_timing_gate(model, ema, optimizer, scaler, batch, validate, tr, va, diagnostic_indices, config, started):
+    """Same first64 no-update batches:16 warmup,48 steady; all time is charged."""
+    import torch
+    if (len(tr), len(va), len(diagnostic_indices), config['batch_size']) != (512, 200, 64, 2):
+        raise ValueError('Duration gate requires the exact512/200/train64 cohort and batch2')
+    before = rng_state()
+    warmup_started = time.monotonic()
+    measured = 0
+    warmup_backward = timed_backward = 0
+    try:
+        model.train()
+        for batch_number in range(64):
+            if time.monotonic() - started > config['training_seconds'] - 180:
+                raise TimeoutError('Duration timing gate exhausted the training budget')
+            if batch_number == 16:
+                torch.cuda.synchronize()
+                timed_started = time.monotonic()
+                warmup_seconds = timed_started - warmup_started
+            offset = batch_number * 2
+            x, mask, pos, y = batch(tr[offset:offset + 2])
+            optimizer.zero_grad(set_to_none=True)
+            with torch.autocast('cuda', dtype=torch.float16):
+                numerator, denominator = loss_terms(model(x, mask, pos, res=config['image_size'], train=True), y)
+            if not torch.isfinite(numerator).all():
+                raise ValueError('Nonfinite duration pilot supervision')
+            if (denominator > 0).any():
+                scaler.scale(macro_loss(numerator, denominator)).backward()
+                measured += 1
+                if batch_number < 16:
+                    warmup_backward += 1
+                else:
+                    timed_backward += 1
+        torch.cuda.synchronize()
+        timed_seconds = time.monotonic() - timed_started
+        if (warmup_backward, timed_backward) != (16, 48):
+            raise ValueError('Duration gate requires16warmup and48timed supervised backward batches')
+        tick = time.monotonic()
+        validate(ema, va[:16]); torch.cuda.synchronize()
+        validation_seconds = (time.monotonic() - tick) / 8
+        tick = time.monotonic()
+        validate(ema, diagnostic_indices[:16]); torch.cuda.synchronize()
+        diagnostic_seconds = (time.monotonic() - tick) / 8
+    finally:
+        optimizer.zero_grad(set_to_none=True)
+        restore_rng(before)
+    return duration_gate_budget(timed_seconds / 48, validation_seconds, diagnostic_seconds,
+                                time.monotonic() - started) | {
+        'warmup_batches': 16, 'timed_batches': 48, 'warmup_seconds': warmup_seconds,
+        'warmup_backward_batches': warmup_backward, 'timed_backward_batches': timed_backward,
+        'timed_seconds': timed_seconds, 'measured_training_steps': measured, 'optimizer_updates': 0,
+        'train_batch_seconds': timed_seconds / 48, 'validation_batch_seconds': validation_seconds,
+        'training_diagnostic_batch_seconds': diagnostic_seconds, 'training_diagnostic_studies': 64}
+
+
+def validate_duration_resume(state, experiment):
+    if (state.get('experiment') != experiment or state.get('experiment_fingerprint') != experiment['fingerprint'] or
+            state.get('config') != experiment['config'] or state.get('planned_epochs') != 12 or
+            state.get('initial_encoder_sha256') != INITIAL_ENCODER_SHA256 or
+            not math.isfinite(state.get('best_loss', math.inf)) or
+            not isinstance(state.get('best_evidence_fingerprint'), str) or
+            len(state.get('best_evidence_fingerprint', '')) != 64 or
+            not 0 <= state.get('epoch', -1) < 12 or not state.get('gate', {}).get('passed') or
+            state.get('gate', {}).get('planned_epochs') != 12 or
+            state.get('gate', {}).get('experiment_fingerprint') != experiment['fingerprint'] or
+            state.get('scheduler', {}).get('T_max') != 12 * 256):
+        raise ValueError('Duration resume requires its own incomplete12epoch experiment/checkpoint pair')
+
+
+def remaining_training_budget(elapsed_before, started, *, reserve=180):
+    if (isinstance(elapsed_before, bool) or not isinstance(elapsed_before, (int, float)) or
+            not math.isfinite(elapsed_before) or elapsed_before < 0):
+        raise ValueError('Invalid cumulative training elapsed time')
+    remaining = 5400 - elapsed_before - (time.monotonic() - started) - reserve
+    if remaining <= 0:
+        raise TimeoutError('Cumulative training budget exhausted before preparation')
+    return remaining
+
+
+def duration_resume_report(resume, experiment, started):
+    """Small receipt first: reject exhausted/mixed runs before loading tensors."""
+    report = json.loads((Path(resume).parent / 'training-report.json').read_text())
+    if (report.get('experiment') != experiment or report.get('experiment_fingerprint') != experiment['fingerprint'] or
+            report.get('runner_sha256') != experiment['runner_sha256'] or
+            report.get('plan_fingerprint') != experiment['plan_fingerprint']):
+        raise ValueError('Duration resume training report differs')
+    elapsed = report.get('elapsed_seconds')
+    remaining_training_budget(elapsed, started)
+    return elapsed
 
 
 def write_json(path, value):
@@ -401,13 +546,14 @@ def save_checkpoint(path, payload):
     os.replace(path.with_suffix('.tmp'), path)
 
 
-def weak_validation_evidence(plan, indices, predictions, *, logits, epoch, weak_bce):
+def weak_validation_evidence(plan, indices, predictions, *, logits, epoch, weak_bce, experiment=None):
     """Bind already-computed best-EMA predictions to the full ordered weak holdout.
 
     This private payload includes original soft labels (including unknown 0.5),
     never gold labels. It does not fit, recompute, or change the selection metric.
     """
     validate_plan(plan)
+    validate_experiment(plan, experiment, current_runner=False)
     expected = [i for i, row in enumerate(plan['records']) if row['split'] == 'weak_validation']
     if not expected or list(indices) != expected:
         raise ValueError('Evidence must cover the exact ordered weak-validation plan records')
@@ -440,6 +586,10 @@ def weak_validation_evidence(plan, indices, predictions, *, logits, epoch, weak_
                 'logits': logit_values, 'loss_dtype': 'float32 logits and float32-cast original weak labels',
                 'selected_epoch': epoch, 'selected_weak_bce': float(weak_bce),
                 'selection_metric': 'confidence-weighted per-target macro weak BCE; exact 0.5 unknown'}
+    if experiment is not None:
+        if epoch > experiment['config']['max_epochs']:
+            raise ValueError('Selected epoch exceeds its named experiment')
+        evidence.update(version=2, experiment=experiment, experiment_fingerprint=experiment['fingerprint'])
     return evidence | {'fingerprint': fingerprint(evidence)}
 
 
@@ -449,9 +599,15 @@ def _check_best_evidence(plan, payload, expected_fingerprint=None):
         raise ValueError('Best checkpoint has no matching weak-validation evidence')
     if payload.get('plan_fingerprint') != plan['fingerprint'] or payload.get('targets') != plan['targets']:
         raise ValueError('Best evidence checkpoint plan or target order differs')
+    experiment = payload.get('experiment')
+    if experiment is not None and (payload.get('experiment_fingerprint') != experiment['fingerprint'] or
+            payload.get('runner_sha256') != experiment['runner_sha256'] or
+            payload.get('config') != experiment['config'] or
+            payload.get('initial_encoder_sha256') != experiment['initial_encoder_sha256']):
+        raise ValueError('Best checkpoint experiment binding differs')
     expected = weak_validation_evidence(plan, evidence.get('plan_record_indices', []),
         evidence.get('probabilities', []), logits=evidence.get('logits', []),
-        epoch=payload['epoch'], weak_bce=payload['weak_bce'])
+        epoch=payload['epoch'], weak_bce=payload['weak_bce'], experiment=experiment)
     if evidence != expected or (expected_fingerprint is not None and evidence['fingerprint'] != expected_fingerprint):
         raise ValueError('Best weak-validation evidence differs from its plan or selected checkpoint')
     return evidence
@@ -469,13 +625,15 @@ def write_best_evidence(output_dir, plan, payload, *, expected_fingerprint=None)
             'selected_epoch': evidence['selected_epoch']}
 
 
-def restore_best_evidence(previous_dir, output_dir, plan, *, best_loss, expected_fingerprint):
+def restore_best_evidence(previous_dir, output_dir, plan, *, best_loss, expected_fingerprint, experiment=None):
     """Recover the sidecar from the selected checkpoint, even if no epoch improves."""
     import torch
     if not isinstance(expected_fingerprint, str) or len(expected_fingerprint) != 64:
         raise ValueError('Resume has no selected weak-validation evidence fingerprint')
     previous = Path(previous_dir) / 'best.pt'
     payload = torch.load(previous, map_location='cpu', weights_only=True)
+    if payload.get('experiment') != experiment:
+        raise ValueError('Resume best checkpoint belongs to a different experiment')
     if payload.get('weak_bce') != best_loss:
         raise ValueError('Resume best checkpoint loss does not match')
     _check_best_evidence(plan, payload, expected_fingerprint)
@@ -546,7 +704,7 @@ def load_cached_batch(records, index, cache_dir, indices, *, device='cuda'):
     return x, mask, pos, y
 
 
-def train(cache_dir, source_dir, output_dir, *, resume=None):
+def train(cache_dir, source_dir, output_dir, *, resume=None, experiment=None, started_at=None):
     import copy
     import numpy as np
     import torch
@@ -557,30 +715,52 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
     output_dir.mkdir(parents=True, exist_ok=True)
     if (output_dir / 'last.pt').exists() and resume is None:
         raise ValueError('Existing training output requires explicit resume or a new directory')
-    started = time.monotonic()
+    started = time.monotonic() if started_at is None else started_at
+    if not math.isfinite(started) or started > time.monotonic():
+        raise ValueError('Invalid whole-stage start time')
     elapsed_before = 0.
     plan = json.loads((cache_dir / 'plan-private.json').read_text())
     validate_plan(plan)
     complete = json.loads((cache_dir / 'cache-complete.json').read_text())
     if complete['status'] != 'PASS' or complete['plan_fingerprint'] != plan['fingerprint']:
         raise ValueError('A completed cache with matching fingerprint is required')
-    config = plan['config']
-    if config['max_epochs'] > 4 or config['training_seconds'] > 5400:
+    validate_experiment(plan, experiment)
+    config = dict(plan['config']) if experiment is None else dict(experiment['config'])
+    experiment_fields = {} if experiment is None else {'experiment': experiment, 'experiment_fingerprint': experiment['fingerprint']}
+    if experiment is None and (config['max_epochs'] > 4 or config['training_seconds'] > 5400):
         raise ValueError('Pilot exceeds its authorized four-epoch/90-minute budget')
+    state = None
+    if resume:
+        if experiment is not None:
+            elapsed_before = duration_resume_report(resume, experiment, started)
+        with time_limit(remaining_training_budget(elapsed_before, started), 'resume checkpoint loading'):
+            state = torch.load(resume, map_location='cpu', weights_only=False)
+        if state['plan_fingerprint'] != plan['fingerprint'] or state['source_hashes'] != SOURCE_HASHES or state['backbone'] != BACKBONE or state.get('runner_sha256') != file_sha256(__file__):
+            raise ValueError('Resume training contract differs')
+        if state.get('experiment') != experiment:
+            raise ValueError('Resume belongs to a different training experiment')
+        if experiment is not None:
+            validate_duration_resume(state, experiment)
+            if state['elapsed_seconds'] > elapsed_before:
+                raise ValueError('Duration resume report predates its last checkpoint')
+        remaining_training_budget(state['elapsed_seconds'], started)
+        elapsed_before = max(elapsed_before, state['elapsed_seconds'])
+    remaining_training_budget(elapsed_before, started)
     records = plan['records']
     index = json.loads((cache_dir / 'cache-index-private.json').read_text())
     cache_verification_started = time.monotonic()
     verified_bytes = 0
     progress('train_cache_verification_begin', verified_studies=0, total_studies=len(records),
              verified_bytes=0, elapsed_seconds=0.)
-    for verified_studies, row in enumerate(records, 1):
-        if file_sha256(cache_dir / 'arrays' / index[row['uid']]['file']) != index[row['uid']]['sha256']:
-            raise ValueError('Training cache hash mismatch')
-        verified_bytes += index[row['uid']]['bytes']
-        if verified_studies % 64 == 0:
-            progress('train_cache_verification_progress', verified_studies=verified_studies,
-                     total_studies=len(records), verified_bytes=verified_bytes,
-                     elapsed_seconds=time.monotonic() - cache_verification_started)
+    with time_limit(remaining_training_budget(elapsed_before, started), 'training cache verification'):
+        for verified_studies, row in enumerate(records, 1):
+            if file_sha256(cache_dir / 'arrays' / index[row['uid']]['file']) != index[row['uid']]['sha256']:
+                raise ValueError('Training cache hash mismatch')
+            verified_bytes += index[row['uid']]['bytes']
+            if verified_studies % 64 == 0:
+                progress('train_cache_verification_progress', verified_studies=verified_studies,
+                         total_studies=len(records), verified_bytes=verified_bytes,
+                         elapsed_seconds=time.monotonic() - cache_verification_started)
     progress('train_cache_verification_complete', verified_studies=len(records), total_studies=len(records),
              verified_bytes=verified_bytes, elapsed_seconds=time.monotonic() - cache_verification_started)
     tr = [i for i, row in enumerate(records) if row['split'] == 'train']
@@ -601,18 +781,20 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
     # Fixed network timeouts plus the POSIX deadline bound fresh ImageNet loading.
     os.environ.setdefault('HF_HUB_DOWNLOAD_TIMEOUT', '120')
     os.environ.setdefault('HF_HUB_ETAG_TIMEOUT', '30')
-    with time_limit(300, 'ImageNet model initialization'):
+    with time_limit(min(300, remaining_training_budget(elapsed_before, started)), 'ImageNet model initialization'):
         code = load_source(source_dir, 'knee')
         model = code.KneeNet(BACKBONE, pretrained=resume is None, img_size=config['image_size']).cuda()
-    initial_encoder_sha256 = tensor_state_sha256(model.enc.state_dict()) if resume is None else None
-    progress('model_initialization_complete', elapsed_seconds=time.monotonic() - started)
-    model.cls_b.data.copy_(torch.as_tensor(np.log(prior / (1 - prior)), device='cuda'))
-    ema = copy.deepcopy(model).eval().requires_grad_(False)
-    optimizer = torch.optim.AdamW([
-        {'params': model.enc.parameters(), 'lr': config['lr_encoder']},
-        {'params': [p for n, p in model.named_parameters() if not n.startswith('enc.')], 'lr': config['lr_head']}],
-        weight_decay=config['weight_decay'])
-    scaler = torch.amp.GradScaler('cuda')
+        initial_encoder_sha256 = tensor_state_sha256(model.enc.state_dict()) if resume is None else None
+        if experiment is not None and resume is None and initial_encoder_sha256 != INITIAL_ENCODER_SHA256:
+            raise ValueError('Duration experiment generic ImageNet encoder hash differs')
+        progress('model_initialization_complete', elapsed_seconds=time.monotonic() - started)
+        model.cls_b.data.copy_(torch.as_tensor(np.log(prior / (1 - prior)), device='cuda'))
+        ema = copy.deepcopy(model).eval().requires_grad_(False)
+        optimizer = torch.optim.AdamW([
+            {'params': model.enc.parameters(), 'lr': config['lr_encoder']},
+            {'params': [p for n, p in model.named_parameters() if not n.startswith('enc.')], 'lr': config['lr_head']}],
+            weight_decay=config['weight_decay'])
+        scaler = torch.amp.GradScaler('cuda')
     batch_size = config['batch_size']
 
     def batch(indices):
@@ -645,18 +827,31 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
                 'undefined_bce_targets': [t for t, d in zip(plan['targets'], denominator) if d <= 0],
                 'thresholded_weak_auc': auc}, predictions, saved_logits
 
-    state = torch.load(resume, map_location='cpu', weights_only=False) if resume else None
     best_evidence_receipt = None
     if state:
-        if state['plan_fingerprint'] != plan['fingerprint'] or state['source_hashes'] != SOURCE_HASHES or state['backbone'] != BACKBONE or state.get('runner_sha256') != file_sha256(__file__):
-            raise ValueError('Resume training contract differs')
-        if math.isfinite(state['best_loss']):
-            best_evidence_receipt = restore_best_evidence(Path(resume).parent, output_dir, plan,
-                best_loss=state['best_loss'], expected_fingerprint=state.get('best_evidence_fingerprint'))
-        model.load_state_dict(state['model']); ema.load_state_dict(state['ema'])
-        optimizer.load_state_dict(state['optimizer']); scaler.load_state_dict(state['scaler'])
+        with time_limit(remaining_training_budget(elapsed_before, started), 'matching checkpoint restoration'):
+            if math.isfinite(state['best_loss']):
+                best_evidence_receipt = restore_best_evidence(Path(resume).parent, output_dir, plan,
+                    best_loss=state['best_loss'], expected_fingerprint=state.get('best_evidence_fingerprint'), experiment=experiment)
+            model.load_state_dict(state['model']); ema.load_state_dict(state['ema'])
+            optimizer.load_state_dict(state['optimizer']); scaler.load_state_dict(state['scaler'])
         epochs, gate = state['planned_epochs'], state['gate']
         initial_encoder_sha256 = state['initial_encoder_sha256']
+    elif experiment is not None:
+        gate_started = time.monotonic()
+        progress('gpu_gate_begin', train_studies=len(tr), validation_studies=len(va),
+                 diagnostic_studies=len(diagnostic_indices), elapsed_seconds=0.)
+        gate = duration_timing_gate(model, ema, optimizer, scaler, batch, validate, tr, va,
+                                   diagnostic_indices, config, started)
+        gate.update(experiment_fingerprint=experiment['fingerprint'])
+        write_json(output_dir / 'gpu-gate.json', gate)
+        progress('gpu_gate_complete', elapsed_seconds=time.monotonic() - gate_started,
+                 passed=gate['passed'], planned_epochs=gate['planned_epochs'],
+                 warmup_batches=16, timed_batches=48,
+                 estimated_epoch_seconds_with_margin=gate['estimated_epoch_seconds_with_margin'])
+        if not gate['passed']:
+            raise RuntimeError('All12 duration epochs must fit the90minute budget; no shortened horizon')
+        epochs = 12
     else:
         # Forward/backward timing only; no optimizer updates. Restore RNG afterward.
         gate_started = time.monotonic()
@@ -716,7 +911,6 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
     if state:
         scheduler.load_state_dict(state['scheduler'])
         restore_rng(state['rng'])
-    elapsed_before = state['elapsed_seconds'] if state else 0.
     epoch = state['epoch'] if state else 0
     cursor = state['cursor'] if state else 0
     order = state['order'] if state else None
@@ -725,7 +919,8 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
     best = state['best_loss'] if state else float('inf')
     best_evidence_fingerprint = best_evidence_receipt['evidence_fingerprint'] if best_evidence_receipt else None
     step = state['step'] if state else 0
-    run_contract = {'plan_fingerprint': plan['fingerprint'], 'source_hashes': SOURCE_HASHES,
+    run_contract = {**experiment_fields, 'runner_sha256': file_sha256(__file__),
+                    'plan_fingerprint': plan['fingerprint'], 'source_hashes': SOURCE_HASHES,
                     'backbone': BACKBONE, 'config': config, 'environment': environment(),
                     'pretrained_cfg': model.enc.pretrained_cfg, 'initial_encoder_sha256': initial_encoder_sha256,
                     'encoder_hash_scheme': 'fresh-encoder-state-v1', 'targets': plan['targets'],
@@ -749,6 +944,7 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
         progress('checkpoint_save_begin', kind='last', epoch=epoch,
                  elapsed_seconds=elapsed_before + time.monotonic() - started)
         save_checkpoint(output_dir / 'last.pt', {
+            **experiment_fields, 'config': config,
             'model': model.state_dict(), 'ema': ema.state_dict(), 'optimizer': optimizer.state_dict(),
             'scheduler': scheduler.state_dict(), 'scaler': scaler.state_dict(), 'rng': rng_state(),
             'epoch': epoch, 'cursor': cursor, 'order': order, 'history': history, 'best_loss': best,
@@ -824,8 +1020,9 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
                     ('weak_bce', 'confidence_support', 'undefined_bce_targets')}})
             if score < best:
                 evidence = weak_validation_evidence(plan, va, validation_predictions,
-                    logits=validation_logits, epoch=epoch + 1, weak_bce=score)
-                best_payload = {'model': ema.state_dict(), 'backbone': BACKBONE,
+                    logits=validation_logits, epoch=epoch + 1, weak_bce=score, experiment=experiment)
+                best_payload = {**experiment_fields, 'runner_sha256': file_sha256(__file__),
+                    'model': ema.state_dict(), 'backbone': BACKBONE,
                     'targets': plan['targets'], 'source_hashes': SOURCE_HASHES, 'config': config,
                     'plan_fingerprint': plan['fingerprint'], 'epoch': epoch + 1, 'weak_bce': score,
                     'training_prior': prior.tolist(), 'initial_encoder_sha256': initial_encoder_sha256,
@@ -850,7 +1047,8 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
     except Exception:
         status = 'FAILED'; checkpoint(); raise
     finally:
-        write_json(output_dir / 'training-report.json', {'status': status, 'history': history,
+        write_json(output_dir / 'training-report.json', {**experiment_fields, 'runner_sha256': file_sha256(__file__),
+            'status': status, 'history': history,
             'prevalence_weak_bce': prior_bce, 'planned_epochs': epochs, 'completed_epochs': epoch,
             'best_weak_bce': best if math.isfinite(best) else None,
             'best_weak_validation_evidence': best_evidence_receipt,

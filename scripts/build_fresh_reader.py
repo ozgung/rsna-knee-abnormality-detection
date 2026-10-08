@@ -6,16 +6,19 @@ from pathlib import Path
 import subprocess
 import sys
 import textwrap
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from knee.fresh_reader import CONFIG, SOURCE_HASHES, check_sources, cache_time_budget
+from knee.fresh_reader import (CONFIG, SOURCE_HASHES, DURATION_PROFILE, TRAINING_SOURCE_FILES,
+                               check_sources, cache_time_budget, duration_experiment, duration_resume_report)
 from knee.fresh_reader_setup import reference_parts
 
 DOCKER = 'gcr.io/kaggle-private-byod/python@sha256:37c64f7dd9c54116ecd1bcc88817c5469b88387388fade02bfa8bf3fc647d461'
 
 
-def build(source_dir, destination, slug, stage, *, cache_kernel=None, plan_fingerprint=None, resume_kernel=None, cache_seconds=None):
+def build(source_dir, destination, slug, stage, *, cache_kernel=None, plan_fingerprint=None, resume_kernel=None,
+          cache_seconds=None, training_profile=None, resume_contract=None):
     source_dir, destination = Path(source_dir), Path(destination)
     check_sources(source_dir)
     if stage not in ('cache-pilot', 'cache', 'train', 'probe'):
@@ -27,13 +30,30 @@ def build(source_dir, destination, slug, stage, *, cache_kernel=None, plan_finge
         raise ValueError('Expansion/training requires a cache kernel and its reviewed plan fingerprint')
     if resume_kernel and stage != 'train':
         raise ValueError('Resume applies to training only')
+    if training_profile not in (None, DURATION_PROFILE) or (training_profile is not None and stage != 'train'):
+        raise ValueError('Named duration profile applies only to training')
+    experiment = duration_experiment(plan_fingerprint, CONFIG) if training_profile else None
+    resume_contract_sha256 = None
+    resume_report_sha256 = None
+    prior_elapsed_seconds = 0.
+    if resume_contract and not (experiment and resume_kernel):
+        raise ValueError('Named resume contract requires its own duration resume attachment')
+    if experiment and resume_kernel:
+        if not resume_contract:
+            raise ValueError('Duration resume requires a downloaded matching run-contract; no old checkpoint attachment')
+        prior = json.loads(Path(resume_contract).read_text())
+        if (prior.get('experiment') != experiment or prior.get('experiment_fingerprint') != experiment['fingerprint'] or
+                prior.get('runner_sha256') != experiment['runner_sha256'] or
+                prior.get('plan_fingerprint') != plan_fingerprint or prior.get('config') != experiment['config']):
+            raise ValueError('Duration resume attachment contract differs')
+        resume_contract_sha256 = hashlib.sha256(Path(resume_contract).read_bytes()).hexdigest()
+        prior_elapsed_seconds = duration_resume_report(resume_contract, experiment, time.monotonic())
+        resume_report_sha256 = hashlib.sha256((Path(resume_contract).parent/'training-report.json').read_bytes()).hexdigest()
+        stage_seconds -= prior_elapsed_seconds
     for reference in (cache_kernel, resume_kernel):
         if reference:
             reference_parts(reference, owner='ozgung')
-    own = {str(p.relative_to(ROOT)): p.read_text() for p in
-           [ROOT/'knee/__init__.py', ROOT/'knee/validation.py', ROOT/'knee/features.py',
-            ROOT/'knee/experiment.py', ROOT/'knee/fresh_reader.py', ROOT/'knee/fresh_reader_setup.py',
-            ROOT/'knee/fresh_reader_probe.py']}
+    own = {name: (ROOT / name).read_text() for name in TRAINING_SOURCE_FILES}
     external = {name: (source_dir/name).read_text() for name in SOURCE_HASHES}
     license_text = (ROOT/'docs/licenses/fresh_reader_Apache-2.0.txt').read_text()
     for name, content in {**own, **external}.items():
@@ -43,7 +63,10 @@ def build(source_dir, destination, slug, stage, *, cache_kernel=None, plan_finge
                 'own_sources': {name: hashlib.sha256(content.encode()).hexdigest() for name, content in own.items()},
                 'license_sha256': hashlib.sha256(license_text.encode()).hexdigest(),
                 'config': CONFIG, 'cache_kernel': cache_kernel, 'plan_fingerprint': plan_fingerprint,
+                'experiment': experiment, 'experiment_fingerprint': experiment['fingerprint'] if experiment else None,
                 'resume_kernel': resume_kernel, 'setup_seconds': 300,
+                'resume_contract_sha256': resume_contract_sha256,
+                'resume_report_sha256': resume_report_sha256, 'prior_elapsed_seconds': prior_elapsed_seconds,
                 'cache_seconds_override': cache_seconds, 'effective_stage_seconds': stage_seconds}
     source_hash = hashlib.sha256(json.dumps(contract, sort_keys=True).encode()).hexdigest()
     setup = f'''from pathlib import Path
@@ -54,6 +77,9 @@ RESUME_KERNEL = {resume_kernel!r}
 CACHE_KERNEL = {cache_kernel!r}
 STAGE_BUDGET = {stage_seconds}
 CACHE_SECONDS_OVERRIDE = {cache_seconds!r}
+EXPERIMENT = {experiment!r}
+RESUME_CONTRACT_SHA256 = {resume_contract_sha256!r}
+RESUME_REPORT_SHA256 = {resume_report_sha256!r}
 CODE = {own!r}
 EXTERNAL = {external!r}
 LICENSE_TEXT = {license_text!r}
@@ -71,7 +97,7 @@ for name, content in EXTERNAL.items():
 sys.path.insert(0, str(base))
 os.environ['KNEE_CODE_REVISION'] = {revision!r}
 os.environ['KNEE_SOURCE_SHA256'] = {source_hash!r}
-from knee.fresh_reader import prepare_cache, train
+from knee.fresh_reader import prepare_cache, train, duration_resume_report, remaining_training_budget
 from knee.fresh_reader_probe import probe
 from knee.fresh_reader_setup import dataset_root, exact_root, cache_root, resume_checkpoint, progress, time_limit
 with time_limit(STAGE_BUDGET - (time.monotonic() - _stage_started), 'whole ' + STAGE + ' stage'):
@@ -106,12 +132,23 @@ with time_limit(STAGE_BUDGET - (time.monotonic() - _stage_started), 'whole ' + S
             else:
                 cache = previous
         resume = resume_checkpoint(inputs, RESUME_KERNEL, EXPECTED_PLAN) if RESUME_KERNEL else None
+        if resume and EXPERIMENT:
+            if hashlib.sha256((resume.parent/'run-contract.json').read_bytes()).hexdigest() != RESUME_CONTRACT_SHA256:
+                raise ValueError('Attached duration resume contract differs from reviewed local contract')
+            if hashlib.sha256((resume.parent/'training-report.json').read_bytes()).hexdigest() != RESUME_REPORT_SHA256:
+                raise ValueError('Attached duration resume report differs from reviewed local report')
         progress('setup_complete', elapsed_seconds=time.monotonic() - _stage_started)
     progress('stage_execution_begin', stage=STAGE)
     if STAGE == 'probe':
         result = probe(cache, sources, '/kaggle/working/fresh_reader_probe', EXPECTED_PLAN)
     elif STAGE == 'train':
-        result = train(cache, sources, '/kaggle/working/fresh_reader_training', resume=resume)
+        if EXPERIMENT:
+            prior_elapsed = duration_resume_report(resume, EXPERIMENT, _stage_started) if resume else 0.
+            with time_limit(remaining_training_budget(prior_elapsed, _stage_started, reserve=0), 'cumulative duration training'):
+                result = train(cache, sources, '/kaggle/working/fresh_reader_training', resume=resume,
+                               experiment=EXPERIMENT, started_at=_stage_started)
+        else:
+            result = train(cache, sources, '/kaggle/working/fresh_reader_training', resume=resume)
     else:
         result = prepare_cache(data, weak, sources, cache, pilot=STAGE == 'cache-pilot', cache_seconds=CACHE_SECONDS_OVERRIDE)
     print(json.dumps(result, indent=2))
@@ -131,6 +168,7 @@ with time_limit(STAGE_BUDGET - (time.monotonic() - _stage_started), 'whole ' + S
             'Public architecture/preprocessing by goodpjw2008 (Apache-2.0): https://www.kaggle.com/datasets/goodpjw2008/rsna-knee-2-5d-convnext-reader\n',
             'Own split, compact cache, confidence-masked supervision, resource gates and resumable training. No public knee checkpoint loaded. No gold evaluation.\n',
             ('Diagnostic: cached training32 only, ≤64 updates/600 seconds, no saved weights or model selection.\n' if stage == 'probe' else
+             'Named same512-duration12-v1: fresh ImageNet/optimizer/EMA/cosine, exact512/200, all12epochs must fit5400s; no4epoch warm start.\n' if experiment else
              'Predeclared: 224px, six slots × four fixed windows, ≤512 training/200 weak validation, ≤4 epochs/90 GPU minutes.\n')]},
         {'cell_type': 'code', 'id': 'pilot', 'metadata': {}, 'execution_count': None, 'outputs': [],
          'source': setup.splitlines(True)}]}
@@ -157,6 +195,8 @@ if __name__ == '__main__':
     ap.add_argument('--stage', required=True, choices=('cache-pilot', 'cache', 'train', 'probe'))
     ap.add_argument('--cache-seconds', type=int)
     ap.add_argument('--cache-kernel'); ap.add_argument('--plan-fingerprint'); ap.add_argument('--resume-kernel')
+    ap.add_argument('--training-profile', choices=(DURATION_PROFILE,)); ap.add_argument('--resume-contract')
     args = ap.parse_args()
     build(args.source_dir, args.destination, args.slug, args.stage, cache_kernel=args.cache_kernel,
-          plan_fingerprint=args.plan_fingerprint, resume_kernel=args.resume_kernel, cache_seconds=args.cache_seconds)
+          plan_fingerprint=args.plan_fingerprint, resume_kernel=args.resume_kernel, cache_seconds=args.cache_seconds,
+          training_profile=args.training_profile, resume_contract=args.resume_contract)

@@ -8,7 +8,7 @@ import json
 import math
 from pathlib import Path
 
-from knee.fresh_reader import fingerprint, validate_plan, weak_validation_evidence
+from knee.fresh_reader import fingerprint, validate_plan, validate_experiment, weak_validation_evidence
 from knee.validation import file_sha256
 
 MEMBERS = ('baseline', 'attention_seed43', 'attention_seed44', 'meanmax_seed42')
@@ -174,6 +174,42 @@ def _load_predictions(path, targets):
     return ids, values
 
 
+def evidence_experiment(plan, private, directory):
+    """Explicit v1 compatibility; named v2 evidence must match its run artifacts."""
+    evidence = private['evidence']
+    if evidence.get('version') == 1:
+        require('experiment' not in evidence and 'experiment_fingerprint' not in evidence,
+                'Legacy v1 evidence cannot carry a named experiment')
+        require(1 <= evidence.get('selected_epoch', 0) <= min(4, plan.get('config', {}).get('max_epochs', 4)),
+                'Legacy v1 selected epoch exceeds its original pilot horizon')
+        for name in ('run-contract.json', 'training-report.json'):
+            path = Path(directory) / name
+            if path.exists():
+                artifact = json.loads(path.read_text())
+                require(artifact.get('experiment') is None and artifact.get('experiment_fingerprint') is None,
+                        'Legacy v1 evidence cannot accompany a named experiment run')
+        return None
+    require(evidence.get('version') == 2 and isinstance(evidence.get('experiment'), dict),
+            'Unknown fresh evidence version or missing experiment')
+    experiment = evidence['experiment']
+    validate_experiment(plan, experiment, current_runner=False)
+    require(evidence.get('experiment_fingerprint') == experiment['fingerprint'], 'Evidence experiment hash differs')
+    artifacts = [json.loads((Path(directory) / name).read_text()) for name in
+                 ('run-contract.json', 'training-report.json')]
+    for artifact in artifacts:
+        require(artifact.get('experiment') == experiment and
+                artifact.get('experiment_fingerprint') == experiment['fingerprint'] and
+                artifact.get('plan_fingerprint') == plan['fingerprint'] and
+                artifact.get('runner_sha256') == experiment['runner_sha256'], 'Evidence/run experiment binding differs')
+    run, report = artifacts
+    require(run.get('config') == experiment['config'] and
+            run.get('initial_encoder_sha256') == experiment['initial_encoder_sha256'], 'Named run config or initialization differs')
+    selected = report.get('best_weak_validation_evidence') or {}
+    require(selected.get('evidence_fingerprint') == evidence['fingerprint'] and
+            selected.get('best_checkpoint_sha256') == private['best_checkpoint_sha256'], 'Selected report/evidence pair differs')
+    return experiment
+
+
 def load_inputs(plan_path, fresh_path, baseline_dir, comparison_dir, *, fresh_checkpoint=None):
     """Return private aligned arrays in memory, never in the aggregate report."""
     import numpy as np
@@ -193,8 +229,10 @@ def load_inputs(plan_path, fresh_path, baseline_dir, comparison_dir, *, fresh_ch
     require(set(private) == {'best_checkpoint', 'best_checkpoint_sha256', 'evidence'} and
             private['best_checkpoint'] == 'best.pt', 'Unexpected fresh evidence envelope')
     evidence = private['evidence']
+    experiment = evidence_experiment(plan, private, fresh_path.parent)
     expected = weak_validation_evidence(plan, indices, evidence['probabilities'], logits=evidence['logits'],
-                                       epoch=evidence['selected_epoch'], weak_bce=evidence['selected_weak_bce'])
+                                       epoch=evidence['selected_epoch'], weak_bce=evidence['selected_weak_bce'],
+                                       experiment=experiment)
     require(evidence == expected, 'Fresh evidence differs from exact ordered plan, labels, or fingerprint')
     checkpoint = Path(fresh_checkpoint) if fresh_checkpoint else fresh_path.parent / 'best.pt'
     require(file_sha256(checkpoint) == private['best_checkpoint_sha256'], 'Fresh checkpoint hash differs')
@@ -263,6 +301,8 @@ def load_inputs(plan_path, fresh_path, baseline_dir, comparison_dir, *, fresh_ch
     take = [positions[uid] for uid in selected_ids]
     predictions = {FRESH: fresh_p, BASELINES[0]: arrays['baseline'][take], BASELINES[1]: arrays['selected'][take]}
     receipt = {'status': 'PASS', 'targets': targets, 'cohort_studies': len(cohort),
+               'fresh_evidence_version': evidence['version'],
+               'fresh_experiment_fingerprint': experiment['fingerprint'] if experiment else None,
                'fresh_training_studies': sum(r['split'] == 'train' for r in records),
                'original_baseline_training_studies': baseline_training_count,
                'plan_fingerprint': plan['fingerprint'], 'plan_file_sha256': file_sha256(plan_path),

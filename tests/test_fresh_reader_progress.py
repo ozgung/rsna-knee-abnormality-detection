@@ -51,7 +51,10 @@ class TrainingProgressTests(unittest.TestCase):
             (root/'cache-index-private.json').write_text(json.dumps(index))
             plan={'records':records}; before=copy.deepcopy(plan); rng=random.getstate()
             namespace=dict(plan=plan,cache_dir=root,json=json,file_sha256=file_sha256,
-                           progress=progress,time=SimpleNamespace(monotonic=lambda:10.))
+                           progress=progress,time=SimpleNamespace(monotonic=lambda:10.),
+                           time_limit=lambda *a: __import__('contextlib').nullcontext(),
+                           remaining_training_budget=fresh_reader.remaining_training_budget,
+                           elapsed_before=0.,started=__import__('time').monotonic())
             events=execute(tree.body[start:end],namespace)
             self.assertEqual([e['event'] for e in events],['train_cache_verification_begin',
                 'train_cache_verification_progress','train_cache_verification_progress','train_cache_verification_complete'])
@@ -89,13 +92,13 @@ class TrainingProgressTests(unittest.TestCase):
                node.value.args[0].value in {'gpu_gate_begin','gpu_gate_complete','train_epoch_begin',
                                             'checkpoint_save_begin','checkpoint_save_complete'}]
         namespace=dict(progress=progress,time=SimpleNamespace(monotonic=lambda:10.),tr=[0]*512,va=[0]*200,
-            diagnostic_indices=[0]*64,gate_started=1.,gate={'passed':True},measured=64,epochs=4,
+            diagnostic_indices=[0]*64,gate_started=1.,gate={'passed':True,'planned_epochs':12,'estimated_epoch_seconds_with_margin':100.},measured=64,epochs=4,
             train_batch_seconds=.25,val_batch_seconds=.1,diagnostic_batch_seconds=.1,epoch_seconds=100.,
             checkpoint_started=7.,epoch=1,elapsed_before=0.,started=0.,
             epoch_training_trace={'online_training_batches':32,'successful_optimizer_steps':31},
             best_payload={'PRIVATE-ID-CANARY':'PRIVATE-LABEL-CANARY'},output_dir=Path('/PRIVATE-PATH-CANARY'))
         events=execute(nodes,namespace)
-        self.assertEqual(len(events),7)
+        self.assertEqual(len(events),9)
         self.assertNotIn('PRIVATE',json.dumps(events))
         saves=[e for e in events if e['event']=='checkpoint_save_complete']
         self.assertEqual({e['kind'] for e in saves},{'best','last'})
