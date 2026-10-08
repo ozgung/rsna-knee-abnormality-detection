@@ -152,7 +152,7 @@ def verify_index(root, plan, index, *, complete):
             raise ValueError('Cache file identity differs')
 
 
-def build_cache(data, sources, plan, out, *, previous=None, expansion_bytes=None):
+def build_cache(data, sources, plan, out, *, previous=None, expansion_bytes=None, expansion_reserve=None):
     import cv2
     import numpy as np
     import pandas as pd
@@ -164,6 +164,10 @@ def build_cache(data, sources, plan, out, *, previous=None, expansion_bytes=None
             not CACHE_CONFIG['bytes_limit']<=expansion_bytes<=17*1024**3):
         raise ValueError('Explicit byte revision applies to full cache only; max17GiB')
     byte_limit=expansion_bytes or CACHE_CONFIG['bytes_limit']
+    if expansion_reserve is not None and (pilot or type(expansion_reserve) is not int or
+            not 2*1024**3<=expansion_reserve<=CACHE_CONFIG['disk_reserve']):
+        raise ValueError('Full-cache working reserve must be2..5GiB')
+    disk_reserve=expansion_reserve or CACHE_CONFIG['disk_reserve']
     started = time.monotonic()
     limit = CACHE_CONFIG['pilot_seconds' if pilot else 'full_seconds']
     data, out = Path(data), Path(out)
@@ -173,7 +177,8 @@ def build_cache(data, sources, plan, out, *, previous=None, expansion_bytes=None
     audit = {'status': 'RUNNING', 'stage': 'pilot' if pilot else 'complete',
              'plan_fingerprint': plan['fingerprint'], 'environment': environment(),
              'selected_series': 0, 'missing_slots': 0, 'failures': 0, 'cached_studies': 0,
-             'expansion_bytes_override':expansion_bytes,'effective_bytes_limit':byte_limit}
+             'expansion_bytes_override':expansion_bytes,'effective_bytes_limit':byte_limit,
+             'effective_disk_reserve':disk_reserve,'initial_disk_free_bytes':shutil.disk_usage(out).free}
     index, total_bytes, new_seconds = {}, 0, 0.
     try:
         with time_limit(limit, 'TRAIN04 CPU cache'):
@@ -190,7 +195,10 @@ def build_cache(data, sources, plan, out, *, previous=None, expansion_bytes=None
                 gate = projection(list(index.values()), len(plan['records']), old_audit['overhead_seconds'],bytes_limit=byte_limit)
                 audit['original_pilot_gate']=old_audit['gate']
                 audit['expansion_gate']=gate
-                if not gate['passed'] or shutil.disk_usage(out).free < gate['estimated_bytes_with_margin'] + CACHE_CONFIG['disk_reserve']:
+                audit['expansion_disk_free_bytes']=shutil.disk_usage(out).free
+                audit['expansion_required_free_bytes']=gate['estimated_bytes_with_margin']+disk_reserve
+                audit['expansion_disk_gate_passed']=audit['expansion_disk_free_bytes']>=audit['expansion_required_free_bytes']
+                if not gate['passed'] or not audit['expansion_disk_gate_passed']:
                     raise ValueError('CPU expansion time/disk gate failed')
                 for row in index.values():
                     shutil.copy2(previous/'arrays'/row['file'], out/'arrays'/row['file'])
@@ -213,7 +221,7 @@ def build_cache(data, sources, plan, out, *, previous=None, expansion_bytes=None
                 uid = row['uid']
                 if uid in index:
                     continue
-                if shutil.disk_usage(out).free < CACHE_CONFIG['disk_reserve'] + 64*6*256**2:
+                if shutil.disk_usage(out).free < disk_reserve + 64*6*256**2:
                     raise RuntimeError('Remote disk reserve reached')
                 tick = time.monotonic()
                 volumes, selected_series = [], []
