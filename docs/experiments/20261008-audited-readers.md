@@ -122,3 +122,36 @@ Nested timeout cleanup fixed in `9196c69`: expired enclosing timers are not rear
 Parent full suite **102/102 PASS**, including 1,000 nested expirations across subprocesses.
 CPU64 has reached 40 cached studies with no reported failure. Next CPU duration will
 be determined from the completed measured gate; training remains unlaunched.
+
+## Completed CPU64 pilot and revised CPU resource budget
+
+CPU64 v1 completed on October8 around00:16UTC. Data checks **PASS**:64studies,
+311selected series,73missing slots,0failures;119,629,145compressed bytes.
+Decode/write time308.35s; total preprocessing675.32s, including366.97s of metadata
+and header work. The initial broad attachment search added startup latency outside
+that measurement; later builds resolve explicit mounts and bound setup.
+
+The original one-hour gate **failed on time**: projected712-study decoding with
+1.5×margin5,145.55s, storage with1.25×margin1,663,592,798bytes. The storage gate passed.
+Under the user's explicit authorization for long runs and dynamic planning, the
+next full-cache CPU cap is **7,200s**. Revised projection adds the measured nondecode
+cost: **5,512.52s**. The512/200split, image recipe,2GiBstorage limit and90minGPU budget
+remain fixed. The original failed gate is preserved; an explicit revised gate is
+required before expansion. Hash-verified pilot arrays will be reused.
+
+Final private plan fingerprint:
+`1bd346c05c0aac20f54b82b790e356d3d6c1b95606accaa4a5d1da7e3e421942`.
+All770selected/gold studies had header identities; no additional weak exclusions.
+Anonymization still limits patient-level guarantees. Pilot cache contains45training
+and19weak-validationstudies. Receipts under`outputs/kaggle/fresh-cache-pilot-result/`.
+Two label-blind arrays were downloaded for local QA: hashes, uint8shape6×4×3×224×224,
+finite positions and zero padding passed. Visual inspection retained expected planes
+and knee anatomy. Gallery`outputs/analysis/fresh-pilot-baselines/cache-gallery.png`.
+
+The existing frozen models were evaluated without refitting on the exact200-row
+fresh-pilot validation cohort: single weakBCE**0.44760065**, macro weakAUC**0.85756882**;
+fixedfour-head weakBCE**0.44628505**, macro weakAUC**0.86033998**. All12AUCs defined.
+These baselines used2,000trainingstudies versus512in the new pilot; this is a matched
+validation cohort, not a matched training budget. No gold labels or metrics used.
+Aggregate per-target evidence and hash checks are in
+`outputs/analysis/fresh-pilot-baselines/actual-200-baselines.json`.
