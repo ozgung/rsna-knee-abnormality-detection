@@ -55,7 +55,7 @@ class ProbeCoreTests(unittest.TestCase):
             generated = ''.join(nb['cells'][1]['source'])
             compile(generated, 'probe', 'exec')
             self.assertIn('STAGE_BUDGET = 600', generated)
-            self.assertIn("if STAGE != 'probe':", generated)
+            self.assertIn("if STAGE not in ('train', 'probe'):", generated)
 
 
 @unittest.skipIf(np is None, 'Optional ML dependencies unavailable')

@@ -1,6 +1,6 @@
 # Fresh ImageNet ConvNeXt pilot — 2026-10-08
 
-Implemented, source-reviewed and tested on synthetic inputs; **not yet trained or run on remote DICOMs**. Parent owns launch and STATUS updates. This pilot is separate from both the existing toy network and frozen DINO model.
+The real CPU64 DICOM cache check and the disposable CUDA32 trainability diagnostic have **passed**. Full fitting remains gated on the complete cache and measured GPU epoch budget; no held-out result from fresh fitting is available yet. Current receipts and run state are in [STATUS](../../STATUS.md). This pilot is separate from both the existing toy network and frozen DINO model.
 
 ## Predeclared experiment
 
@@ -22,7 +22,7 @@ Hypothesis: fine-tuning an ImageNet ConvNeXt-Tiny encoder with six MRI sequence 
 3. GPU job starts only from a complete cache with recomputed plan digest and verified array hashes. Time64 forward/backward batches without optimizer updates; restore RNG afterward. Measure validation throughput separately, then preselect1–4 epochs that fit90min with1.5× margin. Stop if even one epoch is projected not to fit. No full-training loop starts before this gate.
 4. Checkpoint model, EMA, optimizer, scheduler, scaler, Python/NumPy/Torch/CUDA RNG, shuffled order/cursor, metrics and cumulative elapsed time at epochs and graceful budget stops. Resume requires identical runner SHA, sources and plan; budget does not reset. The previous `best.pt` must accompany `last.pt` and is copied forward even if no new epoch improves. Abrupt process termination can lose work since the previous completed checkpoint.
 
-Private outputs contain IDs/labels/arrays and must remain private. Cache: `fresh_reader_cache/{plan-private.json,cache-index-private.json,cache-pilot.json,cache-complete.json,arrays/}`. Training: `fresh_reader_training/{run-contract.json,gpu-gate.json,last.pt,best.pt,training-report.json}`. Generated notebooks record early failures in `/kaggle/working/fresh-reader-failure.json`. No cache transfer to Colab is needed for this path.
+Private outputs contain IDs/labels/arrays and must remain private. Cache: `fresh_reader_cache/{plan-private.json,cache-index-private.json,cache-pilot.json,cache-complete.json,arrays/}`. Training: `fresh_reader_training/{run-contract.json,gpu-gate.json,last.pt,best.pt,best-weak-validation-private.json,training-report.json}`. Generated notebooks record early failures in `/kaggle/working/fresh-reader-failure.json`. No cache transfer to Colab is needed for this path.
 
 ## Commands for parent execution
 
@@ -113,3 +113,13 @@ python3.12 scripts/build_fresh_reader.py \
 Build only; parent launches after review. CUDA is unavailable locally, so unit checks establish selection, hash/mask/attachment boundaries and error reporting, not GPU trainability or throughput.
 
 Probe verification:84/84 ML-environment tests pass; dependency-free42 pass/42 optional skips; both dependency-free smoke invocations and `git diff --check` pass. Five probe regressions cover label-independent training-only selection, private attachment settings, deterministic tensor hashing, selected-array integrity without reading validation arrays, and explicit CUDA-unavailable failure reporting.
+
+## Selected prediction and training evidence
+
+The selected best-EMA checkpoint now embeds its already-computed weak-validation logits and probabilities with exact plan row indices, ordered study IDs, target order, original soft labels (0.5 preserved), selected epoch/BCE and a payload fingerprint. Finite logits preserve reproducible BCE when float32 sigmoid probabilities saturate to0/1; labels are cast to float32 by the loss. The atomic `best-weak-validation-private.json` sidecar adds the saved `best.pt` SHA256. These private outputs support paired comparison on the identical200-row cohort; no gold labels or extra prediction pass are used. Resume checks the payload against the plan, selected epoch/BCE and the fingerprint in `last.pt`, then reconstructs the sidecar from `best.pt`, including when no later epoch improves. A missing or mismatched embedded payload fails closed. The selected probabilities remain bound to best EMA, not the latest online weights.
+
+Each completed epoch reports successful optimizer steps, AMP overflow skips, starting/ending learning rates and mean online macro batch BCE over known-label attempted batches, including overflow attempts. This augmented online loss is diagnostic and is not directly the unaugmented EMA holdout metric. Partial epoch counters are checkpointed and restored. A fixed, label-blind ID-hash sample of up to64 **training** rows is also evaluated using EMA and the same unaugmented evaluation routine; only BCE, target confidence support and undefined targets are retained. Its count/fingerprint are recorded, its separately measured evaluation cost is included in the GPU epoch gate, and it never selects a checkpoint. Weak-validation BCE alone still selects best EMA; the recipe and four-epoch/90-minute caps are unchanged.
+
+Training and probe notebooks attach only the needed private cache/resume outputs and skip competition-root resolution. Source compilation and focused synthetic checks cover evidence ordering/tampering, missing-sidecar resume, diagnostic cohort/trace preservation, and cache-only training attachments. These checks do not establish CUDA resume correctness or a held-out improvement; parent owns the gated launch.
+
+Evidence update verification:32/32 focused fresh-reader tests pass, including eight new evidence tests; full ML suite116/116 passes with audited source snapshots/receipts enabled. Dependency-free suite62 passes/54 optional skips; smoke and diff checks pass. A fresh training notebook built from the real audited source compiles (145,741bytes) with one private cache attachment and no competition/model/dataset attachments. Independent review reran the focused checks and found no launch blocker. No remote run was launched for this implementation.

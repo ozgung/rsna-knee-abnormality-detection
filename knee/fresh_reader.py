@@ -401,6 +401,120 @@ def save_checkpoint(path, payload):
     os.replace(path.with_suffix('.tmp'), path)
 
 
+def weak_validation_evidence(plan, indices, predictions, *, logits, epoch, weak_bce):
+    """Bind already-computed best-EMA predictions to the full ordered weak holdout.
+
+    This private payload includes original soft labels (including unknown 0.5),
+    never gold labels. It does not fit, recompute, or change the selection metric.
+    """
+    validate_plan(plan)
+    expected = [i for i, row in enumerate(plan['records']) if row['split'] == 'weak_validation']
+    if not expected or list(indices) != expected:
+        raise ValueError('Evidence must cover the exact ordered weak-validation plan records')
+    targets = list(plan['targets'])
+    records = [plan['records'][i] for i in expected]
+    ids = [row['uid'] for row in records]
+    if not targets or len(set(targets)) != len(targets) or len(set(ids)) != len(ids) or any(not uid for uid in ids):
+        raise ValueError('Invalid weak-validation target or ID schema')
+    labels = [[float(value) for value in row['labels']] for row in records]
+    probabilities = [[float(value) for value in row] for row in predictions]
+    logit_values = [[float(value) for value in row] for row in logits]
+    if (len(probabilities) != len(expected) or
+            any(len(row) != len(targets) or any(not math.isfinite(v) or not 0 <= v <= 1 for v in row)
+                for row in labels + probabilities)):
+        raise ValueError('Weak-validation evidence has invalid shape or probabilities')
+    if (len(logit_values) != len(expected) or
+            any(len(row) != len(targets) or any(not math.isfinite(v) for v in row) for row in logit_values)):
+        raise ValueError('Weak-validation evidence has invalid logits')
+    for probability_row, logit_row in zip(probabilities, logit_values):
+        for probability, logit in zip(probability_row, logit_row):
+            sigmoid = 1 / (1 + math.exp(-logit)) if logit >= 0 else math.exp(logit) / (1 + math.exp(logit))
+            if abs(sigmoid - probability) > 1e-6:
+                raise ValueError('Weak-validation probabilities and logits are misaligned')
+    if (not isinstance(epoch, int) or isinstance(epoch, bool) or epoch < 1 or
+            not math.isfinite(weak_bce) or weak_bce < 0):
+        raise ValueError('Invalid selected epoch or weak BCE')
+    evidence = {'version': 1, 'split': 'weak_validation', 'model': 'selected_best_ema',
+                'plan_fingerprint': plan['fingerprint'], 'plan_record_indices': expected,
+                'targets': targets, 'ids': ids, 'weak_labels': labels, 'probabilities': probabilities,
+                'logits': logit_values, 'loss_dtype': 'float32 logits and float32-cast original weak labels',
+                'selected_epoch': epoch, 'selected_weak_bce': float(weak_bce),
+                'selection_metric': 'confidence-weighted per-target macro weak BCE; exact 0.5 unknown'}
+    return evidence | {'fingerprint': fingerprint(evidence)}
+
+
+def _check_best_evidence(plan, payload, expected_fingerprint=None):
+    evidence = payload.get('weak_validation_evidence')
+    if not isinstance(evidence, dict):
+        raise ValueError('Best checkpoint has no matching weak-validation evidence')
+    if payload.get('plan_fingerprint') != plan['fingerprint'] or payload.get('targets') != plan['targets']:
+        raise ValueError('Best evidence checkpoint plan or target order differs')
+    expected = weak_validation_evidence(plan, evidence.get('plan_record_indices', []),
+        evidence.get('probabilities', []), logits=evidence.get('logits', []),
+        epoch=payload['epoch'], weak_bce=payload['weak_bce'])
+    if evidence != expected or (expected_fingerprint is not None and evidence['fingerprint'] != expected_fingerprint):
+        raise ValueError('Best weak-validation evidence differs from its plan or selected checkpoint')
+    return evidence
+
+
+def write_best_evidence(output_dir, plan, payload, *, expected_fingerprint=None):
+    evidence = _check_best_evidence(plan, payload, expected_fingerprint)
+    output_dir = Path(output_dir)
+    checkpoint_sha256 = file_sha256(output_dir / 'best.pt')
+    name = 'best-weak-validation-private.json'
+    write_json(output_dir / name, {'best_checkpoint': 'best.pt', 'best_checkpoint_sha256': checkpoint_sha256,
+                                  'evidence': evidence})
+    return {'file': name, 'sha256': file_sha256(output_dir / name),
+            'evidence_fingerprint': evidence['fingerprint'], 'best_checkpoint_sha256': checkpoint_sha256,
+            'selected_epoch': evidence['selected_epoch']}
+
+
+def restore_best_evidence(previous_dir, output_dir, plan, *, best_loss, expected_fingerprint):
+    """Recover the sidecar from the selected checkpoint, even if no epoch improves."""
+    import torch
+    if not isinstance(expected_fingerprint, str) or len(expected_fingerprint) != 64:
+        raise ValueError('Resume has no selected weak-validation evidence fingerprint')
+    previous = Path(previous_dir) / 'best.pt'
+    payload = torch.load(previous, map_location='cpu', weights_only=True)
+    if payload.get('weak_bce') != best_loss:
+        raise ValueError('Resume best checkpoint loss does not match')
+    _check_best_evidence(plan, payload, expected_fingerprint)
+    destination = Path(output_dir) / 'best.pt'
+    if previous.resolve() != destination.resolve():
+        shutil.copy2(previous, destination)
+    return write_best_evidence(output_dir, plan, payload, expected_fingerprint=expected_fingerprint)
+
+
+def training_diagnostic_indices(records, limit=64):
+    """Fixed ID-hash cohort of training rows, independent of labels and validation."""
+    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 64:
+        raise ValueError('Training diagnostic is bounded to at most 64 rows')
+    eligible = [i for i, row in enumerate(records) if row['split'] == 'train']
+    if not eligible or len({records[i]['uid'] for i in eligible}) != len(eligible):
+        raise ValueError('Training diagnostic requires unique training IDs')
+    return sorted(eligible, key=lambda i: hashlib.sha256(
+        ('fresh-ema-training-diagnostic:' + records[i]['uid']).encode()).hexdigest())[:limit]
+
+
+def record_training_step(trace, loss, *, overflow):
+    """Track attempted known-label batches without changing optimizer decisions."""
+    if not math.isfinite(loss) or loss < 0:
+        raise ValueError('Invalid diagnostic online batch loss')
+    trace['online_loss_sum'] += float(loss)
+    trace['online_training_batches'] += 1
+    trace['amp_overflow_skips'] += int(overflow)
+    trace['successful_optimizer_steps'] += int(not overflow)
+
+
+def training_trace_summary(trace, lr_end):
+    return {key: trace[key] for key in ('successful_optimizer_steps', 'amp_overflow_skips',
+            'online_training_batches', 'lr_start')} | {
+        'lr_end': list(lr_end),
+        'online_training_batch_loss_mean': trace['online_loss_sum'] / trace['online_training_batches']
+            if trace['online_training_batches'] else None,
+        'online_loss_note': 'Mean of confidence-weighted macro batch BCE over known-label attempted batches, including AMP-overflow skips; online weights and training augmentation.'}
+
+
 def tensor_state_sha256(state):
     """Hash actual tensors deterministically without saving another weight file.
 
@@ -461,6 +575,11 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
     va = [i for i, row in enumerate(records) if row['split'] == 'weak_validation']
     if not tr or not va or {records[i]['group'] for i in tr} & {records[i]['group'] for i in va}:
         raise ValueError('Empty partitions or report-group leakage')
+    diagnostic_indices = training_diagnostic_indices(records)
+    diagnostic_contract = {'count': len(diagnostic_indices),
+        'ordered_ids_fingerprint': fingerprint([records[i]['uid'] for i in diagnostic_indices]),
+        'selection': 'SHA256(fresh-ema-training-diagnostic:ID), training rows only; no label selection',
+        'model': 'EMA; unaugmented; diagnostic only, never checkpoint selection'}
     random.seed(config['seed']); np.random.seed(config['seed']); torch.manual_seed(config['seed'])
     torch.backends.cudnn.benchmark = False
     torch.backends.cuda.matmul.allow_tf32 = False
@@ -492,7 +611,7 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
     def validate(current, indices):
         current.eval()
         numerator, denominator = torch.zeros(len(plan['targets'])), torch.zeros(len(plan['targets']))
-        predictions = []
+        predictions, saved_logits = [], []
         for offset in range(0, len(indices), batch_size):
             if elapsed_before + time.monotonic() - started > config['training_seconds'] - 120:
                 raise TimeoutError('Validation wall-clock budget exhausted')
@@ -502,6 +621,7 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
             n, d = loss_terms(logit, y)
             numerator += n.cpu(); denominator += d.cpu()
             predictions.extend(logit.float().sigmoid().cpu().tolist())
+            saved_logits.extend(logit.float().cpu().tolist())
         if not (denominator > 0).any() or not torch.isfinite(numerator).all():
             raise ValueError('Invalid validation loss/support')
         from knee.validation import evaluate_predictions
@@ -512,21 +632,16 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
                 'confidence_support': denominator.tolist(),
                 'per_target_bce': per_target_bce(numerator, denominator),
                 'undefined_bce_targets': [t for t, d in zip(plan['targets'], denominator) if d <= 0],
-                'thresholded_weak_auc': auc}
+                'thresholded_weak_auc': auc}, predictions, saved_logits
 
     state = torch.load(resume, map_location='cpu', weights_only=False) if resume else None
+    best_evidence_receipt = None
     if state:
         if state['plan_fingerprint'] != plan['fingerprint'] or state['source_hashes'] != SOURCE_HASHES or state['backbone'] != BACKBONE or state.get('runner_sha256') != file_sha256(__file__):
             raise ValueError('Resume training contract differs')
         if math.isfinite(state['best_loss']):
-            previous_best = Path(resume).parent / 'best.pt'
-            best_payload = torch.load(previous_best, map_location='cpu', weights_only=True)
-            if (best_payload['plan_fingerprint'] != plan['fingerprint'] or
-                    best_payload['weak_bce'] != state['best_loss']):
-                raise ValueError('Resume best checkpoint is missing or does not match')
-            if previous_best.resolve() != (output_dir / 'best.pt').resolve():
-                shutil.copy2(previous_best, output_dir / 'best.pt')
-            del best_payload
+            best_evidence_receipt = restore_best_evidence(Path(resume).parent, output_dir, plan,
+                best_loss=state['best_loss'], expected_fingerprint=state.get('best_evidence_fingerprint'))
         model.load_state_dict(state['model']); ema.load_state_dict(state['ema'])
         optimizer.load_state_dict(state['optimizer']); scaler.load_state_dict(state['scaler'])
         epochs, gate = state['planned_epochs'], state['gate']
@@ -559,13 +674,20 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
         validate(ema, va[:min(len(va), 8 * batch_size)])
         torch.cuda.synchronize()
         val_batch_seconds = (time.monotonic() - tick) / math.ceil(min(len(va), 8 * batch_size) / batch_size)
+        tick = time.monotonic()
+        validate(ema, diagnostic_indices[:min(len(diagnostic_indices), 8 * batch_size)])
+        torch.cuda.synchronize()
+        diagnostic_batch_seconds = (time.monotonic() - tick) / math.ceil(min(len(diagnostic_indices), 8 * batch_size) / batch_size)
         restore_rng(before_gate)
         epoch_seconds = (math.ceil(len(tr) / batch_size) * train_batch_seconds +
-                         math.ceil(len(va) / batch_size) * val_batch_seconds) * 1.5
+                         math.ceil(len(va) / batch_size) * val_batch_seconds +
+                         math.ceil(len(diagnostic_indices) / batch_size) * diagnostic_batch_seconds) * 1.5
         remaining = config['training_seconds'] - (time.monotonic() - started) - 180
         epochs = min(config['max_epochs'], int(remaining // epoch_seconds))
         gate = {'passed': epochs >= 1, 'measured_training_steps': measured, 'train_batch_seconds': train_batch_seconds,
                 'validation_batch_seconds': val_batch_seconds, 'estimated_epoch_seconds_with_margin': epoch_seconds,
+                'training_diagnostic_batch_seconds': diagnostic_batch_seconds,
+                'training_diagnostic_studies': len(diagnostic_indices),
                 'planned_epochs': epochs}
         write_json(output_dir / 'gpu-gate.json', gate)
         if epochs < 1:
@@ -579,14 +701,17 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
     epoch = state['epoch'] if state else 0
     cursor = state['cursor'] if state else 0
     order = state['order'] if state else None
+    epoch_training_trace = state['epoch_training_trace'] if state else None
     history = state['history'] if state else []
     best = state['best_loss'] if state else float('inf')
+    best_evidence_fingerprint = best_evidence_receipt['evidence_fingerprint'] if best_evidence_receipt else None
     step = state['step'] if state else 0
     run_contract = {'plan_fingerprint': plan['fingerprint'], 'source_hashes': SOURCE_HASHES,
                     'backbone': BACKBONE, 'config': config, 'environment': environment(),
                     'pretrained_cfg': model.enc.pretrained_cfg, 'initial_encoder_sha256': initial_encoder_sha256,
                     'encoder_hash_scheme': 'fresh-encoder-state-v1', 'targets': plan['targets'],
                     'train_studies': len(tr), 'validation_studies': len(va), 'training_prior': prior.tolist(),
+                    'training_diagnostic': diagnostic_contract,
                     'training_confidence_support': support.tolist(), 'gate': gate,
                     'normalization': 'Fixed ImageNet mean/std; no fitted image statistics.',
                     'metric': 'Per-target macro confidence-weighted weak BCE, excluding and listing unsupported targets; exact 0.5 masked. No gold evaluation.'}
@@ -605,6 +730,8 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
             'model': model.state_dict(), 'ema': ema.state_dict(), 'optimizer': optimizer.state_dict(),
             'scheduler': scheduler.state_dict(), 'scaler': scaler.state_dict(), 'rng': rng_state(),
             'epoch': epoch, 'cursor': cursor, 'order': order, 'history': history, 'best_loss': best,
+            'best_evidence_fingerprint': best_evidence_fingerprint,
+            'epoch_training_trace': epoch_training_trace,
             'step': step, 'planned_epochs': epochs, 'gate': gate, 'backbone': BACKBONE,
             'plan_fingerprint': plan['fingerprint'], 'source_hashes': SOURCE_HASHES,
             'runner_sha256': file_sha256(__file__), 'initial_encoder_sha256': initial_encoder_sha256,
@@ -615,6 +742,10 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
         while epoch < epochs:
             if order is None:
                 order = np.random.permutation(tr).tolist()
+            if epoch_training_trace is None:
+                epoch_training_trace = {'successful_optimizer_steps': 0, 'amp_overflow_skips': 0,
+                    'online_training_batches': 0, 'online_loss_sum': 0.,
+                    'lr_start': [group['lr'] for group in optimizer.param_groups]}
             model.train()
             while cursor < len(order):
                 if elapsed_before + time.monotonic() - started > config['training_seconds'] - 120:
@@ -628,13 +759,16 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
                 if not (denominator > 0).any():
                     cursor += batch_size
                     continue
-                scaler.scale(macro_loss(numerator, denominator)).backward()
+                batch_loss = macro_loss(numerator, denominator)
+                scaler.scale(batch_loss).backward()
                 scaler.unscale_(optimizer)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 3.)
                 old_scale = scaler.get_scale()
                 scaler.step(optimizer); scaler.update()
                 cursor += batch_size
-                if scaler.get_scale() < old_scale:
+                overflow = scaler.get_scale() < old_scale
+                record_training_step(epoch_training_trace, float(batch_loss.detach()), overflow=overflow)
+                if overflow:
                     continue  # FP16 overflow: no optimizer/scheduler/EMA update occurred.
                 scheduler.step()
                 step += 1
@@ -644,16 +778,28 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
                         a.lerp_(b, 1 - decay)
                     for a, b in zip(ema.buffers(), model.buffers()):
                         a.copy_(b)
-            validation = validate(ema, va)
+            diagnostic, _, _ = validate(ema, diagnostic_indices)
+            validation, validation_predictions, validation_logits = validate(ema, va)
             score = validation['weak_bce']
-            history.append({'epoch': epoch + 1, **validation, 'prevalence_weak_bce': prior_bce})
+            history.append({'epoch': epoch + 1, **validation, 'prevalence_weak_bce': prior_bce,
+                'training_trace': training_trace_summary(epoch_training_trace,
+                    [group['lr'] for group in optimizer.param_groups]),
+                'training_diagnostic': {key: diagnostic[key] for key in
+                    ('weak_bce', 'confidence_support', 'undefined_bce_targets')}})
             if score < best:
-                best = score
-                save_checkpoint(output_dir / 'best.pt', {'model': ema.state_dict(), 'backbone': BACKBONE,
+                evidence = weak_validation_evidence(plan, va, validation_predictions,
+                    logits=validation_logits, epoch=epoch + 1, weak_bce=score)
+                best_payload = {'model': ema.state_dict(), 'backbone': BACKBONE,
                     'targets': plan['targets'], 'source_hashes': SOURCE_HASHES, 'config': config,
                     'plan_fingerprint': plan['fingerprint'], 'epoch': epoch + 1, 'weak_bce': score,
-                    'training_prior': prior.tolist(), 'initial_encoder_sha256': initial_encoder_sha256})
-            epoch += 1; cursor = 0; order = None
+                    'training_prior': prior.tolist(), 'initial_encoder_sha256': initial_encoder_sha256,
+                    'weak_validation_evidence': evidence}
+                save_checkpoint(output_dir / 'best.pt', best_payload)
+                best, best_evidence_fingerprint = score, evidence['fingerprint']
+                best_evidence_receipt = None
+                best_evidence_receipt = write_best_evidence(output_dir, plan, best_payload)
+                del best_payload
+            epoch += 1; cursor = 0; order = None; epoch_training_trace = None
             checkpoint()
             print(json.dumps({'event': 'epoch', 'epoch': epoch, 'weak_bce': score, 'prevalence_weak_bce': prior_bce}), flush=True)
         status = 'PASS'
@@ -665,6 +811,10 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
         write_json(output_dir / 'training-report.json', {'status': status, 'history': history,
             'prevalence_weak_bce': prior_bce, 'planned_epochs': epochs, 'completed_epochs': epoch,
             'best_weak_bce': best if math.isfinite(best) else None,
+            'best_weak_validation_evidence': best_evidence_receipt,
+            'training_diagnostic': diagnostic_contract,
+            'partial_epoch_training_trace': training_trace_summary(epoch_training_trace,
+                [group['lr'] for group in optimizer.param_groups]) if epoch_training_trace else None,
             'elapsed_seconds': elapsed_before + time.monotonic() - started,
             'cuda_peak_bytes': torch.cuda.max_memory_allocated(), 'plan_fingerprint': plan['fingerprint']})
     return status

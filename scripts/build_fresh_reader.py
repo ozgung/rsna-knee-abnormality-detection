@@ -78,10 +78,9 @@ with time_limit(STAGE_BUDGET - (time.monotonic() - _stage_started), 'whole ' + S
     with time_limit(300, 'attachment and decoder setup'):
         progress('setup_begin', stage=STAGE)
         inputs = Path('/kaggle/input')
-        if STAGE != 'probe':
+        if STAGE not in ('train', 'probe'):
             data = exact_root([inputs/'competitions/rsna-knee-abnormality-detection',
                                inputs/'rsna-knee-abnormality-detection'], ['train.csv', 'train_series.csv'])
-        if STAGE not in ('train', 'probe'):
             if sys.version_info[:2] not in ((3,11), (3,12)):
                 raise RuntimeError('Pinned decoder bundle requires Python 3.11/3.12')
             assets = dataset_root(inputs, 'goodpjw2008/rsna-knee-2-5d-convnext-reader',
@@ -140,7 +139,7 @@ with time_limit(STAGE_BUDGET - (time.monotonic() - _stage_started), 'whole ' + S
                 'enable_gpu': stage in ('train', 'probe'), 'enable_tpu': False, 'enable_internet': stage in ('train', 'probe'),
                 'dataset_sources': [] if stage in ('train', 'probe') else
                     ['stevenleehans/rsna-knee-llm-report-labels', 'goodpjw2008/rsna-knee-2-5d-convnext-reader'],
-                'competition_sources': [] if stage == 'probe' else ['rsna-knee-abnormality-detection'],
+                'competition_sources': [] if stage in ('train', 'probe') else ['rsna-knee-abnormality-detection'],
                 'kernel_sources': [x for x in (cache_kernel, resume_kernel) if x], 'model_sources': [],
                 'docker_image': DOCKER}
     if stage in ('train', 'probe'):
