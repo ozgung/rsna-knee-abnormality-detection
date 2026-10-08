@@ -1,12 +1,12 @@
 # Project status and session handoff
 
-Updated **2026-10-08, 02:40 UTC** (Europe/Istanbul). Read this first, then [README](README.md) and [AGENTS](AGENTS.md).
+Updated **2026-10-08, 02:42 UTC** (Europe/Istanbul). Read this first, then [README](README.md) and [AGENTS](AGENTS.md).
 
 ## Current snapshot
 
-- Target: public macro AUC **strictly above 0.950**. Not achieved. Best actually scored entry remains **0.757**. Two corrected stronger entries are scoring; their original versions failed hidden reruns with generic exceptions and no traceback.
+- Target: public macro AUC **strictly above 0.950**. Not achieved. Corrected ConvNeXt entry **56927932 scored 0.929**, versus previous best 0.757. The corrected blend is still scoring. Original versions failed hidden reruns with generic exceptions and no traceback.
 - User authorizes autonomous research, subagents, long/concurrent local/Kaggle/Colab training and promising submissions. Use small pilots and measured budgets first; existing credits only, no purchases or questions for this run.
-- Branch `codex/first-submission`; local Git only, no remote. Original 01 tasks and second baseline submission are complete. Future-run aggregate progress logging is integrated and independently reviewed; no implementation is active. Current saved fit and submitted notebooks remain immutable.
+- Branch `codex/first-submission`; local Git only, no remote. Original 01 tasks and second baseline submission are complete. Future-run aggregate progress logging is integrated and independently reviewed. Sole active implementation: bounded CPU global header audit/sealed cohort preparation, independent of training promotion. Current saved fit and submitted notebooks remain immutable.
 - Competition: 4,407 training studies, 24,371 series, 58 fully labeled studies, 12 targets. Four nongold report duplicates of gold excluded. Private/generated data and weights remain ignored. No full raw-corpus download.
 - Official rules checked October 8: five entries/day; entry/merge deadline October 15 and final October 22 at 23:59 UTC; offline inference <=9 hours, hidden test approximately 1,300 studies. Recheck before later calendar planning. **Two entries remain today** after the 02:18 submission.
 - Main records: [current campaign](docs/experiments/20261008-audited-readers.md), [fresh pilot](docs/experiments/fresh_reader_pilot-20261008.md), [strategy](docs/experiments/score-strategy-20261008.md), [provenance](docs/experiments/provenance-audit-20261008.md), [original baseline](docs/experiments/20261008-first-baseline.md).
@@ -15,9 +15,10 @@ Updated **2026-10-08, 02:40 UTC** (Europe/Istanbul). Read this first, then [READ
 
 | Task | State | Acceptance / next action |
 | --- | --- | --- |
-| REF-02 | Audit and corrected submissions complete; scoring pending | Check both entry scores **and error_description**. Blank COMPLETE can mean failed hidden rerun. Do not change submitted version 2 notebooks/inputs while pending. |
+| REF-02 | Standalone scored **0.929**; blend pending | Check blend score **and error_description**. Blank COMPLETE can mean failed hidden rerun. Do not change submitted version 2 notebooks/inputs while pending. |
 | TRAIN-02 fit | Running; no metrics available yet | Retrieve the selected checkpoint/evidence and complete report. Verify actual four epochs, successful updates, initial encoder hash, split and finite metrics; run paired comparison. No larger training before this result. |
 | TRAIN-02 observability | Complete, `bb3e9fa` | Flushed aggregate cache/gate/step/checkpoint timing; no added GPU/tensor/RNG operations or scientific/checkpoint-field changes. Small wall-clock overhead remains. V1 resumes must retain the original runner bytes; this cannot restore current remote logs. |
+| DATA-03 | Global identity audit in implementation | Report-only pool is 2,045 unused studies / 1,977 groups, with no retained candidate patient evidence. Prepare a CPU64 header pilot and gate a full one-header-per-series audit before freezing the declared sealed cohort; no pixels copied or labels used for selection. Full audit <=1 hour, private JSON <=32MiB. |
 | TRAIN-03 | Conditional | Follow the prospective spending gates below. Diagnose before expansion on weak/numerically failed learning. Reserve a sealed cohort before larger-data fitting. |
 | Cleanup | Deferred while worktrees remain useful | Preserve each worktree's ignored evidence before archive. Existing archives are under `outputs/agent-archives/20261008/`. |
 
@@ -26,7 +27,7 @@ Updated **2026-10-08, 02:40 UTC** (Europe/Istanbul). Read this first, then [READ
 | Job | Exact state and reproducibility |
 | --- | --- |
 | **Fresh fit** | `ozgung/knee-fresh-train-20261008` v1, launched **01:44:31 UTC**, source `fa8082d`. Command: `kaggle kernels push -p outputs/kaggle/fresh-train --timeout 5700`. Internal 5,400-second cap; at most four epochs after a measured CUDA gate; 512 train / 200 weak validation. Only the completed private image cache is attached. Build SHA `5cc8fbbb4210f3d47a750888893945c9e30adae71bca560ae3c0d65394135620`. Expected `fresh_reader_training/{gpu-gate.json,run-contract.json,training-report.json,last.pt,best.pt,best-weak-validation-private.json}`. Resume requires its own matched checkpoint pair/contract; never silently extend the completed cosine schedule. |
-| **Standalone entry 56927932** | PENDING/scoring, submitted **01:37:10 UTC**. `ozgung/knee-public-reader-submission-20261008` v2, source `f28dfd2`. Final visible run PASS 48.12s; CSV SHA `e2598d9ab64915e6fecc85b53dc1864921f27c17cb30297ed92a04c12e1091e4`. Receipts: `outputs/kaggle/public-reader-submission-v2-result/`. |
+| **Standalone entry 56927932** | **COMPLETE, public score 0.929, empty error field**, verified 02:41:42 UTC; submitted **01:37:10 UTC**. `ozgung/knee-public-reader-submission-20261008` v2, source `f28dfd2`. Final visible run PASS 48.12s; CSV SHA `e2598d9ab64915e6fecc85b53dc1864921f27c17cb30297ed92a04c12e1091e4`. Receipts: `outputs/kaggle/public-reader-submission-v2-result/`, `outputs/research/2026-10-08/standalone-v2-scored-0241.json`. |
 | **Fixed-blend entry 56929332** | PENDING, submitted **02:18:01 UTC**. `ozgung/knee-reference-blend-submission-20261008` v2, source `962ab80`. Final visible run PASS 61.77s, peak CUDA 8.181GB; CSV SHA `2aa5bde70b03e720b21435b9137d9b7560ff4256c4b6ae7059e12538f1fb9d25`. Qualification SHA `1dee9b7992a4e0e0af350c62cbef29a4f8b4615eb310ccb326872eda363360ca`. Receipts: `outputs/kaggle/reference-blend-submission-v2-result/`. |
 
 Fresh training observability: repeated CLI stream HTTP500; API (02:35 UTC) and earlier UI still report saved version 1 running. No application failure or metrics are exposed. Independent read-only checks confirmed exact remote source, all 712 published arrays and matching completion/plan receipts; worker mount readiness is not exposed. **Do not infer failure from 0B persisted outputs or start a duplicate.** Receipt: `outputs/research/2026-10-08/fresh-train-worker-investigation.json`. All log streams through session `76837` ended with HTTP500; retry only with backoff. A temporary editor inspection showed draft off and an already-cancelled interactive event; no cell was executed. Temporary browser tabs were closed.

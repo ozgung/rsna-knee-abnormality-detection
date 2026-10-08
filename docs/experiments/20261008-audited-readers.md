@@ -296,3 +296,13 @@ Corrected standalone56927932 is also pending/scoring. No new publicscore yet.
 Receipts: `outputs/kaggle/raptor-production-rehearsal-v2-result/`,
 `outputs/kaggle/reference-blend-rehearsal-v3-result/`, and
 `outputs/kaggle/reference-blend-submission-v2-result/`.
+
+## Corrected standalone scored, 02:41 UTC
+
+Authenticated competition API confirms entry **56927932 COMPLETE, public macro AUC
+0.929, empty error_description**, improving our previous best0.757 by0.172. This
+establishes successful hidden execution of the corrected savedv2, not the original
+hidden exception's exact cause. The fixed blend56929332 remains pending; no new
+training/ensemble choice is inferred from a nonexistent blend score. The >0.950
+target remains unmet. Immutable receipt:
+`outputs/research/2026-10-08/standalone-v2-scored-0241.json`.
