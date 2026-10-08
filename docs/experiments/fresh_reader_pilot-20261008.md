@@ -1,6 +1,6 @@
 # Fresh ImageNet ConvNeXt pilot — 2026-10-08
 
-The real CPU64 DICOM cache check and the disposable CUDA32 trainability diagnostic have **passed**. Full fitting remains gated on the complete cache and measured GPU epoch budget; no held-out result from fresh fitting is available yet. Current receipts and run state are in [STATUS](../../STATUS.md). This pilot is separate from both the existing toy network and frozen DINO model.
+The CPU64/cache and CUDA32 checks passed; the fresh four-epoch fit now **passed execution but trails the frozen baseline** on the same weak development cohort. The declared gate supports one fresh 12-epoch same-cohort experiment, not larger-data training yet. Current receipts and run state are in [STATUS](../../STATUS.md). This pilot is separate from both the existing toy network and frozen DINO model.
 
 ## Predeclared experiment
 
@@ -148,3 +148,72 @@ Internal5400s, external5700s. At most4epochs after measured throughput gate, sam
 512/200 plan and prospective comparison thresholds; no gold evaluation.
 Small receipts: `outputs/kaggle/fresh-cache-result/fresh_reader_cache/`; aggregate
 local check: `outputs/analysis/fresh-pilot-baselines/full-cache-gate.json`.
+
+## Four-epoch fit and paired analysis completed, 02:46 UTC
+
+`ozgung/knee-fresh-train-20261008` v1 completed PASS from source `fa8082d`,
+with the exact expected generic ImageNet encoder hash, pinned environment and
+512/200 plan. Actual application training time437.924s; peak CUDA3,653,565,440bytes.
+All four epochs completed,256 successful updates each, no AMP skips. Earlier
+HTTP500 live-log failures concealed progress; they did not establish an application
+failure. Logs recovered before completion. No duplicate job was launched.
+
+| Epoch | Weak-validation BCE | All-12 weak AUC | Fixed train64 EMA BCE |
+| --- | ---: | ---: | ---: |
+| 1 | 0.54100317 | 0.72703272 | 0.59039968 |
+| 2 | 0.52126878 | 0.78548150 | 0.53715605 |
+| 3 | 0.49779001 | 0.80039142 | 0.48826918 |
+| 4 | 0.49586046 | 0.80547772 | 0.45936808 |
+
+Epoch4 is the BCE-selected checkpoint. SHA256:
+`3a9d3f7dd9b5401f2c7a9384d3ffd5333a373ab6b6d847e91d07916ab8dfebeb`.
+Selected evidence SHA256:
+`6ea19d93a5780941a74e41ffd08eefe0ef15ce8b97656daa124975d5925480a6`.
+Checkpoint123,121,766bytes remains private because it embeds validation labels/IDs.
+
+Paired analysis PASS: exact ordered cohort/labels/targets, source/plan and checkpoint
+hashes verified. Recomputed fresh BCE0.49586048/AUC0.80547772 versus frozen four-head
+BCE0.44628505/AUC0.86033998. Fresh-minus-frozen report-group paired95% percentile
+intervals: BCE+0.04957543 [0.02807587,0.07303803]; AUC-0.05486226
+[-0.09223748,-0.02209675]. Both2,000-draw schemes had zero invalid draws. These
+intervals condition on prior model/epoch selection and weak labels, not independent
+clinical truth. Fresh used512 training studies versus2,000 for the frozen baseline.
+
+| Target | Known positive / negative | Fresh AUC | Frozen four-head AUC |
+| --- | ---: | ---: | ---: |
+| ACL | 38 / 150 | 0.689298 | 0.742105 |
+| MCL | 31 / 155 | 0.751093 | 0.763788 |
+| Medial Meniscus | 88 / 101 | 0.749887 | 0.841809 |
+| Lateral Meniscus | 51 / 134 | 0.780509 | 0.810506 |
+| Medial OA | 69 / 101 | 0.826661 | 0.902425 |
+| Lateral OA | 57 / 104 | 0.849022 | 0.928644 |
+| PF OA | 83 / 87 | 0.854729 | 0.906384 |
+| Effusion | 111 / 76 | 0.896396 | 0.925557 |
+| Synovitis | 20 / 8 | 0.793750 | 0.906250 |
+| Baker's | 40 / 37 | 0.766216 | 0.840541 |
+| Contusion | 42 / 121 | 0.878591 | 0.895710 |
+| Fracture | 12 / 111 | 0.829580 | 0.860360 |
+
+**Prospective decision:** larger-data gate fails. The declared duration gate passes:
+BCE<=0.537460, all12 AUC>=0.80, epoch4 selected, epoch2-to4 BCE gain0.02540833,
+and improving train diagnostics. Permit exactly one fresh12-epoch same512/200
+comparison after a new GPU timing gate, capped5400s. No public submission from this
+short pilot is justified. Preserve cache bytes and use new generic initialization,
+optimizer, EMA and12-epoch cosine; no resume/reset of the completed4-epoch schedule.
+
+The original timing gate's64-batch mean1.119319s projected450.616s per epoch, while
+the entire four-epoch application took437.924s. The next gate may separately account
+for16 warmup batches and time48 steady batches, retaining all elapsed setup/warmup
+in the total budget and restoring RNG. This changes resource estimation, not the
+training recipe. All12 projected epochs must fit with1.5margin or it fails. Bind the
+new experiment fingerprint separately from the unchanged cache-plan fingerprint in
+best/last/report/evidence, with strict matching resume and backward-compatible
+analysis for v1 evidence. Independent read-only review accepted this design; no
+12-epoch job has launched yet.
+
+Receipts: `outputs/kaggle/fresh-train-result/fresh_reader_training/`;
+`outputs/analysis/fresh-pilot-baselines/{fresh-paired.json,pilot-promotion-decision.json}`.
+Aggregate-only chart and generating script: `fresh-pilot-results.png`,
+`fresh-pilot-results.svg`, `analyze-pilot.py` in that analysis directory. Plotting
+dependencies are isolated under ignored `outputs/analysis/plot-dependencies/`
+(Matplotlib3.10.8); the ML environment was not changed.

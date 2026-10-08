@@ -70,3 +70,25 @@ No GPU job, model import, training, submission, message to a host, dataset uploa
 Small public source snapshots and SHA-256 inventory are under ignored `outputs/provenance-20261008/`. Reads used `kaggle kernels pull -m`, `datasets metadata/files`, targeted small-file downloads and `competitions topics show --page-size 200 --format json`. Rules were read via `KaggleApi.competition_list_pages_cli(..., page_name='rules', content=True, output_format='json')` because the CLI page parser rejected that equivalent command. Web page opening returned no discussion content, so the official CLI responses support this audit.
 
 Documentation-only artifact: all six Python files parse successfully as Python syntax; no code execution or runtime validity is implied. Markdown links, evidence hashes and `git diff --check` verified. Parent owns the main STATUS update and experiment launch decision.
+
+## Narrow Raptor geometry follow-up, 02:50UTC
+
+Public CC0 cards list MaxSpanv5SWA (author public0.928), native384v8SWA
+(author0.926), and native384densev10 (publicscoreundisclosed). Each checkpoint is
+approximately292.83MB. The author states all published checkpoints share the same
+labels, competition-only task data and architecture; geometry/window coverage
+changes. This supports a disclosed non-OAI claim, not an independently attested
+initialization/teacher lineage. Gold58 selected checkpoints and full-corpus training
+overlaps our local development sets. Sources: [MaxSpan](https://www.kaggle.com/datasets/dreaddevelopment/raptor-knee-maxspan),
+[native384](https://www.kaggle.com/datasets/dreaddevelopment/raptor-knee-native384),
+[native384dense](https://www.kaggle.com/datasets/dreaddevelopment/raptor-knee-native384dense),
+[author data statement](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/737696#3521127).
+
+A narrower potential test uses the already downloaded plainv4 weights with62
+windows instead of42. The author reports0.924->0.927 for this single change
+([coverage clarification](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/737696#3524687)).
+This is an author claim; complementarity and our score are untested. It requires a
+new explicit recipe and runtime/memory qualification, not a filename replacement
+or a change to the currently submitted version. No newweights/job/submission was
+made. Public source snapshots and hash-preservation receipt are under
+`outputs/research/2026-10-08/raptor-variants/`.
