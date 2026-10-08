@@ -73,14 +73,17 @@ class FreshReaderCoreTests(unittest.TestCase):
                 for stage in ('cache-pilot', 'cache', 'train'):
                     out = Path(d)/stage
                     builder.build(sources, out, 'synthetic', stage,
-                                  cache_kernel=None if stage == 'cache-pilot' else 'synthetic/cache',
+                                  cache_kernel=None if stage == 'cache-pilot' else 'ozgung/cache',
                                   plan_fingerprint=None if stage == 'cache-pilot' else 'abc')
                     meta = json.loads((out/'kernel-metadata.json').read_text())
                     self.assertTrue(meta['is_private'])
                     self.assertEqual(meta['enable_gpu'], stage == 'train')
                     self.assertEqual(meta['enable_internet'], stage == 'train')
                     nb = json.loads((out/'notebook.ipynb').read_text())
-                    compile(''.join(nb['cells'][1]['source']), 'generated', 'exec')
+                    generated = ''.join(nb['cells'][1]['source'])
+                    compile(generated, 'generated', 'exec')
+                    self.assertNotIn('inputs.rglob', generated)
+                    self.assertIn("with time_limit(300, 'attachment and decoder setup')", generated)
 
     def test_training_bounds_are_predeclared(self):
         self.assertEqual(CONFIG['image_size'], 224)

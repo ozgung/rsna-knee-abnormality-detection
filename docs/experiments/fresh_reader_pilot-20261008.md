@@ -58,3 +58,14 @@ For an existing environment, equivalent entry points are `python -m knee.fresh_r
 ## Verification
 
 Twelve focused regression tests cover group/split preservation, label-blind selection, plan/source tampering, cache time/disk gates, synthetic masks/windows/resume/strict decoding, exact unknown masking, sparse-target timing, macro-loss parity, optimizer/RNG replay and compiled private notebook settings. Default dependency-free tests skip optional ML paths cleanly. Full ML-environment suite:72/72 passed; dependency-free suite:33 passed/39 optional skips; both dependency-free smoke invocations passed. `git diff --check` passed. An independent source reviewer found no remaining launch blockers after the resume/digest/metric fixes; this is not CUDA or real-DICOM certification.
+
+
+## Setup follow-up — 2026-10-08
+
+Replaced global `inputs.rglob` discovery with exact modern/classic mounts for the named decoder and Steven datasets and own notebook cache/resume outputs. Competition image directories are never enumerated by attachment discovery. Missing/ambiguous mounts, mutated plan digests, other owners and incomplete/mismatched own `last.pt`/`best.pt` pairs fail before training. The existing running CPU64 notebook is unchanged; rebuild subsequent stages. Data-plan configuration and fingerprint semantics are unchanged.
+
+New notebooks emit setup/decoder/cache-copy/stage progress. Attachment setup is capped at300s, pip at120s, and ImageNet import/download/CUDA initialization at300s. A POSIX stage deadline starts before attachment setup and bounds the full CPU or GPU stage using the original1800/3600/5400s limits; nested setup deadlines cannot extend it. HTTP download/metadata timeouts are set before importing timm/HuggingFace. These bounds apply to newly built Kaggle notebooks, not to the already-running CPU64 version.
+
+Five additional dependency-free regression tests forbid `rglob`, `glob`, `iterdir`, `os.walk` and `os.scandir` while resolving synthetic attachments, including distractors under a competition image subtree. They also reject ambiguous/mutated plans and wrong-owner/incomplete resumes, and exercise blocking/nested setup deadlines. No remote job was launched or altered in this fix.
+
+Follow-up verification:77/77 ML-environment tests passed; dependency-free38 passed/39 optional skips; both smoke checks and `git diff --check` passed. The real metadata plan equals the running-pilot implementation exactly before header identity checks.

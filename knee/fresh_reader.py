@@ -379,9 +379,16 @@ def train(cache_dir, source_dir, output_dir, *, resume=None):
     torch.backends.cudnn.benchmark = False
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.set_num_threads(2)
-    code = load_source(source_dir, 'knee')
     prior, support = training_prior([records[i]['labels'] for i in tr])
-    model = code.KneeNet(BACKBONE, pretrained=resume is None, img_size=config['image_size']).cuda()
+    from knee.fresh_reader_setup import progress, time_limit
+    progress('model_initialization_begin', backbone=BACKBONE, resume=resume is not None)
+    # Fixed network timeouts plus the POSIX deadline bound fresh ImageNet loading.
+    os.environ.setdefault('HF_HUB_DOWNLOAD_TIMEOUT', '120')
+    os.environ.setdefault('HF_HUB_ETAG_TIMEOUT', '30')
+    with time_limit(300, 'ImageNet model initialization'):
+        code = load_source(source_dir, 'knee')
+        model = code.KneeNet(BACKBONE, pretrained=resume is None, img_size=config['image_size']).cuda()
+    progress('model_initialization_complete', elapsed_seconds=time.monotonic() - started)
     model.cls_b.data.copy_(torch.as_tensor(np.log(prior / (1 - prior)), device='cuda'))
     ema = copy.deepcopy(model).eval().requires_grad_(False)
     optimizer = torch.optim.AdamW([

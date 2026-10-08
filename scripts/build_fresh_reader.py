@@ -10,6 +10,7 @@ import textwrap
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from knee.fresh_reader import CONFIG, SOURCE_HASHES, check_sources
+from knee.fresh_reader_setup import reference_parts
 
 DOCKER = 'gcr.io/kaggle-private-byod/python@sha256:37c64f7dd9c54116ecd1bcc88817c5469b88387388fade02bfa8bf3fc647d461'
 
@@ -23,9 +24,12 @@ def build(source_dir, destination, slug, stage, *, cache_kernel=None, plan_finge
         raise ValueError('Expansion/training requires a cache kernel and its reviewed plan fingerprint')
     if resume_kernel and stage != 'train':
         raise ValueError('Resume applies to training only')
+    for reference in (cache_kernel, resume_kernel):
+        if reference:
+            reference_parts(reference, owner='ozgung')
     own = {str(p.relative_to(ROOT)): p.read_text() for p in
            [ROOT/'knee/__init__.py', ROOT/'knee/validation.py', ROOT/'knee/features.py',
-            ROOT/'knee/experiment.py', ROOT/'knee/fresh_reader.py']}
+            ROOT/'knee/experiment.py', ROOT/'knee/fresh_reader.py', ROOT/'knee/fresh_reader_setup.py']}
     external = {name: (source_dir/name).read_text() for name in SOURCE_HASHES}
     license_text = (ROOT/'docs/licenses/fresh_reader_Apache-2.0.txt').read_text()
     for name, content in {**own, **external}.items():
@@ -35,13 +39,15 @@ def build(source_dir, destination, slug, stage, *, cache_kernel=None, plan_finge
                 'own_sources': {name: hashlib.sha256(content.encode()).hexdigest() for name, content in own.items()},
                 'license_sha256': hashlib.sha256(license_text.encode()).hexdigest(),
                 'config': CONFIG, 'cache_kernel': cache_kernel, 'plan_fingerprint': plan_fingerprint,
-                'resume_kernel': resume_kernel}
+                'resume_kernel': resume_kernel, 'setup_seconds': 300}
     source_hash = hashlib.sha256(json.dumps(contract, sort_keys=True).encode()).hexdigest()
     setup = f'''from pathlib import Path
 import hashlib, json, os, shutil, subprocess, sys
 STAGE = {stage!r}
 EXPECTED_PLAN = {plan_fingerprint!r}
 RESUME_KERNEL = {resume_kernel!r}
+CACHE_KERNEL = {cache_kernel!r}
+STAGE_BUDGET = {CONFIG['pilot_seconds'] if stage == 'cache-pilot' else CONFIG['cache_seconds'] if stage == 'cache' else CONFIG['training_seconds']}
 CODE = {own!r}
 EXTERNAL = {external!r}
 LICENSE_TEXT = {license_text!r}
@@ -59,50 +65,47 @@ for name, content in EXTERNAL.items():
 sys.path.insert(0, str(base))
 os.environ['KNEE_CODE_REVISION'] = {revision!r}
 os.environ['KNEE_SOURCE_SHA256'] = {source_hash!r}
-from knee.fresh_reader import prepare_cache, train, validate_plan
-inputs = Path('/kaggle/input')
-roots = [inputs/'competitions/rsna-knee-abnormality-detection', inputs/'rsna-knee-abnormality-detection']
-data = next((p for p in roots if (p/'train.csv').exists()), None)
-if data is None:
-    raise RuntimeError('Competition attachment missing')
-if STAGE != 'train':
-    if sys.version_info[:2] not in ((3,11), (3,12)):
-        raise RuntimeError('Pinned decoder bundle requires Python 3.11/3.12')
-    wheel = next(iter(inputs.rglob('pylibjpeg-2.1.0-py3-none-any.whl')), None)
-    if wheel is None:
-        raise RuntimeError('Decoder bundle missing')
-    subprocess.run([sys.executable, '-m', 'pip', 'install', '--no-index', '--no-deps', '--find-links', str(wheel.parent),
-                    'pylibjpeg', 'pylibjpeg-libjpeg', 'pylibjpeg-openjpeg'], check=True)
-    weak_files = list(inputs.rglob('llm_labels_full.csv'))
-    if len(weak_files) != 1:
-        raise RuntimeError('Expected exactly one Steven v1 llm_labels_full.csv attachment')
-    weak = weak_files[0]
-cache = Path('/kaggle/working/fresh_reader_cache')
-if STAGE != 'cache-pilot':
-    matches = [p.parent for p in inputs.rglob('plan-private.json')
-               if json.loads(p.read_text()).get('fingerprint') == EXPECTED_PLAN]
-    if len(matches) != 1:
-        raise RuntimeError('Exactly one matching private cache required')
-    previous = matches[0]
-    validate_plan(json.loads((previous/'plan-private.json').read_text()))
-    if STAGE == 'cache':
-        cache.mkdir(exist_ok=True)
-        for name in ('plan-private.json','cache-index-private.json','cache-pilot.json'):
-            shutil.copy2(previous/name, cache/name)
-        shutil.copytree(previous/'arrays', cache/'arrays', dirs_exist_ok=True)
+from knee.fresh_reader import prepare_cache, train
+from knee.fresh_reader_setup import dataset_root, exact_root, cache_root, resume_checkpoint, progress, time_limit
+with time_limit(STAGE_BUDGET - (time.monotonic() - _stage_started), 'whole ' + STAGE + ' stage'):
+    with time_limit(300, 'attachment and decoder setup'):
+        progress('setup_begin', stage=STAGE)
+        inputs = Path('/kaggle/input')
+        data = exact_root([inputs/'competitions/rsna-knee-abnormality-detection',
+                           inputs/'rsna-knee-abnormality-detection'], ['train.csv', 'train_series.csv'])
+        if STAGE != 'train':
+            if sys.version_info[:2] not in ((3,11), (3,12)):
+                raise RuntimeError('Pinned decoder bundle requires Python 3.11/3.12')
+            assets = dataset_root(inputs, 'goodpjw2008/rsna-knee-2-5d-convnext-reader',
+                                  ['pylibjpeg-2.1.0-py3-none-any.whl'])
+            weak = dataset_root(inputs, 'stevenleehans/rsna-knee-llm-report-labels',
+                                ['llm_labels_full.csv']) / 'llm_labels_full.csv'
+            progress('attachments_resolved', stage=STAGE)
+            progress('decoder_install_begin')
+            subprocess.run([sys.executable, '-m', 'pip', 'install', '--no-index', '--no-deps', '--find-links', str(assets),
+                            'pylibjpeg', 'pylibjpeg-libjpeg', 'pylibjpeg-openjpeg'], check=True, timeout=120)
+            progress('decoder_install_complete')
+        cache = Path('/kaggle/working/fresh_reader_cache')
+        if STAGE != 'cache-pilot':
+            previous = cache_root(inputs, CACHE_KERNEL, EXPECTED_PLAN, complete=STAGE == 'train')
+            progress('cache_attachment_verified', stage=STAGE)
+            if STAGE == 'cache':
+                progress('pilot_cache_copy_begin')
+                cache.mkdir(exist_ok=True)
+                for name in ('plan-private.json','cache-index-private.json','cache-pilot.json'):
+                    shutil.copy2(previous/name, cache/name)
+                shutil.copytree(previous/'arrays', cache/'arrays', dirs_exist_ok=True)
+                progress('pilot_cache_copy_complete')
+            else:
+                cache = previous
+        resume = resume_checkpoint(inputs, RESUME_KERNEL, EXPECTED_PLAN) if RESUME_KERNEL else None
+        progress('setup_complete', elapsed_seconds=time.monotonic() - _stage_started)
+    progress('stage_execution_begin', stage=STAGE)
+    if STAGE == 'train':
+        result = train(cache, sources, '/kaggle/working/fresh_reader_training', resume=resume)
     else:
-        cache = previous
-if STAGE == 'train':
-    resume = None
-    if RESUME_KERNEL:
-        checkpoints = list(inputs.rglob('last.pt'))
-        if len(checkpoints) != 1:
-            raise RuntimeError('Expected exactly one own resume checkpoint')
-        resume = checkpoints[0]
-    result = train(cache, sources, '/kaggle/working/fresh_reader_training', resume=resume)
-else:
-    result = prepare_cache(data, weak, sources, cache, pilot=STAGE == 'cache-pilot')
-print(json.dumps(result, indent=2))
+        result = prepare_cache(data, weak, sources, cache, pilot=STAGE == 'cache-pilot')
+    print(json.dumps(result, indent=2))
 '''
     setup = ('import time, json\nfrom pathlib import Path\n_stage_started = time.monotonic()\ntry:\n'
              + textwrap.indent(setup, '    ')
