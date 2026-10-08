@@ -306,3 +306,14 @@ hidden exception's exact cause. The fixed blend56929332 remains pending; no new
 training/ensemble choice is inferred from a nonexistent blend score. The >0.950
 target remains unmet. Immutable receipt:
 `outputs/research/2026-10-08/standalone-v2-scored-0241.json`.
+
+## Corrected fixed blend scored,12:57UTC
+
+After the usage interruption, the authenticated API confirms **56929332 COMPLETE,
+public macro AUC0.936, empty error_description**. This is our best scored entry,
++0.007 over corrected standalone ConvNeXt0.929 and+0.179 over the old frozen-head
+0.757. The fixed50/50 per-target rank blend was declared before results; no weights
+were fitted to this score. Both repaired savedv2 notebooks now completed hidden
+execution, while the exact original exceptions remain unknown. The >0.950 target
+is not yet achieved. Receipt: `outputs/research/2026-10-08/blend-v2-scored-1257.json`.
+Two submissions remain today; no new entry was sent during the interruption.

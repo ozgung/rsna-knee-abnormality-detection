@@ -1,6 +1,6 @@
 # Global identity audit and sealed weak-proxy reservation
 
-Implemented for future training; **CPU64 pilot PASS and full audit running**. This changes neither the completed fresh fit nor its original split. The audit addresses missing patient evidence outside the original selected studies before any larger-data training. It does not establish independent label provenance or authorize sealed-cohort evaluation.
+Implemented for future training; **CPU64 pilot and full audit PASS**. This changes neither the completed fresh fit nor its original split. The audit addresses missing patient evidence outside the original selected studies before any larger-data training. It does not establish independent label provenance or authorize sealed-cohort evaluation.
 
 The private CPU notebook attaches only the competition, uses the existing pinned Docker image, and needs stdlib plus preinstalled pydicom. GPU and internet are disabled. It reads the three hash-pinned competition CSVs and the lexicographically first `.dcm` header from **every metadata series** using `stop_before_pixels=True, specific_tags=['PatientID']`. No pixel decoding/copying, report output, labels, decoder wheels or model assets are included. Missing/unreadable headers, empty/nonscalar PatientID, schema/coverage discrepancies and changed contracts fail qualification and withhold the sealed manifest. Pydicom warning text is suppressed; only its count is retained. Failure receipts contain fixed codes/types and aggregate counts, without raw exception text or tracebacks.
 
@@ -44,3 +44,23 @@ Build directory `outputs/kaggle/sealed-identity-full/`. Runtimecontract
 `63cc0d81da737a38a570e432fb56bc698cf4b3528065fd783e72f312084d1167` unchanged.
 No real sealed manifest has been accepted yet; parent must verify fullPASS, exact
 24,371-series/4,407-study coverage, transitive role separation and manifest equality.
+
+## Full audit accepted after interruption,12:59UTC
+
+All4,407studies/24,371series passed in526.300875s:24,018new header reads and353
+hash-verified pilot rows, zero parser warnings. Private identity+manifest bytes
+9,721,238, under32MiB. Exact local reconstruction of the source-pinned identity and
+manifest, receipt/hash verification, original roles and component separation PASS.
+Future roles:3,745training candidates,300development,300sealed,58gold,4quarantined
+gold relatives. No original training study newly quarantined; the current512/200
+roles are unchanged. Sealed selection reaches300exactly, no overshoot, within4,257
+transitive components. All4,407patient hashes are unique; anonymization and one
+representative header per series remain identity limitations. No model predictions
+or target values were used to choose or evaluate the sealed cohort.
+
+Frozen manifest fingerprint:
+`911f1605497f5c181402e3fbf70c26d588ffb9c73d6cb2d67e45f22eec52245d`;
+fileSHA`21c71745703d742585684298494a6269ae4217fadc5fc4c26f3bf0d10a289467`.
+ReceiptSHA`874a94583cfd396bf44b6b15b9a6e29397c1f3014bf4f79884f3060aa4fef249`.
+Private outputs: `outputs/kaggle/sealed-identity-full-result/sealed_identity/`.
+Aggregate acceptance: `outputs/analysis/sealed-identity/verification.json`.
