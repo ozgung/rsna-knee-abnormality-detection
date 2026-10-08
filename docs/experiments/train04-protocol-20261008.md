@@ -105,3 +105,29 @@ Acceptance before launch: exhaustive synthetic objective/gradient parity for bat
 Report all12target AUCs, positive/negative/unknown counts, macro policy, BCE and paired group-bootstrap intervals from the same selected checkpoint. Separately report trainability (finite learning and improvement against train-prior), ranking usefulness (same-cohort own-model comparison and predeclared50/50own probability blend), and offline submission qualification. The old standalone `.855 AUC AND .457601 BCE` spending threshold is superseded prospectively for future candidates: it conflates calibration with ranking and can reject useful complements. Candidate promotion remains evidence-based, not automatic: prefer selected macroAUC improvement>=.005 or fixed-own-blend improvement>=.003, inspect substantial per-target regressions, and report uncertainty; these are planning heuristics, not score forecasts. Before any own-model leaderboard experiment, record the exact fixed blend and complete image-only offline qualification. No public-checkpoint local blend establishes independent validation, and the sealed cohort remains untouched.
 
 Detailed aggregate review and replay: `outputs/analysis/training-strategy-20261009/{recommendation.md,objective-check.json,training-support.json,rng-replay.json}`. These contain no new gold/sealed metrics. This amendment precedes implementation or launch of the corrected objective.
+
+### Objective implementation and launch handoff
+
+October9: `knee/coverage_objective.py` plus narrow trainer/builder edits implement the amendment. The original source is pinned to6af8902, runner81594a1d… and archived build digest2b178cdb…. All seven unaffected packaged modules, sampling/evaluation and selected-checkpoint logic retain original hashes/AST. Original initialization is hash-checked before loading and copied byte-for-byte, including head and saved RNG. The new contract records its own source/objective/denominator fingerprints. The shared empty-batch policy executes sampling/forward before skipping every update, preserving their RNG consumption. Cumulative loss, preclip norms/clipping, AMP/empty skips, small parameter probes and already-computed per-target validation metrics are logged without additional evaluation.
+
+Parent integration: **223/223 fixture-enabled tests PASS**, dependency-free smoke and diff checks PASS. This includes exhaustive synthetic loss/gradient parity at batch1/2/12, actual loop-AST empty-batch checks, telemetry stochastic-update parity and exact initial artifact/RNG restoration. CPU tests are not CUDA execution or legacy failure-recovery evidence. Receipts: `outputs/analysis/train04-objective-20261009/`.
+
+The builder accepts a finite verified original-reference epoch prefix and its initialization even if the old run fails or has poor accuracy; it never treats that prefix as a completed comparison. Exact private reference report/run files must be available before packaging. The original runner writes its training report on termination, so the new fit is waiting for authentic artifacts, not a spending gate. Next package command after retrieval:
+
+```bash
+.venv/bin/python scripts/build_coverage_training.py \
+  outputs/research/2026-10-08/convnext-audit \
+  outputs/kaggle/train04-global-objective-20261009 \
+  knee-train04-global-objective-20261009 \
+  outputs/kaggle/train04-cache-full-v2-result/coverage_cache \
+  --cache-kernel ozgung/knee-train04-cache-full-20261008 \
+  --reference-result outputs/kaggle/train04-reference-20261009-result/coverage_training \
+  --reference-kernel ozgung/knee-train04-reference-20261009 \
+  --objective train_global_macro_v1
+```
+
+Before pushing, verify the candidate slug does not already exist, current quota and exact notebook/source/attachment pins. The candidate attaches only the cache and original private training output, with internet disabled and no alternate-label datasets. Keep the stopped consensus controller stopped. Actual original failure recovery is deferred until its failure evidence exists; no generalized contract bypass was added. Export of a future corrected-objective checkpoint needs an explicit extension of the inference exporter's reviewed runner pin.
+
+### Training-only label-density finding
+
+The independent2,000row source-semantics audit rejects dense unknown-cell filling:6,036 originally unknown cells become directional under four-table averaging (6,014negative), but5,099 lack explicit-evidence flags in either structured source. Pilkwang UNK maps to0.28 and Qwen unmentioned to0, so numerical probability does not establish a negative statement. A future narrow Pilkwang YES/NO rule with explicit-Qwen contradiction veto identifies487candidate additions (101asserted,386denied; only36Synovitis); these are unverified structured LLM extractions, not verified report spans. Keep labels unchanged for the objective comparison. Reconsider this limited expansion only after trainability results; no dense fill or new fit is authorized by these counts alone. Evidence and primary source links: `outputs/analysis/label-density-20261009/recommendation.md`, aggregate hashes/counts in `aggregate.json`.

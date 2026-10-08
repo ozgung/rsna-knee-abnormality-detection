@@ -8,7 +8,9 @@ import sys
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from knee.coverage_training import CONFIG,runtime_sources,require_pair_invariants
+from knee.coverage_training import CONFIG,runtime_sources,require_pair_invariants,comparison_sources,supervision
+from knee.coverage_objective import (BATCH_OBJECTIVE,GLOBAL_OBJECTIVE,validate_reference_prefix,
+                                     require_objective_invariants)
 from knee.fresh_reader import SOURCE_HASHES,check_sources,validate_plan
 from knee.fresh_reader_setup import reference_parts
 from knee.validation import file_sha256
@@ -34,7 +36,10 @@ def reference_gate(report):
     return selected
 
 
-def build(sources,destination,slug,cache_receipts,*,cache_kernel,reference_result=None,reference_kernel=None):
+def build(sources,destination,slug,cache_receipts,*,cache_kernel,reference_result=None,reference_kernel=None,
+          objective=BATCH_OBJECTIVE):
+    if objective not in (BATCH_OBJECTIVE,GLOBAL_OBJECTIVE):raise ValueError('Unknown TRAIN04 objective')
+    if objective==GLOBAL_OBJECTIVE and not reference_result:raise ValueError('Original reference initialization required')
     check_sources(sources);reference_parts(cache_kernel,owner='ozgung')
     receipts=Path(cache_receipts)
     plan=json.loads((receipts/'plan-private.json').read_text());validate_plan(plan)
@@ -44,12 +49,16 @@ def build(sources,destination,slug,cache_receipts,*,cache_kernel,reference_resul
             report['plan_fingerprint']!=plan['fingerprint'] or not report['gate']['passed'] or
             set(index)!={r['uid'] for r in plan['records']}):
         raise ValueError('Successful complete2200 cache required')
-    reference_pins=None;reference_contract=None
+    reference_pins=None;reference_contract=None;reference_prefix=None
     if (reference_result is None)!=(reference_kernel is None):raise ValueError('Reference files and kernel required together')
     if reference_result:
         reference_parts(reference_kernel,owner='ozgung');ref=Path(reference_result)
-        r=json.loads((ref/'training-report.json').read_text());selected=reference_gate(r)
+        r=json.loads((ref/'training-report.json').read_text())
         run=json.loads((ref/'run-contract.json').read_text())
+        if objective==GLOBAL_OBJECTIVE:
+            reference_prefix=validate_reference_prefix(r,run)
+        else:
+            reference_gate(r)
         if run['contract']!=r['contract'] or r['contract']['plan_fingerprint']!=plan['fingerprint']:
             raise ValueError('Reference plan/run identity differs')
         reference_contract=r['contract']
@@ -59,19 +68,26 @@ def build(sources,destination,slug,cache_receipts,*,cache_kernel,reference_resul
                  'index_sha256':file_sha256(receipts/'index-private.json'),
                  'complete_sha256':file_sha256(receipts/'cache-report.json'),
                  'weights_fingerprint':fingerprint_weights(plan)}
-        require_pair_invariants(current,reference_contract,environment=False)
+        if objective==GLOBAL_OBJECTIVE:
+            from knee.fresh_reader import fingerprint
+            current.update(objective=objective,variant='v1',comparison_sources=comparison_sources(),
+                           labels_fingerprint=fingerprint(supervision(plan)[0].tolist()))
+            require_objective_invariants(current,reference_contract,environment=False)
+        else:
+            require_pair_invariants(current,reference_contract,environment=False)
         reference_pins={'training-report.json':file_sha256(ref/'training-report.json'),
                         'run-contract.json':file_sha256(ref/'run-contract.json'),
                         'initial.pt':run['initial_model_sha256']}
         if any(not isinstance(x,str) or len(x)!=64 for x in reference_pins.values()):raise ValueError('Reference artifact hashes missing')
     names=['knee/__init__.py','knee/validation.py','knee/features.py','knee/experiment.py','knee/fresh_reader.py',
-           'knee/fresh_reader_setup.py','knee/coverage_cache.py','knee/coverage_training.py']
+           'knee/fresh_reader_setup.py','knee/coverage_cache.py','knee/coverage_training.py','knee/coverage_objective.py']
     own={n:(ROOT/n).read_text() for n in names};external={n:(Path(sources)/n).read_text() for n in SOURCE_HASHES}
     for n,s in {**own,**external}.items():compile(s,n,'exec')
     revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     pins={n:file_sha256(receipts/n) for n in ('plan-private.json','cache-report.json','index-private.json')}
     contract={'revision':revision,'cache_kernel':cache_kernel,'cache_pins':pins,'reference_kernel':reference_kernel,
               'reference_pins':reference_pins,'reference_contract':reference_contract,
+              'reference_prefix':reference_prefix,'objective':objective,
               'config':CONFIG,'sources':{n:hashlib.sha256(s.encode()).hexdigest() for n,s in own.items()},
               'builder_sha256':file_sha256(__file__),'external':SOURCE_HASHES,
               'notebook_seconds':CONFIG['seconds'],'time_policy':'platform_limit_only'}
@@ -110,10 +126,13 @@ try:
             for name,digest in CONTRACT['reference_pins'].items():
                 if file_sha256(ref/name)!=digest:raise ValueError('Reference artifact changed')
             initial=ref/'initial.pt'
-            refs={{'steven':'stevenleehans/rsna-knee-llm-report-labels','pilkwang':'pilkwang/rsna-knee-llm-labels','lixin':'lixin73/rsna-knee-llm-report-labels-sol56','qwen':'laymond/rsna-knee-abnormality-qwen3-8b-weak-labels'}}
-            label_paths={{k:dataset_root(inputs,refs[k],[filename])/filename for k,(filename,digest) in LABEL_SOURCES.items()}}
+            if CONTRACT['objective']!={GLOBAL_OBJECTIVE!r}:
+                refs={{'steven':'stevenleehans/rsna-knee-llm-report-labels','pilkwang':'pilkwang/rsna-knee-llm-labels','lixin':'lixin73/rsna-knee-llm-report-labels-sol56','qwen':'laymond/rsna-knee-abnormality-qwen3-8b-weak-labels'}}
+                label_paths={{k:dataset_root(inputs,refs[k],[filename])/filename for k,(filename,digest) in LABEL_SOURCES.items()}}
         result=train(cache,sources,'/kaggle/working/coverage_training',source_paths=label_paths,initial=initial,
-                     reference_contract=CONTRACT['reference_contract'],session_deadline=STARTED+CONTRACT['notebook_seconds'])
+                     reference_contract=CONTRACT['reference_contract'],session_deadline=STARTED+CONTRACT['notebook_seconds'],
+                     objective=CONTRACT['objective'],
+                     reference_initial_sha256=CONTRACT['reference_pins']['initial.pt'] if CONTRACT['reference_pins'] else None)
         print(json.dumps({{'status':result,'elapsed_seconds':time.monotonic()-STARTED}}),flush=True)
 except BaseException as exc:
     write_json('/kaggle/working/train04-failure.json',{{'failure_type':type(exc).__name__,'elapsed_seconds':time.monotonic()-STARTED,'contract':CONTRACT}})
@@ -125,7 +144,7 @@ except BaseException as exc:
                  {'cell_type':'code','id':'run','metadata':{},'execution_count':None,'outputs':[],'source':entry.splitlines(True)}]}
     meta={'id':'ozgung/'+slug,'title':slug.replace('-',' ').title(),'code_file':'notebook.ipynb','language':'python','kernel_type':'notebook',
           'is_private':True,'enable_gpu':True,'enable_tpu':False,'enable_internet':not bool(reference_kernel),
-          'dataset_sources':['stevenleehans/rsna-knee-llm-report-labels','pilkwang/rsna-knee-llm-labels','lixin73/rsna-knee-llm-report-labels-sol56','laymond/rsna-knee-abnormality-qwen3-8b-weak-labels'] if reference_kernel else [],
+          'dataset_sources':['stevenleehans/rsna-knee-llm-report-labels','pilkwang/rsna-knee-llm-labels','lixin73/rsna-knee-llm-report-labels-sol56','laymond/rsna-knee-abnormality-qwen3-8b-weak-labels'] if reference_kernel and objective!=GLOBAL_OBJECTIVE else [],
           'kernel_sources':[cache_kernel]+([reference_kernel] if reference_kernel else []),
           'competition_sources':[],'model_sources':[],'docker_image':DOCKER,'machine_shape':'NvidiaTeslaT4'}
     out=Path(destination);out.mkdir(parents=True,exist_ok=False)
@@ -139,5 +158,6 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('sources','destination','slug','cache_receipts'):p.add_argument(name)
     p.add_argument('--cache-kernel',required=True);p.add_argument('--reference-result');p.add_argument('--reference-kernel')
+    p.add_argument('--objective',choices=(BATCH_OBJECTIVE,GLOBAL_OBJECTIVE),default=BATCH_OBJECTIVE)
     a=p.parse_args();build(a.sources,a.destination,a.slug,a.cache_receipts,cache_kernel=a.cache_kernel,
-                           reference_result=a.reference_result,reference_kernel=a.reference_kernel)
+                           reference_result=a.reference_result,reference_kernel=a.reference_kernel,objective=a.objective)

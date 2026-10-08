@@ -14,6 +14,9 @@ from knee.fresh_reader import (environment, fingerprint, load_source, macro_loss
     validate_plan, weak_validation_evidence, write_json)
 from knee.fresh_reader_setup import progress, time_limit
 from knee.validation import file_sha256, evaluate_predictions
+from knee.coverage_objective import (BATCH_OBJECTIVE, GLOBAL_OBJECTIVE, EMPTY_POLICY,
+    REFERENCE_SOURCES, training_mean_weights, training_loss, require_objective_invariants,
+    copy_initial, load_exact_initial, StepTelemetry, parameter_probes, probe_displacements)
 
 CONFIG = dict(seed=42, backbone='convnext_tiny.fb_in22k_ft_in1k', image_size=256,
               train_windows=8, eval_windows=12, batch_size=2, epochs=12,
@@ -119,7 +122,13 @@ class VolumeCache:
 def runtime_sources():
     root=Path(__file__).resolve().parents[1]
     return {name:file_sha256(root/name) for name in ('knee/coverage_training.py','knee/coverage_cache.py',
-        'knee/fresh_reader.py','knee/fresh_reader_setup.py','knee/validation.py')}
+        'knee/fresh_reader.py','knee/fresh_reader_setup.py','knee/validation.py','knee/coverage_objective.py')}
+
+
+def comparison_sources():
+    root=Path(__file__).resolve().parents[1]
+    return {name:file_sha256(root/name) for name in
+            (*REFERENCE_SOURCES,'knee/coverage_training.py','knee/coverage_objective.py')}
 
 
 def require_pair_invariants(current,reference,*,environment=True):
@@ -130,10 +139,14 @@ def require_pair_invariants(current,reference,*,environment=True):
         raise ValueError('Controlled target comparison changed a non-label invariant')
 
 
-def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,reference_contract=None,session_deadline=None):
+def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,reference_contract=None,
+           session_deadline=None,objective=BATCH_OBJECTIVE,reference_initial_sha256=None):
     import numpy as np
     import torch
     started=time.monotonic();elapsed_before=0.
+    if objective not in (BATCH_OBJECTIVE,GLOBAL_OBJECTIVE):raise ValueError('Unknown TRAIN04 objective')
+    if objective==GLOBAL_OBJECTIVE and (source_paths is not None or initial is None or reference_contract is None):
+        raise ValueError('Global objective requires original v1 initialization and contract')
     session_deadline=started+CONFIG['seconds'] if session_deadline is None else session_deadline
     if not math.isfinite(session_deadline) or session_deadline<=started:
         raise ValueError('Invalid platform session deadline')
@@ -156,8 +169,18 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
               'labels_fingerprint':fingerprint(labels.tolist()),'weights_fingerprint':fingerprint(weights.tolist()),
               'label_sources':LABEL_SOURCES if source_paths else {},'label_source_audit':label_audit,
               'initial_file_sha256':file_sha256(initial) if initial else None}
+    train_indices=[i for i,r in enumerate(plan['records']) if r['split']=='train']
+    mean_weights=training_mean_weights(weights,train_indices)
+    contract.update(objective=objective,empty_batch_policy=EMPTY_POLICY,
+                    train_mean_weights=mean_weights,train_mean_weights_fingerprint=fingerprint(mean_weights),
+                    comparison_sources=comparison_sources(),
+                    reference_contract_fingerprint=reference_contract.get('fingerprint') if reference_contract else None)
     contract['fingerprint']=fingerprint(contract)
-    if variant=='consensus':
+    if objective==GLOBAL_OBJECTIVE:
+        require_objective_invariants(contract,reference_contract)
+        if not reference_initial_sha256 or contract['initial_file_sha256']!=reference_initial_sha256:
+            raise ValueError('Global objective initialization artifact differs')
+    elif variant=='consensus':
         if reference_contract is None:raise ValueError('Controlled comparison requires reference contract')
         require_pair_invariants(contract,reference_contract)
     elif reference_contract is not None:raise ValueError('Unexpected reference contract for original targets')
@@ -195,10 +218,8 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
         code=load_source(sources,'knee')
         model=code.KneeNet(CONFIG['backbone'],pretrained=initial is None and state is None,img_size=256)
         if initial:
-            init=torch.load(initial,map_location='cpu',weights_only=False)
-            if init['plan_fingerprint']!=plan['fingerprint'] or init['config']!=CONFIG:
-                raise ValueError('Reference initialization contract differs')
-            model.load_state_dict(init['model'],strict=True);restore_rng(init['rng'])
+            init=load_exact_initial(model,initial,expected_sha256=contract['initial_file_sha256'],
+                                    plan_fingerprint=plan['fingerprint'],config=CONFIG)
         else:
             model.cls_b.data.copy_(torch.tensor(np.log(original_prior/(1-original_prior))))
         model=model.cuda().to(memory_format=torch.channels_last)
@@ -206,13 +227,18 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
         if init_hash!=INITIAL_ENCODER_SHA256:raise ValueError('Generic ImageNet encoder changed after CUDA probe')
         if initial and init_hash!=init['initial_encoder_sha256']:raise ValueError('Initial encoder tensors differ')
         if state is None:
-            save_checkpoint(out/'initial.pt',dict(model={k:v.detach().cpu() for k,v in model.state_dict().items()},
-                 config=CONFIG,plan_fingerprint=plan['fingerprint'],initial_encoder_sha256=init_hash,rng=rng_state()))
+            if objective==GLOBAL_OBJECTIVE:
+                copy_initial(initial,out/'initial.pt',reference_initial_sha256)
+            else:
+                save_checkpoint(out/'initial.pt',dict(model={k:v.detach().cpu() for k,v in model.state_dict().items()},
+                     config=CONFIG,plan_fingerprint=plan['fingerprint'],initial_encoder_sha256=init_hash,rng=rng_state()))
+        probes=parameter_probes(model)
         ema=copy.deepcopy(model).eval().requires_grad_(False)
         optimizer=torch.optim.AdamW([{'params':model.enc.parameters(),'lr':CONFIG['lr_encoder']},
           {'params':[p for n,p in model.named_parameters() if not n.startswith('enc.')],'lr':CONFIG['lr_head']}],weight_decay=.02)
         scaler=torch.amp.GradScaler('cuda')
         scheduler=torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,12*1000)
+    mean_weights_tensor=torch.tensor(mean_weights,device='cuda',dtype=torch.float32)
     volumes=VolumeCache(cache,index)
     def batch(indices,training=False):
         samples=[sample_windows(volumes.get(rows[i]['uid']),8 if training else 12,train=training,rng=np.random) for i in indices]
@@ -238,6 +264,7 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
     if state:
         model.load_state_dict(state['model']);ema.load_state_dict(state['ema']);optimizer.load_state_dict(state['optimizer'])
         scaler.load_state_dict(state['scaler']);scheduler.load_state_dict(state['scheduler']);restore_rng(state['rng'])
+        probes=state['parameter_probes']
         gate=state['gate'];shutil_best=Path(resume).parent/'best.pt'
         import shutil
         initial_previous=Path(resume).parent/'initial.pt'
@@ -257,8 +284,8 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
                 if b==16:torch.cuda.synchronize();tick=time.monotonic()
                 optimizer.zero_grad(set_to_none=True);x,m,p,y,w=batch(tr[2*b:2*b+2],True)
                 with torch.autocast('cuda',dtype=torch.float16):n,d=weighted_terms(model(x,m,p,res=256,train=True),y,w)
-                if not torch.isfinite(n).all():raise ValueError('Nonfinite timing supervision')
-                scaler.scale(macro_loss(n,d)).backward()
+                loss=training_loss(n,d,objective=objective,batch_size=len(y),mean_weights=mean_weights_tensor)
+                if loss is not None:scaler.scale(loss).backward()
             torch.cuda.synchronize();train_seconds=(time.monotonic()-tick)/48
             tick=time.monotonic();evaluate(ema,va[:16],require_all=False);torch.cuda.synchronize();eval_warmup_seconds=time.monotonic()-tick
             tick=time.monotonic();evaluate(ema,va[:16],require_all=False);torch.cuda.synchronize();eval_seconds=(time.monotonic()-tick)/8
@@ -283,6 +310,8 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
     order=state['order'] if state else None;history=state['history'] if state else []
     best=state['best'] if state else math.inf;step=state['step'] if state else 0
     overflow_total=state['overflow_total'] if state else 0;consecutive=state['consecutive'] if state else 0
+    empty_skips=state['zero_supervision_skips'] if state else 0
+    telemetry=StepTelemetry('cuda',state['telemetry'] if state else None)
     status='RUNNING'
     def save_last():
         save_checkpoint(out/'last.pt',dict(contract=contract,model=model.state_dict(),ema=ema.state_dict(),
@@ -290,7 +319,8 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
           epoch=epoch,cursor=cursor,order=order,history=history,best=best,step=step,gate=gate,
           initial_encoder_sha256=init_hash,initial_output_sha256=initial_output_sha,
           best_checkpoint_sha256=best_checkpoint_sha,best_evidence_sha256=best_evidence_sha,
-          overflow_total=overflow_total,consecutive=consecutive,elapsed_seconds=elapsed()))
+          overflow_total=overflow_total,consecutive=consecutive,elapsed_seconds=elapsed(),
+          zero_supervision_skips=empty_skips,telemetry=telemetry.values,parameter_probes=probes))
     try:
         with time_limit(session_remaining(),'Kaggle session: fit'):
             while epoch<12:
@@ -299,11 +329,16 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
                 while cursor<len(order):
                     deadline();x,m,p,y,w=batch(order[cursor:cursor+2],True);optimizer.zero_grad(set_to_none=True)
                     with torch.autocast('cuda',dtype=torch.float16):n,d=weighted_terms(model(x,m,p,res=256,train=True),y,w)
-                    if not torch.isfinite(n).all():raise ValueError('Nonfinite training loss')
-                    loss=macro_loss(n,d);scaler.scale(loss).backward();scaler.unscale_(optimizer)
-                    torch.nn.utils.clip_grad_norm_(model.parameters(),3.)
+                    loss=training_loss(n,d,objective=objective,batch_size=len(y),mean_weights=mean_weights_tensor)
+                    if loss is None:
+                        cursor+=len(y);empty_skips+=1
+                        progress('train04_empty_batch',epoch=epoch+1,studies=cursor,zero_supervision_skips=empty_skips)
+                        continue
+                    scaler.scale(loss).backward();scaler.unscale_(optimizer)
+                    preclip_norm=torch.nn.utils.clip_grad_norm_(model.parameters(),3.)
                     previous_scale=scaler.get_scale();scaler.step(optimizer);scaler.update();cursor+=2
                     overflow=scaler.get_scale()<previous_scale
+                    telemetry.add(loss,preclip_norm,overflow)
                     overflow_total+=int(overflow);consecutive=consecutive+1 if overflow else 0
                     if consecutive>5:raise ValueError('More than five consecutive AMP overflows')
                     if not overflow:
@@ -311,9 +346,12 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
                         with torch.no_grad():
                             for a,b in zip(ema.parameters(),model.parameters()):a.lerp_(b,1-decay)
                             for a,b in zip(ema.buffers(),model.buffers()):a.copy_(b)
-                    if cursor%128==0:progress('train04_steps',epoch=epoch+1,studies=cursor,updates=step,overflows=overflow_total,seconds=elapsed())
+                    if step==1 and not overflow:progress('train04_parameter_probes',updates=step,probes=probe_displacements(model,probes))
+                    if cursor%128==0:progress('train04_steps',epoch=epoch+1,studies=cursor,updates=step,overflows=overflow_total,
+                        zero_supervision_skips=empty_skips,cumulative_training_telemetry=telemetry.report(),seconds=elapsed())
                 diag,_,_=evaluate(ema,diagnostic,require_all=False);metrics,preds,logits=evaluate(ema,va)
-                history.append({'epoch':epoch+1,**metrics,'training_diagnostic':diag,'elapsed_seconds':elapsed()})
+                history.append({'epoch':epoch+1,**metrics,'training_diagnostic':diag,'elapsed_seconds':elapsed(),
+                    'cumulative_training_telemetry':telemetry.report(),'parameter_probe_changes':probe_displacements(model,probes)})
                 if metrics['weak_bce']<best:
                     evidence=weak_validation_evidence(plan,va,preds,logits=logits,epoch=epoch+1,weak_bce=metrics['weak_bce'])
                     save_checkpoint(out/'best.pt',dict(contract=contract,model=ema.state_dict(),epoch=epoch+1,
@@ -324,7 +362,10 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
                     best_evidence_sha=file_sha256(out/'best-weak-validation-private.json')
                     best=metrics['weak_bce']
                 epoch+=1;cursor=0;order=None;save_last()
-                progress('train04_epoch_complete',epoch=epoch,weak_bce=metrics['weak_bce'],seconds=elapsed())
+                progress('train04_epoch_complete',epoch=epoch,weak_bce=metrics['weak_bce'],
+                    thresholded_weak_auc=metrics['thresholded_weak_auc'],per_target_bce=metrics['per_target_bce'],
+                    confidence_support=metrics['confidence_support'],training_diagnostic=diag,
+                    cumulative_training_telemetry=telemetry.report(),seconds=elapsed())
             status='PASS'
     except TimeoutError:
         status='PLATFORM_SESSION_STOP';save_last()
@@ -334,7 +375,8 @@ def _train(cache, sources, out, *, source_paths=None, initial=None, resume=None,
         write_json(out/'training-report.json',dict(contract=contract,status=status,history=history,
           completed_epochs=epoch,selected_bce=best if math.isfinite(best) else None,
           prevalence_weak_bce=prevalence,elapsed_seconds=elapsed(),cuda_peak_bytes=torch.cuda.max_memory_allocated(),
-          successful_updates=step,amp_overflow_skips=overflow_total,initial_encoder_sha256=init_hash))
+          successful_updates=step,amp_overflow_skips=overflow_total,initial_encoder_sha256=init_hash,
+          zero_supervision_skips=empty_skips,cumulative_training_telemetry=telemetry.report()))
     return status
 
 
