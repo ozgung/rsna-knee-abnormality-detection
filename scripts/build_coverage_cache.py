@@ -15,12 +15,15 @@ from knee.fresh_reader_setup import reference_parts
 from build_fresh_reader import DOCKER
 
 
-def build(source_dir, destination, slug, expected_plan, *, pilot_kernel=None):
+def build(source_dir, destination, slug, expected_plan, *, pilot_kernel=None, expansion_bytes=None):
     check_sources(source_dir)
     if len(expected_plan)!=64 or any(c not in '0123456789abcdef' for c in expected_plan):
         raise ValueError('Expected locally verified plan hash')
     if pilot_kernel:
         reference_parts(pilot_kernel, owner='ozgung')
+    if expansion_bytes is not None and (not pilot_kernel or type(expansion_bytes) is not int or
+            not CACHE_CONFIG['bytes_limit']<=expansion_bytes<=17*1024**3):
+        raise ValueError('Explicit16..17GiB revision requires a full-cache build')
     names = ['knee/__init__.py','knee/validation.py','knee/features.py','knee/experiment.py',
              'knee/fresh_reader.py','knee/fresh_reader_setup.py','knee/coverage_cache.py']
     own = {n:(ROOT/n).read_text() for n in names}
@@ -28,7 +31,7 @@ def build(source_dir, destination, slug, expected_plan, *, pilot_kernel=None):
     for n,s in {**own,**external}.items():compile(s,n,'exec')
     revision = subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     config = {'version':VERSION,'expected_plan':expected_plan,'pilot_kernel':pilot_kernel,
-              'revision':revision,'own_sources':{n:hashlib.sha256(s.encode()).hexdigest() for n,s in own.items()},
+              'revision':revision,'expansion_bytes':expansion_bytes,'own_sources':{n:hashlib.sha256(s.encode()).hexdigest() for n,s in own.items()},
               'external_sources':SOURCE_HASHES,'cache':CACHE_CONFIG,
               'builder_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}
     fingerprint = hashlib.sha256(json.dumps(config,sort_keys=True).encode()).hexdigest()
@@ -65,7 +68,7 @@ try:
             previous=notebook_root(inputs,{pilot_kernel!r},'coverage_cache',['cache-report.json','plan-private.json']) if {pilot_kernel is not None!r} else None
             plan=make_coverage_plan(data,weak,original,identity)
             if plan['fingerprint']!={expected_plan!r}:raise ValueError('Remote plan differs from local verified plan')
-        report=build_cache(data,sources,plan,'/kaggle/working/coverage_cache',previous=previous)
+        report=build_cache(data,sources,plan,'/kaggle/working/coverage_cache',previous=previous,expansion_bytes={expansion_bytes!r})
         print(json.dumps(report),flush=True)
 except BaseException as exc:
     write_json('/kaggle/working/coverage-failure.json',{{'failure_type':type(exc).__name__,'elapsed_seconds':time.monotonic()-STARTED,'contract':CONTRACT}})
@@ -92,4 +95,5 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('source_dir','destination','slug','expected_plan'):p.add_argument(name)
     p.add_argument('--pilot-kernel')
-    a=p.parse_args();build(a.source_dir,a.destination,a.slug,a.expected_plan,pilot_kernel=a.pilot_kernel)
+    p.add_argument('--expansion-bytes',type=int)
+    a=p.parse_args();build(a.source_dir,a.destination,a.slug,a.expected_plan,pilot_kernel=a.pilot_kernel,expansion_bytes=a.expansion_bytes)

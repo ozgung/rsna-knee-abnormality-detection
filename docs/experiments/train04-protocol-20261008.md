@@ -56,3 +56,11 @@ The primary comparison is all-12-target weak macro AUC at the BCE-selected check
 4. Only then consider grouped OOF teachers or a complementary backbone. Any changed gate or recipe must be recorded prospectively; the earlier512-row failures remain unchanged. The 0.936 submission stays preserved regardless of these results.
 
 Implementation is pending. Runtime contracts must bind all source hashes, exact data and target fingerprints, environment, initialization tensor hash, selected checkpoint, predictions and timings. Passing unit tests alone does not establish real cache, CUDA training or competitive performance.
+
+## CPU pilot findings and prospective operational revision
+
+Source `194f78b`, private `ozgung/knee-train04-cache-pilot-20261008`v1: all64studies/303selected series decoded in264.99seconds, zero failures,81missing slots,403,365,472compressed bytes. Plan fingerprint `3f4f0230aff05c8ade9b78ff6e898571839349e3cca41a86c6ded491c7408a32` exactly matches local reconstruction. The original expansion gate **failed**: with the declared margins, time is12,346.35seconds (within six hours) but size is17,332,110,125bytes (16.14GiB, slightly above16GiB).
+
+Before any full-cache launch, explicitly revise the remote output allowance to **17GiB**, preserving the25%size margin and5GiBfree-disk reserve. This passes the measured projection without changing images, sampling, cohort or the original plan. The builder records a separate operational override and the failed original gate; the Mac remains limited to2GiB. A failed actual remote free-disk check still stops expansion.
+
+The training-only label audit over2,000rows found two Qwen `error` rows; all other sources cover all selected training rows. Exclude each failed Qwen output entirely before averaging the other available sources. Do not parse its target values or turn the failure into a negative. This prospective clarification produces target fingerprint `82a507d15d60001b5463669bd9542c7e5ac8947847fbf913d111073b0b2ebaf5`; the original confidence fingerprint remains `81451e5298eb7756a2d86d612e501f23cd4ee5d2ac988e8b82d53ebdd3e68c7f`. All development targets, weights and unknown masks are unchanged. [Aggregate verification](../../outputs/analysis/train04/supervision-verification.json).

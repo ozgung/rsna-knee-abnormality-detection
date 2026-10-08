@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-08, 16:50 UTC** (Europe/Istanbul). Read this first, then [README](README.md) and [AGENTS](AGENTS.md).
+Updated **2026-10-08, 17:00 UTC** (Europe/Istanbul). Read this first, then [README](README.md) and [AGENTS](AGENTS.md).
 
 ## Current snapshot
 
@@ -16,7 +16,7 @@ Updated **2026-10-08, 16:50 UTC** (Europe/Istanbul). Read this first, then [READ
 | Task | State | Acceptance / next action |
 | --- | --- | --- |
 | REF-03 | Implemented/tested in isolated worktree; GPU rehearsal QUEUED | Source `19b4486`;176tests PASS. Private `ozgung/knee-raptor62-rehearsal-20261008`v1,1,200s cap; common blend has remaining600s. Same weights/ConvNeXt/equal rank blend; preserve scored versions. No new entry yet. |
-| TRAIN-04 | Protocol written; CPU cache implementation/verification in progress | [Prospective contract](docs/experiments/train04-protocol-20261008.md). Verified original2,000train/unchanged200dev and full identity exclusions; planFP `3f4f0230aff05c8ade9b78ff6e898571839349e3cca41a86c6ded491c7408a32`. Six variable series at256px;64-study CPU pilot before expansion. GPU pair <=6h, >=8h reserve. No fit yet. |
+| TRAIN-04 | CPU64 pilot PASS; original expansion size gate FAIL, revised17GiB gate PASS | [Prospective contract](docs/experiments/train04-protocol-20261008.md). Verified original2,000train/unchanged200dev and full identity exclusions; planFP `3f4f0230aff05c8ade9b78ff6e898571839349e3cca41a86c6ded491c7408a32`. Six variable series at256px;64decoded/zero failures/403MB/264.99s. Original16GiB projected gate failed by0.14GiB; explicit17GiB remote-only revision passes. Two QA arrays (12.8MB) passed hashes/shape/windows and visual inspection; full-cache launch follows; training runner implemented but not yet qualified. GPU pair <=6h, >=8h reserve. No fit yet. |
 | REF-02 | Complete: standalone0.929, fixed blend **0.936** | Preserve scored versions and receipts. Two entries remain today; no new variant before explicit qualification. |
 | TRAIN-02 fit | COMPLETE/PASS execution; accuracy below frozen baseline | All4 epochs /1,024 updates /zeroAMPskips; BCE0.49586048, weakAUC0.80547772. Paired analysis PASS. Larger-data gate fails; same-cohort duration gate passes. |
 | TRAIN-02 observability | Complete, `bb3e9fa` | Flushed aggregate cache/gate/step/checkpoint timing; no added GPU/tensor/RNG operations or scientific/checkpoint-field changes. Small wall-clock overhead remains. V1 resumes must retain the original runner bytes; this cannot restore current remote logs. |
@@ -77,4 +77,4 @@ Use `/Users/ozgun/miniconda3/bin/kaggle kernels status OWNER/SLUG`, `kernels log
 
 ## Latest session checkpoint
 
-October8 continuation,16:50UTC: official rules/pages and submission history refreshed; five/day, offline9h, two entries remaining. Quota27.96GPUh. REF03 subagent completed explicit62-window code and176tests; first qualification queued. Parent wrote TRAIN04 prospective protocol and implemented variable-series CPU cache; six new unit tests pass. Exact local cohort reconstruction proves original2,000train plus unchanged200dev with frozen identity exclusions. Full regression checks pending; no new model fit or submission. Next: finish cache tests, launch64-study CPU pilot; inspect REF03 receipts before common blend/entry. Private plan and checks are under `outputs/analysis/train04/`. Git consolidation from the prior session remains intact; unrelated `fc7c` worktree remains untouched.
+October8 continuation,16:50UTC: official rules/pages and submission history refreshed; five/day, offline9h, two entries remaining. Quota27.96GPUh. REF03 subagent completed explicit62-window code and176tests; first qualification queued. Parent wrote TRAIN04 prospective protocol and implemented variable-series CPU cache; six new unit tests pass. Exact local cohort reconstruction proves original2,000train plus unchanged200dev with frozen identity exclusions. 180/180 full tests and dependency-free smoke PASS. CPU64 pilot completed; full-cache operational byte allowance revised prospectively, original failure retained. Training-only consensus audit excludes two failed Qwen rows; original masks/dev unchanged. No new model fit or submission. Next: finish cache tests, launch64-study CPU pilot; inspect REF03 receipts before common blend/entry. Private plan and checks are under `outputs/analysis/train04/`. Git consolidation from the prior session remains intact; unrelated `fc7c` worktree remains untouched.

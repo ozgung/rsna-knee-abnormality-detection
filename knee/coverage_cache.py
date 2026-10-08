@@ -78,17 +78,19 @@ def pilot_rows(plan):
         ('coverage256-pilot-v1:' + r['uid']).encode()).hexdigest())[:CACHE_CONFIG['pilot_studies']]
 
 
-def projection(sample, total, overhead):
+def projection(sample, total, overhead, *, bytes_limit=CACHE_CONFIG['bytes_limit']):
     import math
     if (not sample or len(sample) > total or not math.isfinite(overhead) or overhead < 0 or
             any(not math.isfinite(r['seconds']) or r['seconds'] <= 0 or r['bytes'] <= 0 for r in sample)):
         raise ValueError('Invalid cache pilot measurements')
+    if type(bytes_limit) is not int or not CACHE_CONFIG['bytes_limit']<=bytes_limit<=17*1024**3:
+        raise ValueError('Remote byte allowance must be16..17GiB')
     seconds = overhead + 1.5 * sum(r['seconds'] for r in sample) * total / len(sample)
     size = 1.25 * sum(r['bytes'] for r in sample) * total / len(sample)
-    return {'passed': seconds <= CACHE_CONFIG['full_seconds'] and size <= CACHE_CONFIG['bytes_limit'],
+    return {'passed': seconds <= CACHE_CONFIG['full_seconds'] and size <= bytes_limit,
             'estimated_seconds_with_margin': seconds, 'estimated_bytes_with_margin': size,
             'time_margin': 1.5, 'size_margin': 1.25, 'measured_studies': len(sample),
-            'target_studies': total, 'overhead_seconds': overhead}
+            'target_studies': total, 'overhead_seconds': overhead,'bytes_limit':bytes_limit}
 
 
 def validate_volumes(volumes, *, image_size=256):
@@ -150,7 +152,7 @@ def verify_index(root, plan, index, *, complete):
             raise ValueError('Cache file identity differs')
 
 
-def build_cache(data, sources, plan, out, *, previous=None):
+def build_cache(data, sources, plan, out, *, previous=None, expansion_bytes=None):
     import cv2
     import numpy as np
     import pandas as pd
@@ -158,6 +160,10 @@ def build_cache(data, sources, plan, out, *, previous=None):
     if plan['version'] != VERSION or plan['config'] != CACHE_CONFIG:
         raise ValueError('Cache recipe differs')
     pilot = previous is None
+    if expansion_bytes is not None and (pilot or type(expansion_bytes) is not int or
+            not CACHE_CONFIG['bytes_limit']<=expansion_bytes<=17*1024**3):
+        raise ValueError('Explicit byte revision applies to full cache only; max17GiB')
+    byte_limit=expansion_bytes or CACHE_CONFIG['bytes_limit']
     started = time.monotonic()
     limit = CACHE_CONFIG['pilot_seconds' if pilot else 'full_seconds']
     data, out = Path(data), Path(out)
@@ -166,7 +172,8 @@ def build_cache(data, sources, plan, out, *, previous=None):
     write_json(out/'plan-private.json', plan)
     audit = {'status': 'RUNNING', 'stage': 'pilot' if pilot else 'complete',
              'plan_fingerprint': plan['fingerprint'], 'environment': environment(),
-             'selected_series': 0, 'missing_slots': 0, 'failures': 0, 'cached_studies': 0}
+             'selected_series': 0, 'missing_slots': 0, 'failures': 0, 'cached_studies': 0,
+             'expansion_bytes_override':expansion_bytes,'effective_bytes_limit':byte_limit}
     index, total_bytes, new_seconds = {}, 0, 0.
     try:
         with time_limit(limit, 'TRAIN04 CPU cache'):
@@ -174,13 +181,15 @@ def build_cache(data, sources, plan, out, *, previous=None):
                 previous = Path(previous)
                 old_plan = json.loads((previous/'plan-private.json').read_text())
                 old_audit = json.loads((previous/'cache-report.json').read_text())
-                if old_plan != plan or old_audit['status'] != 'PASS' or not old_audit['gate']['passed']:
+                if old_plan != plan or old_audit['status'] != 'PASS' or (not old_audit['gate']['passed'] and expansion_bytes is None):
                     raise ValueError('Matching successful pilot required')
                 index = json.loads((previous/'index-private.json').read_text())
                 if set(index) != {r['uid'] for r in pilot_rows(plan)}:
                     raise ValueError('Exact64 pilot coverage required')
                 verify_index(previous, plan, index, complete=False)
-                gate = projection(list(index.values()), len(plan['records']), old_audit['overhead_seconds'])
+                gate = projection(list(index.values()), len(plan['records']), old_audit['overhead_seconds'],bytes_limit=byte_limit)
+                audit['original_pilot_gate']=old_audit['gate']
+                audit['expansion_gate']=gate
                 if not gate['passed'] or shutil.disk_usage(out).free < gate['estimated_bytes_with_margin'] + CACHE_CONFIG['disk_reserve']:
                     raise ValueError('CPU expansion time/disk gate failed')
                 for row in index.values():
@@ -223,7 +232,7 @@ def build_cache(data, sources, plan, out, *, previous=None):
                 path = out/'arrays'/filename
                 np.savez_compressed(path, **{f'slot{i}': v for i,v in enumerate(volumes)})
                 size = path.stat().st_size
-                if total_bytes + size > CACHE_CONFIG['bytes_limit']:
+                if total_bytes + size > byte_limit:
                     path.unlink(); raise RuntimeError('Remote cache size limit exceeded')
                 duration = time.monotonic()-tick
                 index[uid] = dict(file=filename, bytes=size, sha256=file_sha256(path), seconds=duration,
@@ -234,7 +243,7 @@ def build_cache(data, sources, plan, out, *, previous=None):
                     progress('coverage_cache', studies=len(index), bytes=total_bytes, seconds=time.monotonic()-started)
             sample = [index[r['uid']] for r in pilot_rows(plan)]
             overhead = time.monotonic()-started-new_seconds
-            audit.update(status='PASS', gate=projection(sample,len(plan['records']), overhead),
+            audit.update(status='PASS', gate=projection(sample,len(plan['records']), overhead,bytes_limit=byte_limit),
                          overhead_seconds=overhead, new_decode_seconds=new_seconds,
                          cached_studies=len(index), cache_bytes=total_bytes)
             verify_index(out, plan, index, complete=not pilot)

@@ -47,6 +47,10 @@ class CohortTests(unittest.TestCase):
         self.assertFalse(cc.projection([{'seconds':20,'bytes':1000000}]*64,2200,100)['passed'])
         self.assertFalse(cc.projection([{'seconds':2,'bytes':100000000}]*64,2200,100)['passed'])
         with self.assertRaises(ValueError):cc.projection([{'seconds':float('nan'),'bytes':1}],2200,0)
+        measured=[{'seconds':4,'bytes':6300000}]*64
+        self.assertFalse(cc.projection(measured,2200,25)['passed'])
+        self.assertTrue(cc.projection(measured,2200,25,bytes_limit=17*1024**3)['passed'])
+        with self.assertRaises(ValueError):cc.projection(measured,2200,25,bytes_limit=18*1024**3)
 
 
 try:
