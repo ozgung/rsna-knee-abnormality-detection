@@ -21,6 +21,8 @@ import time
 import types
 import warnings
 
+from knee.public_reader_contract import INPUT_POLICY_VERSION, require_reader_rehearsal
+
 from knee.reference import (RAPTOR_WEIGHT_DATASET, RAPTOR_WEIGHT_NAME, canonical_bytes,
                             infer_checked, load_definitions, load_model, reference_reader,
                             sha256, slot_plan, validate_predictions, validate_volume)
@@ -31,7 +33,7 @@ CONVNEXT_SOURCE_HASHES = {
     "preprocess.py": "4491963e4d2156625c9cf79051f4a25c32d2d761f1f07df3117a439ed8029ae2",
     "knee.py": "8e9fd05dd94e9be70d4b4a6cbdf5201c219b5e6eb3d57c07bb8992c8dbe72ae7",
 }
-CONVNEXT_ENTRY_SHA256 = "0efbc7cb3271c2f394228466b5c5c47889d5ea8a6dbd2341d08dbb138fdfbadc"
+CONVNEXT_ENTRY_SHA256 = "450feb0a5090d427ee754bfba6695804d978b5687f0fc1fb13ad9878300db863"
 RAPTOR_PLAIN_SHA256 = "89606f05849838529e1b4658d28fb049623205d9853371548403bca460361ded"
 DOCKER_IMAGE = "gcr.io/kaggle-private-byod/python@sha256:37c64f7dd9c54116ecd1bcc88817c5469b88387388fade02bfa8bf3fc647d461"
 # Exact successful Python 3.12 install from the standalone ConvNeXt rehearsal log.
@@ -69,7 +71,7 @@ def extract_reader(entry):
     """Reuse exact reviewed functions, excluding top-level installs/model loads/jobs."""
     if sha256(entry.encode()) != CONVNEXT_ENTRY_SHA256:
         raise ValueError("ConvNeXt entry differs from the reviewed rehearsal wrapper")
-    names = {"prepare_study", "predict", "run"}
+    names = {"count_event", "fatal_series_error", "load_selected_series", "prepare_study", "predict", "run"}
     nodes = [n for n in ast.parse(entry).body if isinstance(n, ast.FunctionDef) and n.name in names]
     if {n.name for n in nodes} != names:
         raise ValueError("ConvNeXt definition inventory changed")
@@ -82,16 +84,10 @@ def qualify_components(cnn_contract, cnn_report, raptor_contract, raptor_report,
             cnn_report.get("status") != "PASS" or cnn_contract.get("sources") != CONVNEXT_SOURCE_HASHES or
             cnn_report.get("source_hashes") != CONVNEXT_SOURCE_HASHES or
             cnn_contract.get("entry_sha256") != CONVNEXT_ENTRY_SHA256 or
+            cnn_contract.get("input_policy_version") != INPUT_POLICY_VERSION or
             cnn_contract.get("revision") != cnn_report.get("code_revision")):
         raise ValueError("ConvNeXt successful rehearsal/source contract required")
-    weights = cnn_report.get("weight_hashes", {})
-    if (set(weights) != {f"cnxt_v0_fold{i}.pt" for i in range(3)} or
-            not all(_digest(v) for v in weights.values()) or
-            cnn_report.get("studies", 0) < 19 or cnn_report.get("test_studies") != 3 or
-            any(cnn_report.get(k) != 0 for k in ("decode_failures", "zero_studies")) or
-            any(not isinstance(cnn_report.get(k), (int, float)) or not 0 <= cnn_report[k] <= 1e-6
-                for k in ("repeat_max_abs_error", "cache_parity_max_abs_error"))):
-        raise ValueError("ConvNeXt rehearsal guards/weight identities failed")
+    weights = require_reader_rehearsal(cnn_report, CONVNEXT_ENTRY_SHA256, CONVNEXT_SOURCE_HASHES)
     if (raptor_contract.get("source") != manifest or raptor_report.get("manifest") != manifest or
             manifest.get("profile") != "raptor" or manifest.get("checkpoint_sha256") != RAPTOR_PLAIN_SHA256 or
             manifest.get("checkpoint_file") != RAPTOR_WEIGHT_NAME or
@@ -213,6 +209,7 @@ def _source_module(name, source):
 
 
 def _convnext(root, assets, ids, labels, source, entry, weights, rehearsal, deadline):
+    import cv2
     import numpy as np
     import pandas as pd
     import torch
@@ -240,10 +237,12 @@ def _convnext(root, assets, ids, labels, source, entry, weights, rehearsal, dead
         model.load_state_dict(ck["model"], strict=True)
         models.append((model.cuda().to(memory_format=torch.channels_last).eval(), args["res"]))
         del ck, model
-    audit = {"studies": 0, "selected_series": 0, "missing_slots": 0, "decode_failures": 0, "zero_studies": 0}
+    audit = {"studies": 0, "selected_series": 0, "missing_slots": 0, "decode_failures": 0, "zero_studies": 0,
+             "input_policy_version": INPUT_POLICY_VERSION, "resource_errors": 0, "partial_series": 0,
+             "failed_series": 0, "short_series": 0, "zero_decoded_series": 0, "series_error_types": {}}
     namespace = {"np": np, "pd": pd, "torch": torch, "time": time, "Path": Path,
                  "root": Path(root), "prep": prep, "model_code": model_code, "models": models,
-                 "audit": audit, "labels": labels, "REHEARSAL": False, "t0": time.monotonic()}
+                 "audit": audit, "labels": labels, "cv2": cv2, "REHEARSAL": False, "t0": time.monotonic()}
     exec(compile(extracted, "<audited-convnext-entry-functions>", "exec"), namespace)
     # This is the exact independently rehearsed traversal/preparation/three-fold mean.
     prediction, durations = namespace["run"]("test", ids)

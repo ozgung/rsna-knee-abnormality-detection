@@ -21,6 +21,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from knee.reference import audit_source, canonical_bytes, sha256
+from knee.public_reader_contract import INPUT_POLICY_VERSION
 from knee.reference_blend import (CODEC_WHEELS, CONVNEXT_DATASET, CONVNEXT_SOURCE_HASHES, CONVNEXT_URL,
     DOCKER_IMAGE, RAPTOR_PLAIN_SHA256, RAPTOR_WEIGHT_DATASET, RECIPE, extract_reader, qualify_components)
 from build_kaggle import build
@@ -34,10 +35,15 @@ def require_blend_rehearsal(report, fingerprint):
         raise ValueError("Successful matching common-environment blend rehearsal required")
     for name in ("convnext", "raptor"):
         component = report.get("components", {}).get(name, {})
-        if (component.get("studies") != 3 or component.get("decode_failures") != 0 or
+        if (component.get("studies") != 3 or
                 component.get("zero_studies") != 0 or
                 not 0 <= component.get("raw_rerun_max_abs_error", float("inf")) <= 1e-6):
             raise ValueError("Common-environment component reread parity did not pass")
+        if name == "convnext":
+            if component.get("input_policy_version") != INPUT_POLICY_VERSION or component.get("resource_errors") != 0:
+                raise ValueError("Common-environment ConvNeXt input policy did not pass")
+        elif component.get("decode_failures") != 0:
+            raise ValueError("Common-environment Raptor decoding did not pass")
     hashes = report.get("codec_hashes", {})
     if set(hashes) != set(CODEC_WHEELS) or any(len(v) != 64 or any(c not in "0123456789abcdef" for c in v) for v in hashes.values()):
         raise ValueError("Common-environment rehearsal codec hashes missing")
@@ -65,7 +71,7 @@ def build_blend(destination, slug, *, convnext_source_dir, convnext_entry, convn
         receipts["raptor_contract"], receipts["raptor_rehearsal"], manifest)
     qualification["evidence_sha256"] = {name: sha256(value) for name, value in raw.items()}
     qualification["runtime_sha256"] = {name: sha256((root / name).read_bytes()) for name in
-        ("knee/reference.py", "knee/reference_blend.py", "scripts/reference_blend_entry.py")}
+        ("knee/reference.py", "knee/reference_blend.py", "knee/public_reader_contract.py", "scripts/reference_blend_entry.py")}
     qualification["recipe"] = RECIPE
     qualification["common_environment"] = {"python": [3, 12], "docker_image": DOCKER_IMAGE,
         "torch": "2.10.0+cu128", "timm": "1.0.26"}

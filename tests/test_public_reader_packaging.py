@@ -5,6 +5,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import hashlib
+import copy
+
+from knee.public_reader_contract import INPUT_POLICY_VERSION, STRESS_CASES
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location('public_reader_builder', ROOT/'scripts/build_public_reader.py')
@@ -49,7 +52,43 @@ class ReaderPackagingTests(unittest.TestCase):
             notebook=json.loads((dest/'notebook.ipynb').read_text())
             self.assertEqual(notebook['metadata']['kernelspec']['name'],'python3')
             for cell in notebook['cells']:
-                if cell['cell_type']=='code': compile(''.join(cell['source']),'generated','exec')
+                if cell['cell_type']=='code':
+                    source = ''.join(cell['source'])
+                    compile(source,'generated','exec')
+                    self.assertIn('ENTRY_SHA256 = ', source)
+            contract=json.loads((dest/'build-contract.json').read_text())
+            self.assertEqual(contract['input_policy_version'], INPUT_POLICY_VERSION)
+            self.assertEqual(contract['train_studies_requested'], 64)
+
+    def test_full_entry_requires_fresh_expanded_rehearsal_not_just_weight_hashes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            src, hashes = self.fixtures(directory)
+            root = Path(directory)
+            weights = {f'cnxt_v0_fold{i}.pt': str(i)*64 for i in range(3)}
+            report = dict(status='PASS', rehearsal=True, source_hashes=hashes, weight_hashes=weights,
+                entry_sha256=hashlib.sha256((ROOT/'scripts/public_reader_entry.py').read_bytes()).hexdigest(),
+                input_policy_version=INPUT_POLICY_VERSION, train_studies_requested=64,
+                studies=67, test_studies=3, sample_fingerprint='a'*64, zero_studies=0, resource_errors=0,
+                repeat_max_abs_error=0, cache_parity_max_abs_error=0, elapsed_seconds=500,
+                decode_failures=3, partial_series=1, failed_series=1, short_series=1,
+                zero_decoded_series=0, missing_slots=10, selected_series=392,
+                stress_checks=dict(status='PASS', uses_raw_data=False, uses_labels=False,
+                                   cases=dict.fromkeys(STRESS_CASES, 'PASS')))
+            path = root/'receipt.json'
+            with patch.object(builder, 'SOURCE_HASHES', hashes):
+                with self.assertRaisesRegex(ValueError, 'expanded rehearsal'):
+                    builder.build(src,root/'none','test',rehearsal=False,weight_hashes=weights)
+                for key, value in [('entry_sha256', 'b'*64), ('train_studies_requested',16),
+                                   ('stress_checks',{}), ('resource_errors',1), ('elapsed_seconds',3501),
+                                   ('weight_hashes',{**weights,'cnxt_v0_fold0.pt':'f'*64})]:
+                    wrong=copy.deepcopy(report); wrong[key]=value; path.write_text(json.dumps(wrong))
+                    with self.subTest(key=key), self.assertRaises(ValueError):
+                        builder.build(src,root/'wrong','test',rehearsal=False,weight_hashes=weights,rehearsal_report=path)
+                    self.assertFalse((root/'wrong').exists())
+                path.write_text(json.dumps(report))
+                builder.build(src,root/'valid','test',rehearsal=False,weight_hashes=weights,rehearsal_report=path)
+            contract=json.loads((root/'valid/build-contract.json').read_text())
+            self.assertEqual(contract['rehearsal_report_sha256'],hashlib.sha256(path.read_bytes()).hexdigest())
 
 
 if __name__ == '__main__':

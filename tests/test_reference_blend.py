@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from knee.reference import canonical_bytes, sha256
+from knee.public_reader_contract import INPUT_POLICY_VERSION, STRESS_CASES
 from knee.reference_blend import (CODEC_WHEELS, CONVNEXT_ENTRY_SHA256, CONVNEXT_SOURCE_HASHES,
     RAPTOR_PLAIN_SHA256, RAPTOR_WEIGHT_DATASET, RAPTOR_WEIGHT_NAME, RECIPE,
     equal_rank_blend, extract_reader, qualify_components, read_test_contract,
@@ -21,11 +22,17 @@ def component_receipts():
     manifest = {"profile": "raptor", "checkpoint_sha256": RAPTOR_PLAIN_SHA256,
                 "checkpoint_file": RAPTOR_WEIGHT_NAME, "weight_dataset": RAPTOR_WEIGHT_DATASET}
     cc = {"rehearsal": True, "revision": "synthetic-revision", "sources": CONVNEXT_SOURCE_HASHES,
-          "entry_sha256": CONVNEXT_ENTRY_SHA256}
+          "entry_sha256": CONVNEXT_ENTRY_SHA256, "input_policy_version": INPUT_POLICY_VERSION}
     cr = {"rehearsal": True, "status": "PASS", "code_revision": cc["revision"],
           "source_hashes": CONVNEXT_SOURCE_HASHES,
+          "entry_sha256": CONVNEXT_ENTRY_SHA256, "input_policy_version": INPUT_POLICY_VERSION,
+          "train_studies_requested": 64, "sample_fingerprint": "f" * 64,
+          "stress_checks": {"status": "PASS", "uses_raw_data": False, "uses_labels": False,
+                            "cases": dict.fromkeys(STRESS_CASES, "PASS")},
+          "resource_errors": 0, "partial_series": 0, "failed_series": 0, "short_series": 0,
+          "zero_decoded_series": 0, "missing_slots": 2, "selected_series": 390, "elapsed_seconds": 500,
           "weight_hashes": {f"cnxt_v0_fold{i}.pt": str(i) * 64 for i in range(3)},
-          "studies": 19, "test_studies": 3, "decode_failures": 0, "zero_studies": 0,
+          "studies": 67, "test_studies": 3, "decode_failures": 0, "zero_studies": 0,
           "repeat_max_abs_error": 0, "cache_parity_max_abs_error": 0,
           "estimated_1300_studies_seconds": 7000}
     rc = {"source": manifest, "private": True, "internet": False, "train_count": 16, "seed": 42}
@@ -78,7 +85,9 @@ class BlendContractTests(unittest.TestCase):
         qualified = qualify_components(*component_receipts())
         self.assertEqual(qualified["estimated_1300_seconds_with_margin"], 15000)
         cases = [(0, "entry_sha256", "a" * 64), (1, "status", "FAIL"),
-                 (1, "decode_failures", 1), (1, "zero_studies", 1),
+                 (1, "resource_errors", 1), (1, "zero_studies", 1),
+                 (1, "entry_sha256", "f" * 64), (1, "train_studies_requested", 16),
+                 (1, "input_policy_version", "old"), (1, "stress_checks", {}),
                  (1, "repeat_max_abs_error", None), (1, "cache_parity_max_abs_error", .01),
                  (1, "estimated_1300_studies_seconds", 24000),
                  (3, "prediction_fallbacks", 1), (3, "status", "running"),
@@ -88,6 +97,9 @@ class BlendContractTests(unittest.TestCase):
             data[index][key] = value
             with self.subTest(key=key, value=value), self.assertRaises(ValueError):
                 qualify_components(*data)
+        partial = copy.deepcopy(component_receipts())
+        partial[1].update(decode_failures=3, partial_series=2, failed_series=1)
+        self.assertEqual(qualify_components(*partial)["convnext_weights"], partial[1]["weight_hashes"])
         data = copy.deepcopy(component_receipts())
         data[3]["sampling"]["uses_labels"] = True
         with self.assertRaisesRegex(ValueError, "sampling"):
@@ -171,7 +183,8 @@ def load_builder():
 class BlendReceiptTests(unittest.TestCase):
     def test_full_entry_requires_matching_common_environment_parity_receipt(self):
         builder = load_builder()
-        component = {"studies": 3, "decode_failures": 0, "zero_studies": 0, "raw_rerun_max_abs_error": 0}
+        component = {"studies": 3, "decode_failures": 0, "zero_studies": 0, "raw_rerun_max_abs_error": 0,
+                     "resource_errors": 0, "input_policy_version": INPUT_POLICY_VERSION}
         report = {"status": "PASS", "rehearsal": True, "qualification_sha256": "a" * 64,
                   "test_studies": 3, "prediction_fallbacks": 0, "blend_repeat_max_abs_error": 0,
                   "estimated_1300_seconds_mean_with_margin": 17000,
@@ -262,17 +275,34 @@ class BlendRuntimeGuardTests(unittest.TestCase):
 
 @unittest.skipUnless(os.environ.get("KNEE_REFERENCE_PARENT"), "requires optional local audited sources/receipts")
 class BlendSnapshotTests(unittest.TestCase):
-    def test_real_receipts_build_private_offline_notebook_without_prediction_fixtures(self):
+    def test_old_real_receipts_cannot_qualify_changed_wrapper(self):
         builder = load_builder()
         root = Path(os.environ["KNEE_REFERENCE_PARENT"])
         options = dict(convnext_source_dir=root / "outputs/research/2026-10-08/convnext-audit",
-            convnext_entry=root / "scripts/public_reader_entry.py",
+            convnext_entry=Path(__file__).resolve().parents[1] / "scripts/public_reader_entry.py",
             convnext_contract=root / "outputs/kaggle/public-reader-rehearsal/build-contract.json",
             convnext_rehearsal=root / "outputs/kaggle/public-reader-rehearsal-result/reader-audit.json",
             raptor_source=root / "outputs/research/2026-10-08/raptor-audit/knee-mri-twelve-findings-from-a-single-model.py",
             raptor_contract=root / "outputs/kaggle/raptor-rehearsal/reference-contract.json",
             raptor_rehearsal=root / "outputs/kaggle/raptor-rehearsal-result/reference-rehearsal/rehearsal.json")
         with tempfile.TemporaryDirectory() as directory:
+            dest = Path(directory) / "package"
+            with self.assertRaisesRegex(ValueError, "ConvNeXt"):
+                builder.build_blend(dest, "synthetic-private-build", **options)
+            self.assertFalse(dest.exists())
+
+    def test_mocked_fresh_receipts_compile_private_offline_notebook(self):
+        # Packaging-only test: synthetic qualification is not evidence of a real rehearsal.
+        builder = load_builder()
+        root = Path(os.environ["KNEE_REFERENCE_PARENT"])
+        options = dict(convnext_source_dir=root / "outputs/research/2026-10-08/convnext-audit",
+            convnext_entry=Path(__file__).resolve().parents[1] / "scripts/public_reader_entry.py",
+            convnext_contract=root / "outputs/kaggle/public-reader-rehearsal/build-contract.json",
+            convnext_rehearsal=root / "outputs/kaggle/public-reader-rehearsal-result/reader-audit.json",
+            raptor_source=root / "outputs/research/2026-10-08/raptor-audit/knee-mri-twelve-findings-from-a-single-model.py",
+            raptor_contract=root / "outputs/kaggle/raptor-rehearsal/reference-contract.json",
+            raptor_rehearsal=root / "outputs/kaggle/raptor-rehearsal-result/reference-rehearsal/rehearsal.json")
+        with tempfile.TemporaryDirectory() as directory, patch.object(builder, 'qualify_components', return_value={}):
             dest = Path(directory) / "package"
             receipt = builder.build_blend(dest, "synthetic-private-build", **options)
             metadata = json.loads((dest / "kernel-metadata.json").read_text())
