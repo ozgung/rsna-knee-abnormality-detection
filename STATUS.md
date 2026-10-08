@@ -1,12 +1,12 @@
 # Project status and session handoff
 
-Updated **2026-10-08, 02:38 UTC** (Europe/Istanbul). Read this first, then [README](README.md) and [AGENTS](AGENTS.md).
+Updated **2026-10-08, 02:40 UTC** (Europe/Istanbul). Read this first, then [README](README.md) and [AGENTS](AGENTS.md).
 
 ## Current snapshot
 
 - Target: public macro AUC **strictly above 0.950**. Not achieved. Best actually scored entry remains **0.757**. Two corrected stronger entries are scoring; their original versions failed hidden reruns with generic exceptions and no traceback.
 - User authorizes autonomous research, subagents, long/concurrent local/Kaggle/Colab training and promising submissions. Use small pilots and measured budgets first; existing credits only, no purchases or questions for this run.
-- Branch `codex/first-submission`; local Git only, no remote. Original 01 tasks and second baseline submission are complete. Sole active implementation: aggregate progress logging for future training runs; current saved fit and submitted notebooks remain immutable.
+- Branch `codex/first-submission`; local Git only, no remote. Original 01 tasks and second baseline submission are complete. Future-run aggregate progress logging is integrated and independently reviewed; no implementation is active. Current saved fit and submitted notebooks remain immutable.
 - Competition: 4,407 training studies, 24,371 series, 58 fully labeled studies, 12 targets. Four nongold report duplicates of gold excluded. Private/generated data and weights remain ignored. No full raw-corpus download.
 - Official rules checked October 8: five entries/day; entry/merge deadline October 15 and final October 22 at 23:59 UTC; offline inference <=9 hours, hidden test approximately 1,300 studies. Recheck before later calendar planning. **Two entries remain today** after the 02:18 submission.
 - Main records: [current campaign](docs/experiments/20261008-audited-readers.md), [fresh pilot](docs/experiments/fresh_reader_pilot-20261008.md), [strategy](docs/experiments/score-strategy-20261008.md), [provenance](docs/experiments/provenance-audit-20261008.md), [original baseline](docs/experiments/20261008-first-baseline.md).
@@ -17,7 +17,7 @@ Updated **2026-10-08, 02:38 UTC** (Europe/Istanbul). Read this first, then [READ
 | --- | --- | --- |
 | REF-02 | Audit and corrected submissions complete; scoring pending | Check both entry scores **and error_description**. Blank COMPLETE can mean failed hidden rerun. Do not change submitted version 2 notebooks/inputs while pending. |
 | TRAIN-02 fit | Running; no metrics available yet | Retrieve the selected checkpoint/evidence and complete report. Verify actual four epochs, successful updates, initial encoder hash, split and finite metrics; run paired comparison. No larger training before this result. |
-| TRAIN-02 observability | In implementation/review | Add flushed aggregate cache/gate/step/checkpoint timing for future runs, with no recipe, RNG, tensor, checkpoint payload or prediction changes. V1 resumes must retain the original runner bytes. |
+| TRAIN-02 observability | Complete, `bb3e9fa` | Flushed aggregate cache/gate/step/checkpoint timing; no added GPU/tensor/RNG operations or scientific/checkpoint-field changes. Small wall-clock overhead remains. V1 resumes must retain the original runner bytes; this cannot restore current remote logs. |
 | TRAIN-03 | Conditional | Follow the prospective spending gates below. Diagnose before expansion on weak/numerically failed learning. Reserve a sealed cohort before larger-data fitting. |
 | Cleanup | Deferred while worktrees remain useful | Preserve each worktree's ignored evidence before archive. Existing archives are under `outputs/agent-archives/20261008/`. |
 
@@ -35,7 +35,7 @@ Use `/Users/ozgun/miniconda3/bin/kaggle kernels status OWNER/SLUG`, `kernels log
 
 ## Completed qualifications and limits
 
-- **142/142 ML tests PASS**, with pinned source/receipt fixtures enabled; dependency-free smoke and diff checks PASS. Log: `outputs/research/2026-10-08/tests-raptor-integrated.log`. Local decoder stress fixtures are synthetic; real CUDA/decoding results are separate below.
+- **146/146 ML tests PASS**, with pinned source/receipt fixtures enabled; dependency-free smoke and diff checks PASS. Log: `outputs/research/2026-10-08/tests-telemetry-integrated.log`. Telemetry privacy/cadence/strict-resume tests and independent source review pass. Local decoder stress fixtures are synthetic; real CUDA/decoding results are separate below.
 - ConvNeXt repair `67a016f`: retain usable partial series, mask unusable selected slots, preserve source math and fatal resource/whole-empty checks. Expanded rehearsal `ozgung/knee-public-reader-rehearsal-v3-20261008` v1 PASS: **67 studies, 319 series, seven stress cases**, 403.31s, peak CUDA 1.430GB. Healthy visible predictions are byte-identical. [Details](docs/experiments/convnext-resilience-20261008.md).
 - Raptor repair `2d8bf13`: source-compatible geometry defaults and partial/black/empty selected frames; strict healthy decoding audit remains separate. Independent review caught swallowed geometry/append-region resource errors. Exactly two exception-handler prefixes now propagate them; inverse-AST tests prove scientific statements unchanged. Original and transformed source hashes are pinned. [Details](docs/experiments/raptor-resilience-20261008.md).
 - Raptor `ozgung/knee-raptor-production-rehearsal-v2-20261008` v1 PASS: **67 studies, 4,130 unique slices, 16 stress cases**, all 67 strict pixel comparisons and within-run repeats exact; zero real decode/empty/resource failures. Runtime 368.30s, peak CUDA 8.248GB. Receipts: `outputs/kaggle/raptor-production-rehearsal-v2-result/`.
