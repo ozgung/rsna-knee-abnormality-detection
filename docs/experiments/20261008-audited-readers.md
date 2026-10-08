@@ -63,14 +63,34 @@ Safe local load confirmed486state tensors, expected CoAtNet architecture/res384 
 `ozgung/knee-raptor-rehearsal-20261008` v1 launched approximately23:48–23:49UTC; at most16train+3visible
 test, one-hour external cap. Source`659bcbd`, contractSHA
 `d8fedf9a1d7dc9849ab10fd67bb1e981ce96d628eb4e4bceaab20e448a84801b`.
-Status was RUNNING at23:49UTC; output expected`reference-rehearsal/rehearsal.json`.
-Poll via`kaggle kernels status`/`logs`; stop via Kaggle notebook running-job controls
-if needed. No training or blending has run yet at this checkpoint.
+Completed PASS:19studies,1,156unique slices,0fallback; decodedpixelerror0,
+windowerror1.1920928955078125e-6,repeaterror0. Runtime98.71s; p95projection+25%
+7,053.68s/1,300studies. PeakCUDA8,247,278,080bytes; RSS2,106,449,920bytes.
+Actual Python3.13.15,torch2.11.0+cu128,timm1.0.29,T4. Receipts under
+`outputs/kaggle/raptor-rehearsal-result/reference-rehearsal/`.
+
+## Fixed blend and own-training pilot
+
+- Fixed50/50 per-target average-tie percentile-rank blend builder integrated`57bb203`.
+  Both components are sequential; exact sources/checkpoints and all actual test IDs.
+  A commonPython3.12 environment must pass visible reread checks and local comparison
+  to prior component outputs before an entry. Projected combined runtime16,472.59s
+  with margin from separate environments, not a hidden-test measurement.
+- `ozgung/knee-reference-blend-rehearsal-20261008`v1 launched00:03UTC October8,
+  **FAILED before inference**: dataset contains bothcp311 andcp312 codec wheels,
+  while guard counted all five instead of selecting three compatible wheels.
+  Failure at8.34s, no predictions. Logs retained in
+  `outputs/kaggle/reference-blend-rehearsal-result/`. Fix/requalification in progress.
+- `ozgung/knee-fresh-cache-pilot-20261008`v1 launched~23:57UTC October7,source`1f1d788`.
+  CPU64study, internal1800s/external2100s. RUNNING00:06UTC. Require measured
+  `gate.passed` before expanding; see [pilot protocol](fresh_reader_pilot-20261008.md).
+  Device metadata follow-up integrated`367ac30`for future builds; originalCPU source
+  remains fixed. No CUDA training yet.
 
 ## Checks
 
-Public-reader packaging3/3 passed; parent fullML suite63/63 passed before integrating
-the reference module; dependency-free smoke passed. Reference-agent tests69/69 passed
-with both audited source snapshots enabled. Full integrated suite will be rerun after
-the next implementation checkpoint. All generated notebooks compile. These checks
-do not establish model quality or a score above0.950.
+Parent integrated ML suite95tests:92exercised PASS,3optional source/receipt skips.
+Previous dependency-free smoke PASS. Independent review found no training source
+blocker after resume/digest/macro-loss fixes. Blend component contract/rank tests
+passed; actual mixed-ABI asset directory exposed a missing packaging case, now
+being covered. These checks do not establish model quality or score>0.950.
