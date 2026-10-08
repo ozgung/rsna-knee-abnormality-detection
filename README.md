@@ -120,5 +120,23 @@ kaggle kernels push -p outputs/kaggle/submission --timeout 28800
 
 Only submit a completed, successfully rehearsed version. Inspect its actual version number and current quota first. `STATUS.md` records authorized submissions and their results. Do not overwrite an existing training notebook while a dependent submission is pending. Data, private linkage hashes, feature caches, outputs and weights stay out of Git.
 
+### TRAIN04 coverage and target comparison
+
+The [prospective TRAIN04 protocol](docs/experiments/train04-protocol-20261008.md) defines the new 2,000-training/unchanged-200-development reference. `knee.coverage_cache` stores variable-length selected series so training can draw new within-series triplets each epoch. `knee.coverage_training` retains original observation/confidence masks and compares alternate soft targets only after a useful reference completes. Both the old fixed-view pilot and scored public readers remain separate.
+
+After the full remote cache completes, download its JSON receipts only, then build the first private training notebook:
+
+```bash
+kaggle kernels output ozgung/knee-train04-cache-full-20261008 \
+  -p outputs/kaggle/train04-cache-full-v2-result --file-pattern '.*\.json$'
+.venv/bin/python scripts/build_coverage_training.py \
+  outputs/research/2026-10-08/convnext-audit \
+  outputs/kaggle/train04-reference knee-train04-reference-20261008 \
+  outputs/kaggle/train04-cache-full-v2-result/coverage_cache \
+  --cache-kernel ozgung/knee-train04-cache-full-20261008
+```
+
+The builder rejects incomplete or failed cache receipts. Inspect the private notebook metadata and current quota before pushing with a10,500second cap. It verifies every cache file remotely before fitting and requires all twelve epochs to pass its measured throughput budget. To package the controlled alternate targets, add both `--reference-result` (the completed reference's local receipt directory) and `--reference-kernel` (its private notebook reference). The builder checks the reference's prospective performance gate and identical code/cache/configuration; runtime additionally checks package/device identity and the exact saved initial model. No full-cache download to this Mac is required. CUDA training/resume verification state is tracked in STATUS.
+
 
 For a selected ensemble, `scripts/build_ensemble_kaggle.py` builds the notebook and a separate **weights-only** asset directory. Supply `--assets-dir` and the private `--dataset-source`; use `--rehearsal` for cached-feature versus raw-image parity. Kaggle notebook source must be below1MB, so do not embed checkpoint bytes. Inspect the exact upload directory before creating its private dataset; the builder rejects unexpected files. Rehearsal computes reference predictions from the existing training notebook cache on Kaggle. The pure entry reads only its small heads and test images/metadata. Never upload gold prediction fixtures, reports or identifiers as part of the weights package.

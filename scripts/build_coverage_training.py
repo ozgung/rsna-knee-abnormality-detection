@@ -73,7 +73,7 @@ def build(sources,destination,slug,cache_receipts,*,cache_kernel,reference_resul
     contract={'revision':revision,'cache_kernel':cache_kernel,'cache_pins':pins,'reference_kernel':reference_kernel,
               'reference_pins':reference_pins,'reference_contract':reference_contract,
               'config':CONFIG,'sources':{n:hashlib.sha256(s.encode()).hexdigest() for n,s in own.items()},
-              'builder_sha256':file_sha256(__file__),'external':SOURCE_HASHES,'setup_seconds':600,'fit_seconds':10200}
+              'builder_sha256':file_sha256(__file__),'external':SOURCE_HASHES,'setup_seconds':300,'fit_seconds':10200}
     digest=hashlib.sha256(json.dumps(contract,sort_keys=True).encode()).hexdigest()
     license_text=(ROOT/'docs/licenses/fresh_reader_Apache-2.0.txt').read_text()
     entry=f'''import os,sys,time,json,hashlib
@@ -98,8 +98,8 @@ from knee.fresh_reader_setup import notebook_root,dataset_root,time_limit
 from knee.validation import file_sha256
 from knee.fresh_reader import write_json
 try:
-    with time_limit(10800,'entire TRAIN04 notebook'):
-        with time_limit(600,'TRAIN04 setup'):
+    with time_limit(10500,'entire TRAIN04 notebook'):
+        with time_limit(300,'TRAIN04 setup'):
             inputs=Path('/kaggle/input')
             cache=notebook_root(inputs,{cache_kernel!r},'coverage_cache',list(CONTRACT['cache_pins']))
             for name,digest in CONTRACT['cache_pins'].items():
