@@ -21,7 +21,7 @@ from build_kaggle import build
 
 
 def build_reference(source_path, destination, slug, *, train_count=None, seed=20261008,
-                    max_seconds=None, publisher_manifest=None, profile="mirror", checkpoint_sha256=None):
+                    max_seconds=None, publisher_manifest=None, profile="mirror", checkpoint_sha256=None, raptor_windows=42):
     raptor = profile == 'raptor'
     train_count = train_count if train_count is not None else (TRAIN_COUNT if raptor else 24)
     max_seconds = max_seconds if max_seconds is not None else (MAX_SECONDS if raptor else 3600)
@@ -31,7 +31,7 @@ def build_reference(source_path, destination, slug, *, train_count=None, seed=20
             not 0 < max_seconds <= (MAX_SECONDS if raptor else 3600)):
         raise ValueError("Reference rehearsal exceeds its bounded study/time contract")
     module, decoder, manifest = audit_source(Path(source_path).read_text(), profile=profile,
-                                            checkpoint_sha256=checkpoint_sha256)
+                                            checkpoint_sha256=checkpoint_sha256, raptor_windows=raptor_windows)
     if publisher_manifest is not None:
         publisher_manifest = Path(publisher_manifest)
         manifest["publisher_manifest"] = {"filename": publisher_manifest.name,
@@ -84,6 +84,7 @@ if __name__ == "__main__":
     parser.add_argument("slug")
     parser.add_argument("--profile", choices=("raptor", "mirror"), required=True)
     parser.add_argument("--checkpoint-sha256", help="Required for raptor; hash from independent checkpoint audit")
+    parser.add_argument("--raptor-windows", type=int, choices=(42, 62), default=42)
     parser.add_argument("--train-count", type=int)
     parser.add_argument("--seed", type=int, default=20261008)
     parser.add_argument("--max-seconds", type=int)
@@ -93,4 +94,4 @@ if __name__ == "__main__":
                                     train_count=args.train_count, seed=args.seed,
                                     max_seconds=args.max_seconds,
                                     publisher_manifest=args.publisher_manifest,
-                                    profile=args.profile, checkpoint_sha256=args.checkpoint_sha256), indent=2))
+                                    profile=args.profile, checkpoint_sha256=args.checkpoint_sha256, raptor_windows=args.raptor_windows), indent=2))

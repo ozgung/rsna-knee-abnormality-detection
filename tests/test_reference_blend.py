@@ -21,7 +21,7 @@ from knee.reference_blend import (CODEC_WHEELS, CONVNEXT_ENTRY_SHA256, CONVNEXT_
 
 def component_receipts():
     manifest = {"profile": "raptor", "checkpoint_sha256": RAPTOR_PLAIN_SHA256,
-                "checkpoint_file": RAPTOR_WEIGHT_NAME, "weight_dataset": RAPTOR_WEIGHT_DATASET}
+                "checkpoint_file": RAPTOR_WEIGHT_NAME, "weight_dataset": RAPTOR_WEIGHT_DATASET, "recipe": {"windows": 42}}
     cc = {"rehearsal": True, "revision": "synthetic-revision", "sources": CONVNEXT_SOURCE_HASHES,
           "entry_sha256": CONVNEXT_ENTRY_SHA256, "input_policy_version": INPUT_POLICY_VERSION}
     cr = {"rehearsal": True, "status": "PASS", "code_revision": cc["revision"],
@@ -286,6 +286,27 @@ class BlendRuntimeGuardTests(unittest.TestCase):
 
 @unittest.skipUnless(os.environ.get("KNEE_REFERENCE_PARENT"), "requires optional local audited sources/receipts")
 class BlendSnapshotTests(unittest.TestCase):
+    def test_current_42_receipts_cannot_qualify_62_recipe(self):
+        from knee.reference import audit_source
+        from knee.reference_blend import qualify_components, RAPTOR_PLAIN_SHA256
+        root = Path(os.environ["KNEE_REFERENCE_PARENT"])
+        def read(name):
+            return json.loads((root / "outputs/kaggle" / name).read_text())
+        cc = read("public-reader-rehearsal-v3/build-contract.json")
+        cr = read("public-reader-rehearsal-v3-result/reader-audit.json")
+        rc = read("raptor-production-rehearsal-v2/reference-contract.json")
+        rr = read("raptor-production-rehearsal-v2-result/reference-rehearsal/rehearsal.json")
+        source = (root / "outputs/research/2026-10-08/raptor-audit/knee-mri-twelve-findings-from-a-single-model.py").read_text()
+        _, _, manifest = audit_source(source, profile="raptor", checkpoint_sha256=RAPTOR_PLAIN_SHA256, raptor_windows=62)
+        with self.assertRaisesRegex(ValueError, "Plain Raptor"):
+            qualify_components(cc, cr, rc, rr, manifest)
+        from knee.reference import sha256, canonical_bytes
+        # Merely changing the recipe fields cannot replace actual per-study evidence.
+        rc["source"] = rr["manifest"] = manifest
+        rr["manifest_sha256"] = sha256(canonical_bytes(manifest))
+        with self.assertRaisesRegex(ValueError, "62-window runtime"):
+            qualify_components(cc, cr, rc, rr, manifest)
+
     def test_old_real_raptor_receipt_cannot_qualify_new_policy(self):
         from knee.raptor_input import require_rehearsal
         root = Path(os.environ['KNEE_REFERENCE_PARENT'])

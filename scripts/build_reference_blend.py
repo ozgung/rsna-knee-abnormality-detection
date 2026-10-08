@@ -28,7 +28,7 @@ from knee.reference_blend import (CODEC_WHEELS, CONVNEXT_DATASET, CONVNEXT_SOURC
 from build_kaggle import build
 
 
-def require_blend_rehearsal(report, fingerprint):
+def require_blend_rehearsal(report, fingerprint, raptor_windows=42):
     if (report.get("status") != "PASS" or report.get("rehearsal") is not True or
             report.get("qualification_sha256") != fingerprint or report.get("test_studies") != 3 or
             report.get("prediction_fallbacks") != 0 or report.get("blend_repeat_max_abs_error") != 0 or
@@ -47,6 +47,8 @@ def require_blend_rehearsal(report, fingerprint):
                 component.get('raw_pixel_max_error') != 0 or
                 component.get('strict_comparisons_passed', 0) + component.get('strict_comparisons_ineligible', 0) != 3):
             raise ValueError("Common-environment Raptor production policy did not pass")
+    if raptor_windows == 62 and report["components"]["raptor"].get("eval_windows") != 62:
+        raise ValueError("Common-environment 62-window runtime evidence required")
     hashes = report.get("codec_hashes", {})
     if set(hashes) != set(CODEC_WHEELS) or any(len(v) != 64 or any(c not in "0123456789abcdef" for c in v) for v in hashes.values()):
         raise ValueError("Common-environment rehearsal codec hashes missing")
@@ -55,7 +57,7 @@ def require_blend_rehearsal(report, fingerprint):
 
 def build_blend(destination, slug, *, convnext_source_dir, convnext_entry, convnext_contract,
                 convnext_rehearsal, raptor_source, raptor_contract, raptor_rehearsal,
-                submission=False, blend_rehearsal=None, max_seconds=None):
+                submission=False, blend_rehearsal=None, max_seconds=None, raptor_windows=42):
     root = Path(__file__).resolve().parents[1]
     paths = {"convnext_contract": convnext_contract, "convnext_rehearsal": convnext_rehearsal,
              "raptor_contract": raptor_contract, "raptor_rehearsal": raptor_rehearsal}
@@ -67,7 +69,7 @@ def build_blend(destination, slug, *, convnext_source_dir, convnext_entry, convn
     entry = Path(convnext_entry).read_text()
     extract_reader(entry)  # Fail before packaging any unreviewed top-level program.
     public, decoder, manifest = audit_source(Path(raptor_source).read_text(), profile="raptor",
-                                            checkpoint_sha256=RAPTOR_PLAIN_SHA256)
+                                            checkpoint_sha256=RAPTOR_PLAIN_SHA256, raptor_windows=raptor_windows)
     if decoder:
         raise ValueError("Plain Raptor must not have an opaque decoder payload")
     qualification = qualify_components(receipts["convnext_contract"], receipts["convnext_rehearsal"],
@@ -88,7 +90,7 @@ def build_blend(destination, slug, *, convnext_source_dir, convnext_entry, convn
         if blend_rehearsal is None:
             raise ValueError("Submission packaging requires a successful blend rehearsal receipt")
         data = Path(blend_rehearsal).read_bytes()
-        expected_codecs = require_blend_rehearsal(json.loads(data), fingerprint)
+        expected_codecs = require_blend_rehearsal(json.loads(data), fingerprint, raptor_windows)
         rehearsal_hash = sha256(data)
     elif blend_rehearsal is not None:
         raise ValueError("Blend receipt is only an input for full entry packaging")
@@ -138,6 +140,7 @@ if __name__ == "__main__":
     for option in ("convnext-source-dir", "convnext-entry", "convnext-contract", "convnext-rehearsal",
                    "raptor-source", "raptor-contract", "raptor-rehearsal"):
         parser.add_argument("--" + option, required=True, type=Path)
+    parser.add_argument("--raptor-windows", type=int, choices=(42, 62), default=42)
     parser.add_argument("--submission", action="store_true")
     parser.add_argument("--blend-rehearsal", type=Path)
     parser.add_argument("--max-seconds", type=int)

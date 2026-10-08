@@ -99,6 +99,9 @@ def qualify_components(cnn_contract, cnn_report, raptor_contract, raptor_report,
             not _digest(raptor_report.get("source_bundle_sha256")) or
             raptor_contract.get("private") is not True or raptor_contract.get("internet") is not False):
         raise ValueError("Plain Raptor successful rehearsal/source contract required")
+    if manifest["recipe"]["windows"] == 62 and any(
+            study.get("eval_windows") != 62 for study in raptor_report.get("studies", [])):
+        raise ValueError("New 62-window runtime evidence required for every rehearsed study")
     sampling, studies = raptor_report.get("sampling", {}), raptor_report.get("studies", [])
     if (sampling.get("uses_labels") is not False or sampling.get("test_count") != 3 or
             sampling.get("train_count", 0) < 16 or
@@ -285,6 +288,8 @@ def _raptor(root, assets, ids, labels, records, source, manifest, rehearsal, dea
         directory = Path(root) / "test_series"
         volume, mask, counts = raptor_input.prepare_study(public, sid, records, directory)
         windows = public.eval_windows(volume, mask, public.K_EVAL, 384).cuda()
+        if windows.shape[0] != manifest["recipe"]["windows"]:
+            raise ValueError("Raptor runtime evaluation-window count differs from recipe")
         probability = validate_predictions(infer_checked(public, model, [windows], "cuda", mirror=False))
         torch.cuda.synchronize()
         durations.append(time.monotonic() - started)
@@ -316,6 +321,7 @@ def _raptor(root, assets, ids, labels, records, source, manifest, rehearsal, dea
     gc.collect()
     torch.cuda.empty_cache()
     return (probability_matrix(np.stack(result), len(ids)), {**dict(counters), "studies": len(ids),
+            "eval_windows": manifest["recipe"]["windows"],
             "input_policy": raptor_input.policy_contract(), "study_seconds": durations,
             "raw_pixel_max_error": 0 if rehearsal else None, "raw_rerun_max_abs_error": error},
             probability_matrix(np.stack(rerun_values), len(ids)) if rehearsal else None)

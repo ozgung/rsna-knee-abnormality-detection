@@ -146,6 +146,35 @@ class ReferenceSnapshotTests(unittest.TestCase):
 @unittest.skipUnless(os.environ.get("KNEE_RAPTOR_SOURCE") and importlib.util.find_spec("torch"),
                      "requires optional audited Raptor source and torch")
 class RaptorSnapshotTests(unittest.TestCase):
+    def test_62_windows_is_the_only_change_and_requires_matching_manifest(self):
+        import copy
+        import numpy as np
+        import torch
+        torch.set_num_threads(2)
+        source = Path(os.environ["KNEE_RAPTOR_SOURCE"]).read_text()
+        old_source, decoder, old = audit_source(source, profile="raptor", checkpoint_sha256="a" * 64)
+        new_source, _, new = audit_source(source, profile="raptor", checkpoint_sha256="a" * 64, raptor_windows=62)
+        self.assertEqual(old_source, new_source)
+        expected = copy.deepcopy(old)
+        expected["recipe"]["windows"] = 62
+        self.assertEqual(new, expected)
+        before, _ = load_definitions(old_source, decoder, old)
+        after, _ = load_definitions(new_source, decoder, new)
+        self.assertEqual(before.K_EVAL, 42)
+        self.assertEqual(after.K_EVAL, 62)
+        volume = np.broadcast_to(np.arange(64, dtype=np.uint8)[:, None, None], (64, 8, 8)).copy()
+        mask = np.ones(64, np.uint8)
+        self.assertEqual(after.eval_windows(volume, mask, after.K_EVAL, 8).shape, (62, 3, 8, 8))
+        # The variant must retain exact existing arithmetic for an explicit 42 request.
+        self.assertTrue(torch.equal(before.eval_windows(volume, mask, 42, 8), after.eval_windows(volume, mask, 42, 8)))
+        bad = copy.deepcopy(new)
+        bad["recipe"]["slice_span"] = [0.02, 0.98]
+        with self.assertRaisesRegex(ValueError, "contract mismatch"):
+            load_definitions(new_source, decoder, bad)
+        for count in (43, 64, True, 62.0):
+            with self.assertRaisesRegex(ValueError, "42/62"):
+                audit_source(source, profile="raptor", checkpoint_sha256="a" * 64, raptor_windows=count)
+
     def test_non_oai_profile_requires_checkpoint_pin_and_excludes_fp32_fallback(self):
         import numpy as np
         import torch

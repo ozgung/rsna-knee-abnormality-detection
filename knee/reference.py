@@ -62,10 +62,12 @@ def canonical_bytes(value) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
 
 
-def audit_source(source: str, *, profile="mirror", checkpoint_sha256=None) -> tuple[str, str, dict]:
+def audit_source(source: str, *, profile="mirror", checkpoint_sha256=None, raptor_windows=42) -> tuple[str, str, dict]:
     """Extract only reviewed definitions from exactly the inspected source bytes."""
     if profile not in {"mirror", "raptor"}:
         raise ValueError("Unknown audited reference profile")
+    if type(raptor_windows) is not int or raptor_windows not in (42, 62) or (profile == "mirror" and raptor_windows != 42):
+        raise ValueError("Only explicit plain Raptor 42/62-window recipes are reviewed")
     source_pin = SOURCE_SHA256 if profile == "mirror" else RAPTOR_SOURCE_SHA256
     if profile == "raptor" and (not isinstance(checkpoint_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", checkpoint_sha256)):
         raise ValueError("Raptor requires an independently recorded checkpoint SHA256")
@@ -109,7 +111,7 @@ def audit_source(source: str, *, profile="mirror", checkpoint_sha256=None) -> tu
                 "checkpoint_sha256": WEIGHT_SHA256 if mirror else checkpoint_sha256,
                 "checkpoint_file": WEIGHT_NAME if mirror else RAPTOR_WEIGHT_NAME,
                 "weight_dataset": WEIGHT_DATASET if mirror else RAPTOR_WEIGHT_DATASET,
-                "recipe": RECIPE if mirror else RAPTOR_RECIPE,
+                "recipe": RECIPE if mirror else {**RAPTOR_RECIPE, "windows": raptor_windows},
                 "attribution": "Danial Zakaria (nartaa), based on Dread Development's Raptor inference" if mirror else "Dread Development / Johnathan Wagner",
                 "purpose": "bounded offline reproduction; no training or score-based selection",
                 "permissions": "Source/checkpoint eligibility is audited separately; this tool grants no license."}
@@ -125,7 +127,7 @@ def load_definitions(module_source, decoder_source, manifest):
             manifest.get("source_sha256") != (SOURCE_SHA256 if mirror else RAPTOR_SOURCE_SHA256) or
             (mirror and manifest.get("checkpoint_sha256") != WEIGHT_SHA256) or
             not re.fullmatch(r"[0-9a-f]{64}", manifest.get("checkpoint_sha256", "")) or
-            manifest.get("recipe") != (RECIPE if mirror else RAPTOR_RECIPE)):
+            manifest.get("recipe") not in ([RECIPE] if mirror else [RAPTOR_RECIPE, {**RAPTOR_RECIPE, "windows": 62}])):
         raise ValueError("Reference manifest contract mismatch")
     if sha256(module_source.encode()) != manifest["extracted_module_sha256"]:
         raise ValueError("Extracted source hash mismatch")
@@ -141,6 +143,10 @@ def load_definitions(module_source, decoder_source, manifest):
         public._raptor_propagate_fatal = propagate_fatal
         public._raptor_protected_source = protected
         exec(compile(protected, '<raptor-resource-policy>', 'exec'), public.__dict__)
+        if public.K_EVAL != 42:
+            raise ValueError("Pinned public Raptor source must retain its original 42 windows")
+        # Explicit evaluation-only variant; preserve all public scientific definitions.
+        public.K_EVAL = manifest["recipe"]["windows"]
         return public, None
     exec(compile(decoder_source, "<audited-fastread>", "exec"), decoder.__dict__)
     # Avoid the public helper raising process-wide file descriptor limits.
@@ -471,6 +477,8 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
                 else:
                     cpu = public.eval_windows(volume, mask, public.K_EVAL, recipe["input_res"])
                     production = cpu.to(device)
+                if production.shape[0] != recipe["windows"]:
+                    raise ValueError("Runtime evaluation-window count differs from recipe")
                 torch.cuda.synchronize()
                 window_seconds += time.monotonic() - before
                 if mirror:
@@ -500,6 +508,7 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
                                       "fast_seconds": fast_seconds, "reference_seconds": reference_seconds,
                                       "windows_seconds": window_seconds, "inference_seconds": inference_seconds,
                                       "production_seconds": production_seconds,
+                                      "eval_windows": int(windows[0].shape[0]),
                                       "public_pixel_max_error": 0, "strict_comparison": strict_status,
                                       "decoder_pixel_max_error": 0 if strict_status in (None, 'PASS') else None,
                                       "window_max_error": window_error,
