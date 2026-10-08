@@ -22,6 +22,7 @@ import types
 import warnings
 
 from knee.public_reader_contract import INPUT_POLICY_VERSION, require_reader_rehearsal
+from knee import raptor_input
 
 from knee.reference import (RAPTOR_WEIGHT_DATASET, RAPTOR_WEIGHT_NAME, canonical_bytes,
                             infer_checked, load_definitions, load_model, reference_reader,
@@ -88,6 +89,7 @@ def qualify_components(cnn_contract, cnn_report, raptor_contract, raptor_report,
             cnn_contract.get("revision") != cnn_report.get("code_revision")):
         raise ValueError("ConvNeXt successful rehearsal/source contract required")
     weights = require_reader_rehearsal(cnn_report, CONVNEXT_ENTRY_SHA256, CONVNEXT_SOURCE_HASHES)
+    raptor_input.require_rehearsal(raptor_contract, raptor_report)
     if (raptor_contract.get("source") != manifest or raptor_report.get("manifest") != manifest or
             manifest.get("profile") != "raptor" or manifest.get("checkpoint_sha256") != RAPTOR_PLAIN_SHA256 or
             manifest.get("checkpoint_file") != RAPTOR_WEIGHT_NAME or
@@ -103,7 +105,7 @@ def qualify_components(cnn_contract, cnn_report, raptor_contract, raptor_report,
             sampling.get("train_count") != raptor_contract.get("train_count") or
             sampling.get("seed") != raptor_contract.get("seed") or
             len(studies) != sampling["train_count"] + 3 or
-            any(s.get("valid_slices", 0) <= 0 or s.get("decoder_pixel_max_error") != 0 or
+            any(s.get("valid_slices", 0) <= 0 or
                 not 0 <= s.get("window_max_error", math.inf) <= 3e-5 or
                 not 0 <= s.get("repeat_prediction_max_error", math.inf) <= 1e-6 for s in studies)):
         raise ValueError("Raptor rehearsal sampling/parity guards failed")
@@ -275,35 +277,31 @@ def _raptor(root, assets, ids, labels, records, source, manifest, rehearsal, dea
     if labels != public.LAB or manifest["checkpoint_sha256"] != RAPTOR_PLAIN_SHA256:
         raise ValueError("Plain Raptor identity or target order mismatch")
     model = load_model(public, Path(assets) / manifest["checkpoint_file"], "cuda", manifest)
-    reader, failures = reference_reader(public)
     counters, durations, result, rerun_values = Counter(), [], [], []
     error = None
     for ordinal, sid in enumerate(ids):
         deadline()
         started = time.monotonic()
-        plan, substitutions = slot_plan(public, sid, records)
-        cache = {}
-        def cached(path):
-            if path not in cache:
-                cache[path] = reader[1](path)
-            return cache[path]
-        volume, mask = public.build_study(sid, records, str(Path(root) / "test_series"), (reader[0], cached, reader[2]))
-        cache.clear()
-        if failures:
-            raise ValueError("Raptor decoder swallowed a pixel failure")
-        counts = validate_volume(volume, mask, plan, image_size=public.IMG)
+        directory = Path(root) / "test_series"
+        volume, mask, counts = raptor_input.prepare_study(public, sid, records, directory)
         windows = public.eval_windows(volume, mask, public.K_EVAL, 384).cuda()
         probability = validate_predictions(infer_checked(public, model, [windows], "cuda", mirror=False))
         torch.cuda.synchronize()
         durations.append(time.monotonic() - started)
         result.append(probability)
         counters.update(counts)
-        counters["sequence_preference_substitutions"] += substitutions
         if rehearsal:
-            # Separate public reference traversal with an uncached strict reader.
-            reference_volume, reference_mask = public.build_study(sid, records, str(Path(root) / "test_series"), reader)
-            if failures or not np.array_equal(volume, reference_volume) or not np.array_equal(mask, reference_mask):
+            # Separate uncached public traversal; strict audit is distinct and only
+            # eligible when geometry/selected frames are complete.
+            reference_volume, reference_mask, _ = raptor_input.prepare_study(public, sid, records, directory,
+                                                                            cache_pixels=False, reference=True)
+            if not np.array_equal(volume, reference_volume) or not np.array_equal(mask, reference_mask):
                 raise ValueError("Raptor independent raw reread pixel/mask parity failed")
+            if raptor_input.strict_eligible(counts):
+                raptor_input.strict_compare(public, sid, records, directory, volume, mask)
+                counters['strict_comparisons_passed'] += 1
+            else:
+                counters['strict_comparisons_ineligible'] += 1
             qwindows = public.eval_windows(reference_volume, reference_mask, public.K_EVAL, 384).cuda()
             q = validate_predictions(infer_checked(public, model, [qwindows], "cuda", mirror=False))
             rerun_values.append(q)
@@ -318,7 +316,8 @@ def _raptor(root, assets, ids, labels, records, source, manifest, rehearsal, dea
     gc.collect()
     torch.cuda.empty_cache()
     return (probability_matrix(np.stack(result), len(ids)), {**dict(counters), "studies": len(ids),
-            "decode_failures": 0, "zero_studies": 0, "study_seconds": durations, "raw_rerun_max_abs_error": error},
+            "input_policy": raptor_input.policy_contract(), "study_seconds": durations,
+            "raw_pixel_max_error": 0 if rehearsal else None, "raw_rerun_max_abs_error": error},
             probability_matrix(np.stack(rerun_values), len(ids)) if rehearsal else None)
 
 

@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from knee.reference import canonical_bytes, sha256
 from knee.public_reader_contract import INPUT_POLICY_VERSION, STRESS_CASES
+from knee.raptor_input import policy_contract, STRESS_CASES as RAPTOR_STRESS_CASES
 from knee.reference_blend import (CODEC_WHEELS, CONVNEXT_ENTRY_SHA256, CONVNEXT_SOURCE_HASHES,
     RAPTOR_PLAIN_SHA256, RAPTOR_WEIGHT_DATASET, RAPTOR_WEIGHT_NAME, RECIPE,
     equal_rank_blend, extract_reader, qualify_components, read_test_contract,
@@ -35,12 +36,17 @@ def component_receipts():
           "studies": 67, "test_studies": 3, "decode_failures": 0, "zero_studies": 0,
           "repeat_max_abs_error": 0, "cache_parity_max_abs_error": 0,
           "estimated_1300_studies_seconds": 7000}
-    rc = {"source": manifest, "private": True, "internet": False, "train_count": 16, "seed": 42}
+    rc = {"source": manifest, "private": True, "internet": False, "train_count": 64, "seed": 42,
+          "input_policy": policy_contract()}
     rr = {"status": "passed", "manifest": manifest, "manifest_sha256": sha256(canonical_bytes(manifest)),
           "prediction_fallbacks": 0, "source_bundle_sha256": "a" * 64,
-          "sampling": {"train_count": 16, "test_count": 3, "seed": 42, "uses_labels": False},
+          "input_policy": policy_contract(), "runtime_seconds": 300,
+          "environment": {"python_major_minor": [3,12], "packages": {"torch": "2.10.0+cu128", "timm": "1.0.26"}},
+          "stress_checks": {"uses_raw_data": False, "uses_labels": False, "cases": dict.fromkeys(RAPTOR_STRESS_CASES, "PASS")},
+          "sampling": {"train_count": 64, "test_count": 3, "seed": 42, "uses_labels": False},
           "studies": [{"valid_slices": 64, "decoder_pixel_max_error": 0,
-                       "window_max_error": 0, "repeat_prediction_max_error": 0} for _ in range(19)],
+                       "window_max_error": 0, "repeat_prediction_max_error": 0,
+                       "public_pixel_max_error": 0, "resource_errors": 0, "strict_comparison": "PASS"} for _ in range(67)],
           "estimated_1300_seconds_p95": 5000}
     return cc, cr, rc, rr, manifest
 
@@ -91,6 +97,7 @@ class BlendContractTests(unittest.TestCase):
                  (1, "repeat_max_abs_error", None), (1, "cache_parity_max_abs_error", .01),
                  (1, "estimated_1300_studies_seconds", 24000),
                  (3, "prediction_fallbacks", 1), (3, "status", "running"),
+                 (3, "input_policy", {}), (3, "runtime_seconds", 1801), (3, "stress_checks", {}),
                  (3, "manifest_sha256", "f" * 64)]
         for index, key, value in cases:
             data = copy.deepcopy(component_receipts())
@@ -99,10 +106,12 @@ class BlendContractTests(unittest.TestCase):
                 qualify_components(*data)
         partial = copy.deepcopy(component_receipts())
         partial[1].update(decode_failures=3, partial_series=2, failed_series=1)
+        partial[3]['studies'][0].update(strict_comparison='ineligible_partial_input', decoder_pixel_max_error=None,
+                                        pixel_failures=1, masked_selected_frames=2, geometry_defaults=2)
         self.assertEqual(qualify_components(*partial)["convnext_weights"], partial[1]["weight_hashes"])
         data = copy.deepcopy(component_receipts())
         data[3]["sampling"]["uses_labels"] = True
-        with self.assertRaisesRegex(ValueError, "sampling"):
+        with self.assertRaises(ValueError):
             qualify_components(*data)
         data = copy.deepcopy(component_receipts())
         data[4]["checkpoint_sha256"] = "b" * 64
@@ -184,7 +193,9 @@ class BlendReceiptTests(unittest.TestCase):
     def test_full_entry_requires_matching_common_environment_parity_receipt(self):
         builder = load_builder()
         component = {"studies": 3, "decode_failures": 0, "zero_studies": 0, "raw_rerun_max_abs_error": 0,
-                     "resource_errors": 0, "input_policy_version": INPUT_POLICY_VERSION}
+                     "resource_errors": 0, "input_policy_version": INPUT_POLICY_VERSION,
+                     "input_policy": policy_contract(), "raw_pixel_max_error": 0,
+                     "strict_comparisons_passed": 3, "strict_comparisons_ineligible": 0}
         report = {"status": "PASS", "rehearsal": True, "qualification_sha256": "a" * 64,
                   "test_studies": 3, "prediction_fallbacks": 0, "blend_repeat_max_abs_error": 0,
                   "estimated_1300_seconds_mean_with_margin": 17000,
@@ -275,6 +286,14 @@ class BlendRuntimeGuardTests(unittest.TestCase):
 
 @unittest.skipUnless(os.environ.get("KNEE_REFERENCE_PARENT"), "requires optional local audited sources/receipts")
 class BlendSnapshotTests(unittest.TestCase):
+    def test_old_real_raptor_receipt_cannot_qualify_new_policy(self):
+        from knee.raptor_input import require_rehearsal
+        root = Path(os.environ['KNEE_REFERENCE_PARENT'])
+        contract = json.loads((root/'outputs/kaggle/raptor-rehearsal/reference-contract.json').read_text())
+        report = json.loads((root/'outputs/kaggle/raptor-rehearsal-result/reference-rehearsal/rehearsal.json').read_text())
+        with self.assertRaisesRegex(ValueError, 'Fresh expanded'):
+            require_rehearsal(contract, report)
+
     def test_old_real_receipts_cannot_qualify_changed_wrapper(self):
         builder = load_builder()
         root = Path(os.environ["KNEE_REFERENCE_PARENT"])

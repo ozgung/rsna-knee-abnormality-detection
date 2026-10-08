@@ -22,6 +22,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from knee.reference import audit_source, canonical_bytes, sha256
 from knee.public_reader_contract import INPUT_POLICY_VERSION
+from knee.raptor_input import policy_contract
 from knee.reference_blend import (CODEC_WHEELS, CONVNEXT_DATASET, CONVNEXT_SOURCE_HASHES, CONVNEXT_URL,
     DOCKER_IMAGE, RAPTOR_PLAIN_SHA256, RAPTOR_WEIGHT_DATASET, RECIPE, extract_reader, qualify_components)
 from build_kaggle import build
@@ -42,8 +43,10 @@ def require_blend_rehearsal(report, fingerprint):
         if name == "convnext":
             if component.get("input_policy_version") != INPUT_POLICY_VERSION or component.get("resource_errors") != 0:
                 raise ValueError("Common-environment ConvNeXt input policy did not pass")
-        elif component.get("decode_failures") != 0:
-            raise ValueError("Common-environment Raptor decoding did not pass")
+        elif (component.get("input_policy") != policy_contract() or component.get("resource_errors") != 0 or
+                component.get('raw_pixel_max_error') != 0 or
+                component.get('strict_comparisons_passed', 0) + component.get('strict_comparisons_ineligible', 0) != 3):
+            raise ValueError("Common-environment Raptor production policy did not pass")
     hashes = report.get("codec_hashes", {})
     if set(hashes) != set(CODEC_WHEELS) or any(len(v) != 64 or any(c not in "0123456789abcdef" for c in v) for v in hashes.values()):
         raise ValueError("Common-environment rehearsal codec hashes missing")
@@ -71,7 +74,8 @@ def build_blend(destination, slug, *, convnext_source_dir, convnext_entry, convn
         receipts["raptor_contract"], receipts["raptor_rehearsal"], manifest)
     qualification["evidence_sha256"] = {name: sha256(value) for name, value in raw.items()}
     qualification["runtime_sha256"] = {name: sha256((root / name).read_bytes()) for name in
-        ("knee/reference.py", "knee/reference_blend.py", "knee/public_reader_contract.py", "scripts/reference_blend_entry.py")}
+        ("knee/reference.py", "knee/reference_blend.py", "knee/public_reader_contract.py", "knee/raptor_input.py",
+         "scripts/reference_blend_entry.py")}
     qualification["recipe"] = RECIPE
     qualification["common_environment"] = {"python": [3, 12], "docker_image": DOCKER_IMAGE,
         "torch": "2.10.0+cu128", "timm": "1.0.26"}

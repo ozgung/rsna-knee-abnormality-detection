@@ -19,7 +19,7 @@ class ReferenceContractTests(unittest.TestCase):
         self.assertEqual(len(chosen), 24)
         self.assertEqual(chosen, bounded_ids(list(reversed(ids))))
         self.assertNotEqual(chosen, bounded_ids(ids, seed=43))
-        for values, count in [(["a", "a"], 1), (["../private"], 1), (ids, 25), (ids, True)]:
+        for values, count in [(["a", "a"], 1), (["../private"], 1), (ids, 65), (ids, True)]:
             with self.subTest(values=values, count=count), self.assertRaises(ValueError):
                 bounded_ids(values, count=count)
 

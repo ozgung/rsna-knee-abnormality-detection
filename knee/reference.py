@@ -113,6 +113,9 @@ def audit_source(source: str, *, profile="mirror", checkpoint_sha256=None) -> tu
                 "attribution": "Danial Zakaria (nartaa), based on Dread Development's Raptor inference" if mirror else "Dread Development / Johnathan Wagner",
                 "purpose": "bounded offline reproduction; no training or score-based selection",
                 "permissions": "Source/checkpoint eligibility is audited separately; this tool grants no license."}
+    if not mirror:
+        from knee.raptor_input import transform_exception_handlers
+        manifest['exception_policy'] = transform_exception_handlers(module)[1]
     return module, payload.decode(), manifest
 
 
@@ -131,6 +134,13 @@ def load_definitions(module_source, decoder_source, manifest):
     public, decoder = types.ModuleType("audited_public"), types.ModuleType("audited_fastread")
     exec(compile(module_source, "<audited-public-definitions>", "exec"), public.__dict__)
     if not mirror:
+        from knee.raptor_input import propagate_fatal, transform_exception_handlers
+        protected, contract = transform_exception_handlers(module_source)
+        if manifest.get('exception_policy') != contract:
+            raise ValueError('Raptor protected exception policy differs')
+        public._raptor_propagate_fatal = propagate_fatal
+        public._raptor_protected_source = protected
+        exec(compile(protected, '<raptor-resource-policy>', 'exec'), public.__dict__)
         return public, None
     exec(compile(decoder_source, "<audited-fastread>", "exec"), decoder.__dict__)
     # Avoid the public helper raising process-wide file descriptor limits.
@@ -143,8 +153,8 @@ def bounded_ids(ids, *, count=24, seed=20261008):
     ids = [str(x) for x in ids]
     if len(ids) != len(set(ids)) or any(not x or "/" in x or "\\" in x or x in {".", ".."} for x in ids):
         raise ValueError("Study IDs must be unique nonempty path components")
-    if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= 24 or len(ids) < count:
-        raise ValueError("Rehearsal requires 1 to 24 available training studies")
+    if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= 64 or len(ids) < count:
+        raise ValueError("Rehearsal requires 1 to 64 available training studies")
     return sorted(ids, key=lambda s: (sha256(f"{seed}:{s}".encode()), s))[:count]
 
 
@@ -344,6 +354,10 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
     out.mkdir(parents=True, exist_ok=False)
     public, decoder = load_definitions(public_source, decoder_source, manifest)
     recipe, mirror = manifest["recipe"], manifest.get("profile", "mirror") == "mirror"
+    if not mirror:
+        from knee import raptor_input
+        if train_count != raptor_input.TRAIN_COUNT or max_seconds > raptor_input.MAX_SECONDS or sys.version_info[:2] != (3, 12):
+            raise ValueError('Expanded Raptor rehearsal requires 64 training studies, Python 3.12 and at most 1800 seconds')
     # Pydicom diagnostics can include source values; failures are recorded below
     # as sanitized aggregate codes rather than third-party warnings.
     warnings.filterwarnings("ignore", module=r"pydicom(?:\..*)?")
@@ -377,8 +391,7 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
             counters["decoded_unique_slices"] += 1
         return pixel_cache[path]
     if not mirror:
-        fast = lambda sid, rows, directory: public.build_study(sid, rows, directory,
-                                                              (reference[0], cached_pixels, reference[2]))
+        fast = None  # Raptor production acceptance is distinct from strict decoder comparison.
     torch.backends.cudnn.benchmark = True
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.set_num_threads(4)
@@ -393,7 +406,7 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
     report = {"status": "running", "manifest_sha256": sha256(canonical_bytes(manifest)),
               "manifest": manifest, "source_revision": __import__("os").environ.get("KNEE_CODE_REVISION"),
               "source_bundle_sha256": __import__("os").environ.get("KNEE_SOURCE_SHA256"),
-              "environment": {"python": sys.version, "platform": platform.platform(),
+              "environment": {"python": sys.version, "python_major_minor": list(sys.version_info[:2]), "platform": platform.platform(),
                               "packages": {name: package_version(name) for name in
                                            ("torch", "timm", "numpy", "pydicom", "opencv-python", "opencv-python-headless")},
                               "gpu": torch.cuda.get_device_name(0), "cuda": torch.version.cuda},
@@ -407,25 +420,44 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
         (out / "rehearsal.json").write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
     save()
     try:
+        if not mirror:
+            report['input_policy'] = raptor_input.policy_contract()
+            report['stress_checks'] = raptor_input.stress_inputs(public)
         for ordinal, (split, sid) in enumerate(jobs):
             if time.monotonic() - started >= max_seconds:
                 raise TimeoutError("Reference rehearsal time bound exceeded")
             plan, substitutions = slot_plan(public, sid, records[split])
-            for row, _ in plan:
-                if row is not None and not (root / f"{split}_series" / sid / row["SeriesInstanceUID"]).is_dir():
-                    raise ValueError("Selected series directory is absent")
+            if mirror:
+                for row, _ in plan:
+                    if row is not None and not (root / f"{split}_series" / sid / row["SeriesInstanceUID"]).is_dir():
+                        raise ValueError("Selected series directory is absent")
             before = time.monotonic()
-            volume, mask = fast(sid, records[split], str(root / f"{split}_series"))
+            directory = root / f"{split}_series"
+            if mirror:
+                volume, mask = fast(sid, records[split], str(directory))
+            else:
+                volume, mask, counts = raptor_input.prepare_study(public, sid, records[split], directory)
+                counters.update(counts)
             fast_seconds = time.monotonic() - before
             pixel_cache.clear()
-            if failures:
-                raise ValueError("Production decoder swallowed an error")
-            counts = validate_volume(volume, mask, plan, image_size=public.IMG)
+            if mirror:
+                if failures:
+                    raise ValueError("Production decoder swallowed an error")
+                counts = validate_volume(volume, mask, plan, image_size=public.IMG)
             reference_before = time.monotonic()
-            reference_volume, reference_mask = public.build_study(sid, records[split], str(root / f"{split}_series"), reference)
-            if failures:
-                raise ValueError("Reference decoder swallowed an error")
-            validate_volume(reference_volume, reference_mask, plan, image_size=public.IMG)
+            strict_status = None
+            if mirror:
+                reference_volume, reference_mask = public.build_study(sid, records[split], str(directory), reference)
+                if failures:
+                    raise ValueError("Reference decoder swallowed an error")
+                validate_volume(reference_volume, reference_mask, plan, image_size=public.IMG)
+            else:
+                reference_volume, reference_mask, _ = raptor_input.prepare_study(public, sid, records[split], directory,
+                                                                                cache_pixels=False, reference=True)
+                strict_status = 'ineligible_partial_input'
+                if raptor_input.strict_eligible(counts):
+                    raptor_input.strict_compare(public, sid, records[split], directory, volume, mask)
+                    strict_status = 'PASS'
             if not np.array_equal(volume, reference_volume) or not np.array_equal(mask, reference_mask):
                 raise ValueError("Fast decoder differs from pydicom reference pixels/mask")
             reference_seconds = time.monotonic() - reference_before
@@ -468,7 +500,9 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
                                       "fast_seconds": fast_seconds, "reference_seconds": reference_seconds,
                                       "windows_seconds": window_seconds, "inference_seconds": inference_seconds,
                                       "production_seconds": production_seconds,
-                                      "decoder_pixel_max_error": 0, "window_max_error": window_error,
+                                      "public_pixel_max_error": 0, "strict_comparison": strict_status,
+                                      "decoder_pixel_max_error": 0 if strict_status in (None, 'PASS') else None,
+                                      "window_max_error": window_error,
                                       "repeat_prediction_max_error": repeat_error})
             del volume, mask, windows, gpu, production
             report["runtime_seconds"] = time.monotonic() - started
@@ -495,6 +529,9 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
                       disk_free_bytes=shutil.disk_usage(out).free,
                       visible_csv_sha256=sha256((out / "visible-predictions.csv").read_bytes()))
         report["estimated_1300_seconds_p95_with_25_percent_margin"] = report["estimated_1300_seconds_p95"] * 1.25
+        if not mirror:
+            report['production_input_counts'] = dict(counters)
+            report['strict_comparison_counts'] = dict(Counter(s['strict_comparison'] for s in report['studies']))
         if report["estimated_1300_seconds_p95_with_25_percent_margin"] >= 9 * 3600:
             raise ValueError("Measured runtime estimate lacks required notebook headroom")
         save()
