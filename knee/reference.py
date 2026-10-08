@@ -115,9 +115,11 @@ def audit_source(source: str, *, profile="mirror", checkpoint_sha256=None, rapto
                 "attribution": "Danial Zakaria (nartaa), based on Dread Development's Raptor inference" if mirror else "Dread Development / Johnathan Wagner",
                 "purpose": "bounded offline reproduction; no training or score-based selection",
                 "permissions": "Source/checkpoint eligibility is audited separately; this tool grants no license."}
-    if not mirror:
-        from knee.raptor_input import transform_exception_handlers
-        manifest['exception_policy'] = transform_exception_handlers(module)[1]
+    from knee.raptor_input import transform_exception_handlers
+    manifest['exception_policy'] = transform_exception_handlers(module)[1]
+    if mirror:
+        from knee.mirror_input import protect_decoder
+        manifest['decoder_exception_policy'] = protect_decoder(payload.decode())[1]
     return module, payload.decode(), manifest
 
 
@@ -148,7 +150,20 @@ def load_definitions(module_source, decoder_source, manifest):
         # Explicit evaluation-only variant; preserve all public scientific definitions.
         public.K_EVAL = manifest["recipe"]["windows"]
         return public, None
-    exec(compile(decoder_source, "<audited-fastread>", "exec"), decoder.__dict__)
+    from knee.raptor_input import propagate_fatal, transform_exception_handlers
+    from knee.mirror_input import protect_decoder
+    protected, policy = transform_exception_handlers(module_source)
+    if manifest.get('exception_policy') != policy:
+        raise ValueError('Mirror public exception policy differs')
+    public._raptor_propagate_fatal = propagate_fatal
+    public._raptor_protected_source = protected
+    exec(compile(protected, '<mirror-public-resource-policy>', 'exec'), public.__dict__)
+    protected_decoder, policy = protect_decoder(decoder_source)
+    if manifest.get('decoder_exception_policy') != policy:
+        raise ValueError('Mirror decoder exception policy differs')
+    decoder._mirror_propagate_fatal = propagate_fatal
+    decoder._mirror_protected_source = protected_decoder
+    exec(compile(protected_decoder, "<audited-fastread-protected>", "exec"), decoder.__dict__)
     # Avoid the public helper raising process-wide file descriptor limits.
     decoder._KEEP_MAX = 256
     return public, decoder
@@ -298,6 +313,10 @@ def load_model(public, path, device, manifest):
     with path.open("rb") as handle:
         if hashlib.file_digest(handle, "sha256").hexdigest() != manifest["checkpoint_sha256"]:
             raise ValueError("Reference checkpoint hash mismatch")
+    if manifest.get('profile') == 'mirror':
+        from knee.mirror_input import CHECKPOINT_BYTES
+        if path.stat().st_size != CHECKPOINT_BYTES:
+            raise ValueError('Mirror checkpoint size mismatch')
     # Never inherit the public weights_only=False pickle execution path.
     checkpoint = torch.load(path, map_location="cpu", weights_only=True)
     if checkpoint.get("arch") != manifest["recipe"]["arch"] or int(checkpoint.get("res", 0)) != 384:
@@ -307,6 +326,9 @@ def load_model(public, path, device, manifest):
     public.timm = timm
     backbone = public.build_backbone(manifest["recipe"]["arch"], pretrained=False)
     model = public.RaptorClassifier(backbone, F_dim=backbone.num_features)
+    if manifest.get('profile') == 'mirror' and (not checkpoint.get('model') or
+            not all(torch.is_tensor(v) and torch.isfinite(v).all() for v in checkpoint['model'].values())):
+        raise ValueError('Mirror checkpoint tensors nonfinite or invalid')
     model.load_state_dict(checkpoint["model"], strict=True)
     model.eval().to(device)
     del checkpoint
@@ -353,13 +375,18 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
     import warnings
     if device != "cuda" or not torch.cuda.is_available():
         raise RuntimeError("Reference qualification explicitly requires available CUDA")
-    if not 0 < max_seconds <= 3600:
-        raise ValueError("Reference rehearsal must be bounded to at most 3600 seconds")
+    limit = 9 * 3600 if manifest.get('profile', 'mirror') == 'mirror' else 3600
+    if not 0 < max_seconds <= limit:
+        raise ValueError("Reference rehearsal exceeds profile/platform runtime limit")
     started = time.monotonic()
     root, out = Path(root), Path(output_dir)
     out.mkdir(parents=True, exist_ok=False)
     public, decoder = load_definitions(public_source, decoder_source, manifest)
     recipe, mirror = manifest["recipe"], manifest.get("profile", "mirror") == "mirror"
+    if mirror:
+        from knee import mirror_input
+        if train_count != mirror_input.TRAIN_COUNT or sys.version_info[:2] != (3, 12):
+            raise ValueError('Expanded mirror rehearsal requires64 training studies and Python3.12')
     if not mirror:
         from knee import raptor_input
         if train_count != raptor_input.TRAIN_COUNT or max_seconds > raptor_input.MAX_SECONDS or sys.version_info[:2] != (3, 12):
@@ -376,7 +403,19 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
         raise ValueError("Official target order differs from the reference")
     records = {}
     for split in ("train", "test"):
-        _, rows = _csv(root / f"{split}_series.csv")
+        columns, rows = _csv(root / f"{split}_series.csv")
+        if mirror:
+            expected = ['StudyInstanceUID','SeriesInstanceUID','Fluid_Sensitive','Fat_Suppression','Anatomical_Plane']
+            if columns != expected or len({r['SeriesInstanceUID'] for r in rows}) != len(rows):
+                raise ValueError('Mirror official series schema/uniqueness differs')
+            for row in rows:
+                if set(row) != set(expected) or any(row[k] is None for k in expected):
+                    raise ValueError('Malformed mirror series metadata row')
+                for key in ('StudyInstanceUID','SeriesInstanceUID'):
+                    bounded_ids([row[key]],count=1)
+                if (row['Fluid_Sensitive'] not in ('0','1') or row['Fat_Suppression'] not in ('0','1') or
+                        row['Anatomical_Plane'] not in ('Sagittal','Coronal','Axial')):
+                    raise ValueError('Mirror official series metadata differs')
         grouped = {}
         for row in rows:
             grouped.setdefault(row["StudyInstanceUID"], []).append(row)
@@ -385,8 +424,8 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
     visible_ids = [row["StudyInstanceUID"] for row in visible_rows]
     bounded_ids(visible_ids, count=3, seed=seed)  # Validate, but preserve official order.
     jobs = [("test", sid) for sid in visible_ids] + [("train", sid) for sid in selected_train]
-    counters = install_decoder_guards(decoder) if mirror else Counter()
-    fast = decoder.make_builder("study_lut", public.IMG, public.SLOTS, hdr_threads=4, px_threads=4) if mirror else None
+    counters = Counter()
+    fast = None
     reference, failures = reference_reader(public)
     # Per-study memoization removes repeated decodes while preserving every
     # repeated sample's contribution to public percentile normalization.
@@ -426,6 +465,11 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
         (out / "rehearsal.json").write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
     save()
     try:
+        if mirror:
+            report['checkpoint_verified_sha256'] = manifest['checkpoint_sha256']
+            report['checkpoint_bytes'] = Path(checkpoint_path).stat().st_size
+            report['input_policy'] = mirror_input.policy_contract()
+            report['stress_checks'] = mirror_input.stress_inputs(public, decoder)
         if not mirror:
             report['input_policy'] = raptor_input.policy_contract()
             report['stress_checks'] = raptor_input.stress_inputs(public)
@@ -433,30 +477,23 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
             if time.monotonic() - started >= max_seconds:
                 raise TimeoutError("Reference rehearsal time bound exceeded")
             plan, substitutions = slot_plan(public, sid, records[split])
-            if mirror:
-                for row, _ in plan:
-                    if row is not None and not (root / f"{split}_series" / sid / row["SeriesInstanceUID"]).is_dir():
-                        raise ValueError("Selected series directory is absent")
             before = time.monotonic()
             directory = root / f"{split}_series"
             if mirror:
-                volume, mask = fast(sid, records[split], str(directory))
+                volume, mask, counts = mirror_input.prepare_study(public, decoder, sid, records[split], directory)
+                counters.update(counts)
             else:
                 volume, mask, counts = raptor_input.prepare_study(public, sid, records[split], directory)
                 counters.update(counts)
             fast_seconds = time.monotonic() - before
             pixel_cache.clear()
-            if mirror:
-                if failures:
-                    raise ValueError("Production decoder swallowed an error")
-                counts = validate_volume(volume, mask, plan, image_size=public.IMG)
             reference_before = time.monotonic()
             strict_status = None
             if mirror:
-                reference_volume, reference_mask = public.build_study(sid, records[split], str(directory), reference)
-                if failures:
-                    raise ValueError("Reference decoder swallowed an error")
-                validate_volume(reference_volume, reference_mask, plan, image_size=public.IMG)
+                reference_volume, reference_mask, reference_counts = mirror_input.prepare_study(
+                    public, decoder, sid, records[split], directory, reference=True)
+                strict_status = ('PASS' if mirror_input.strict_eligible(counts) and
+                                 mirror_input.strict_eligible(reference_counts) else 'ineligible_partial_input')
             else:
                 reference_volume, reference_mask, _ = raptor_input.prepare_study(public, sid, records[split], directory,
                                                                                 cache_pixels=False, reference=True)
@@ -538,13 +575,16 @@ def rehearse(root, checkpoint_path, public_source, decoder_source, manifest, out
                       disk_free_bytes=shutil.disk_usage(out).free,
                       visible_csv_sha256=sha256((out / "visible-predictions.csv").read_bytes()))
         report["estimated_1300_seconds_p95_with_25_percent_margin"] = report["estimated_1300_seconds_p95"] * 1.25
-        if not mirror:
-            report['production_input_counts'] = dict(counters)
-            report['strict_comparison_counts'] = dict(Counter(s['strict_comparison'] for s in report['studies']))
-        if report["estimated_1300_seconds_p95_with_25_percent_margin"] >= 9 * 3600:
+        report['production_input_counts'] = dict(counters)
+        report['strict_comparison_counts'] = dict(Counter(s['strict_comparison'] for s in report['studies']))
+        if mirror:
+            report['runtime_estimate_policy'] = 'informational_only; actual competition9h runtime enforced'
+        if not mirror and report["estimated_1300_seconds_p95_with_25_percent_margin"] >= 9 * 3600:
             raise ValueError("Measured runtime estimate lacks required notebook headroom")
         save()
     except Exception as exc:
+        if mirror and hasattr(exc, 'mirror_input_counts'):
+            counters.update(exc.mirror_input_counts)
         report.update(status="failed", failure_type=type(exc).__name__,
                       runtime_seconds=time.monotonic() - started, decoder_counts=dict(counters))
         save()

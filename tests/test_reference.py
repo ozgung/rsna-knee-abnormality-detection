@@ -68,18 +68,20 @@ class ReferenceContractTests(unittest.TestCase):
             builder = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(builder)
         manifest = {"attribution": "Synthetic source author", "source_url": "https://example.com/reference",
-                    "weight_dataset": builder.WEIGHT_DATASET}
+                    "weight_dataset": builder.WEIGHT_DATASET, "checkpoint_file":"synthetic.pt", "checkpoint_sha256":"a"*64}
         with tempfile.TemporaryDirectory() as temp:
             source = Path(temp) / "source.py"
             source.write_text("# synthetic input")
             destination = Path(temp) / "build"
+            publisher = Path(temp) / "checkpoint-manifest.json"
+            publisher.write_text(json.dumps({"accuracy":{"filename":"synthetic.pt","sha256":"a"*64}}))
             with patch.object(builder, "audit_source", return_value=("# audited definitions\n", "# audited decoder\n", manifest)):
-                receipt = builder.build_reference(source, destination, "reference-test")
+                receipt = builder.build_reference(source, destination, "reference-test", publisher_manifest=publisher)
             metadata = json.loads((destination / "kernel-metadata.json").read_text())
             self.assertTrue(metadata["is_private"])
             self.assertFalse(metadata["enable_internet"])
             self.assertEqual(metadata["model_sources"], [])
-            self.assertEqual(metadata["dataset_sources"], [builder.WEIGHT_DATASET])
+            self.assertEqual(metadata["dataset_sources"], [builder.WEIGHT_DATASET, builder.CONVNEXT_DATASET])
             notebook = json.loads((destination / "notebook.ipynb").read_text())
             self.assertIn("Synthetic source author", "".join(notebook["cells"][0]["source"]))
             compile("".join(notebook["cells"][1]["source"]), "<generated>", "exec")
