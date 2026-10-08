@@ -183,3 +183,30 @@ Full CPU cache `ozgung/knee-fresh-cache-20261008` v1 remains running since00:21U
 source`ca6ff83`, internal7200s/external7500s. Two log-stream requests returned transient
 server500 errors; both CLI status and browser active-events panel still report RUNNING.
 Both reference entries remain pending. At00:32UTC, Kaggle quota28.72GPUhours remained.
+
+## Prospective promotion rules before the first held-out fit
+
+Declared at00:46UTC before observing the fresh model's validation results. The exact
+512-training-row prevalence baseline is weak BCE **0.59717834** on the fixed200 rows.
+The stronger frozen baseline used2,000 training rows: BCE **0.44628505**, weak AUC
+**0.86033998**. The following thresholds govern spending, not statistical significance
+or expected public score. Epoch selection remains exclusively weak BCE.
+
+- Near-reference performance from512 rows (selected-best BCE≤0.456285 and all-target
+  weak AUC≥0.850340) supports one larger-data pilot with the recipe otherwise fixed.
+- A weaker but still improving result (BCE≤0.537460, AUC≥0.80, epoch4 is BCE-best,
+  epoch2-to4 BCE gain≥0.01, and improving fixed-training diagnostic) supports one
+  newly declared12-epoch experiment on the same512/200 split, capped at90 minutes
+  after throughput measurement. The completed four-epoch cosine schedule must not
+  be silently extended or reset through resume.
+- Numerical failure, failure to beat prevalence, or falling training loss with
+  flat/worsening validation calls for diagnosis before scale. Four epochs alone
+  cannot establish that the architecture is unsuitable.
+
+Compare selected predictions with both frozen baselines using aligned study groups,
+paired uncertainty and per-target support. This is a reused development cohort with
+report-derived labels, not an independent clinical test. Before larger-data training,
+reserve approximately300 eligible previously unused groups outside the entire original
+2,000/300 cohort as a sealed weak proxy. No candidate evaluation on that proxy until
+the modeling choices are fixed. Larger remote caches need a measured allowance beyond
+2GiB; the local2GiB limit and at least8Kaggle GPU hours reserved for qualification stay.
