@@ -9,17 +9,20 @@ import textwrap
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from knee.fresh_reader import CONFIG, SOURCE_HASHES, check_sources
+from knee.fresh_reader import CONFIG, SOURCE_HASHES, check_sources, cache_time_budget
 from knee.fresh_reader_setup import reference_parts
 
 DOCKER = 'gcr.io/kaggle-private-byod/python@sha256:37c64f7dd9c54116ecd1bcc88817c5469b88387388fade02bfa8bf3fc647d461'
 
 
-def build(source_dir, destination, slug, stage, *, cache_kernel=None, plan_fingerprint=None, resume_kernel=None):
+def build(source_dir, destination, slug, stage, *, cache_kernel=None, plan_fingerprint=None, resume_kernel=None, cache_seconds=None):
     source_dir, destination = Path(source_dir), Path(destination)
     check_sources(source_dir)
     if stage not in ('cache-pilot', 'cache', 'train'):
         raise ValueError('Unknown stage')
+    effective_cache_seconds = cache_time_budget(stage, cache_seconds)
+    stage_seconds = (CONFIG['pilot_seconds'] if stage == 'cache-pilot' else
+                     effective_cache_seconds if stage == 'cache' else CONFIG['training_seconds'])
     if stage != 'cache-pilot' and (not cache_kernel or not plan_fingerprint):
         raise ValueError('Expansion/training requires a cache kernel and its reviewed plan fingerprint')
     if resume_kernel and stage != 'train':
@@ -39,7 +42,8 @@ def build(source_dir, destination, slug, stage, *, cache_kernel=None, plan_finge
                 'own_sources': {name: hashlib.sha256(content.encode()).hexdigest() for name, content in own.items()},
                 'license_sha256': hashlib.sha256(license_text.encode()).hexdigest(),
                 'config': CONFIG, 'cache_kernel': cache_kernel, 'plan_fingerprint': plan_fingerprint,
-                'resume_kernel': resume_kernel, 'setup_seconds': 300}
+                'resume_kernel': resume_kernel, 'setup_seconds': 300,
+                'cache_seconds_override': cache_seconds, 'effective_stage_seconds': stage_seconds}
     source_hash = hashlib.sha256(json.dumps(contract, sort_keys=True).encode()).hexdigest()
     setup = f'''from pathlib import Path
 import hashlib, json, os, shutil, subprocess, sys
@@ -47,7 +51,8 @@ STAGE = {stage!r}
 EXPECTED_PLAN = {plan_fingerprint!r}
 RESUME_KERNEL = {resume_kernel!r}
 CACHE_KERNEL = {cache_kernel!r}
-STAGE_BUDGET = {CONFIG['pilot_seconds'] if stage == 'cache-pilot' else CONFIG['cache_seconds'] if stage == 'cache' else CONFIG['training_seconds']}
+STAGE_BUDGET = {stage_seconds}
+CACHE_SECONDS_OVERRIDE = {cache_seconds!r}
 CODE = {own!r}
 EXTERNAL = {external!r}
 LICENSE_TEXT = {license_text!r}
@@ -104,7 +109,7 @@ with time_limit(STAGE_BUDGET - (time.monotonic() - _stage_started), 'whole ' + S
     if STAGE == 'train':
         result = train(cache, sources, '/kaggle/working/fresh_reader_training', resume=resume)
     else:
-        result = prepare_cache(data, weak, sources, cache, pilot=STAGE == 'cache-pilot')
+        result = prepare_cache(data, weak, sources, cache, pilot=STAGE == 'cache-pilot', cache_seconds=CACHE_SECONDS_OVERRIDE)
     print(json.dumps(result, indent=2))
 '''
     setup = ('import time, json\nfrom pathlib import Path\n_stage_started = time.monotonic()\ntry:\n'
@@ -145,7 +150,8 @@ if __name__ == '__main__':
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('source_dir'); ap.add_argument('destination'); ap.add_argument('slug')
     ap.add_argument('--stage', required=True, choices=('cache-pilot', 'cache', 'train'))
+    ap.add_argument('--cache-seconds', type=int)
     ap.add_argument('--cache-kernel'); ap.add_argument('--plan-fingerprint'); ap.add_argument('--resume-kernel')
     args = ap.parse_args()
     build(args.source_dir, args.destination, args.slug, args.stage, cache_kernel=args.cache_kernel,
-          plan_fingerprint=args.plan_fingerprint, resume_kernel=args.resume_kernel)
+          plan_fingerprint=args.plan_fingerprint, resume_kernel=args.resume_kernel, cache_seconds=args.cache_seconds)

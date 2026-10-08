@@ -71,3 +71,22 @@ Five additional dependency-free regression tests forbid `rglob`, `glob`, `iterdi
 Follow-up verification:77/77 ML-environment tests passed; dependency-free38 passed/39 optional skips; both smoke checks and `git diff --check` passed. The real metadata plan equals the running-pilot implementation exactly before header identity checks.
 
 Deadline cleanup correction: a parent run exposed exit142 when nested cleanup rearmed an already-expired outer alarm for1µs, allowing it to arrive after restoration of the default SIGALRM handler. Expired enclosing deadlines now propagate a synchronous `TimeoutError` and are never rearmed. A repeated subprocess regression verifies1,000 nested unwinds per suite without process termination or residual timers. After this fix:78/78 ML tests pass; dependency-free39 pass/39 optional skips; both smoke checks pass. No remote jobs changed.
+
+## Explicit CPU time reassessment after the real pilot
+
+The actual64-study pilot decoded311 series with zero failures, storing119,629,145bytes. It passed decoding but **failed the original3600s time gate**: decode308.34779231s, total675.318511887s, projected full712 decode with1.5× margin5145.55378417s. Original `cache-pilot.json` remains unchanged.
+
+The parent authorized a full-cache-only7200s cap. `--cache-seconds 7200` is a separate operational override, restricted to stage`cache` and values≤7200; it does not modify the plan, split, inputs or original3600s configuration field. The revised gate adds measured pilot nondecode overhead366.970719577s, giving5512.52450375s (~91.9min), and retains the original2GiB cap. Projected bytes with1.25× margin are1,663,592,797.65625, below2GiB. Existing64 arrays are size/hash verified and reused. `cache-revised-gate.json` records the original failed gate, original pilot-file SHA, override and revised decision. Both revised time and disk checks must pass; a failed original gate without an explicit override remains rejected.
+
+```bash
+python3.12 scripts/build_fresh_reader.py \
+  outputs/research/2026-10-08/convnext-audit \
+  outputs/kaggle/fresh-cache knee-fresh-cache-20261008 --stage cache \
+  --cache-kernel ozgung/knee-fresh-cache-pilot-20261008 \
+  --plan-fingerprint 1bd346c05c0aac20f54b82b790e356d3d6c1b95606accaa4a5d1da7e3e421942 \
+  --cache-seconds 7200
+```
+
+The following GPU stage consumes the completed cache under the same fingerprint and retains its original5400s training limit. Synthetic regression checks verify the failed receipt and plan bytes are preserved, cached arrays are reused, the builder exposes its effective7200s timer, and invalid-stage/time/disk overrides are rejected. No remote job was launched by this implementation task.
+
+Override verification:79/79 ML-environment tests pass; dependency-free40 pass/39 optional skips; smoke and `git diff --check` pass.

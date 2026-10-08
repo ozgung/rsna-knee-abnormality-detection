@@ -46,6 +46,34 @@ class FreshReaderCoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             budget_gate(**dict(kw, count=0))
 
+    def test_explicit_full_cache_override_reassesses_time_and_retains_disk_cap(self):
+        from knee.fresh_reader import assess_cache_expansion, cache_time_budget
+        receipt = {'status': 'PASS', 'failures': 0, 'elapsed_seconds': 675.318511887,
+                   'new_decode_seconds': 308.34779231, 'gate': {'passed': False}}
+        original = copy.deepcopy(receipt)
+        sample = [{'seconds': 308.34779231 / 64, 'bytes': 119629145 / 64}] * 64
+        gate = assess_cache_expansion(receipt, sample, 712,
+                                     seconds_limit=cache_time_budget('cache', 7200),
+                                     bytes_limit=CONFIG['cache_bytes'])
+        self.assertTrue(gate['passed'])
+        self.assertFalse(gate['original_gate_passed'])
+        self.assertAlmostEqual(gate['estimated_seconds_with_margin'], 5512.52450375)
+        self.assertAlmostEqual(gate['pilot_nondecode_seconds'], 366.970719577)
+        self.assertEqual(receipt, original)
+        self.assertEqual(CONFIG['cache_seconds'], 3600)
+        self.assertEqual(CONFIG['training_seconds'], 5400)
+        self.assertFalse(assess_cache_expansion(receipt, sample, 712, seconds_limit=3600,
+                                              bytes_limit=CONFIG['cache_bytes'])['passed'])
+        too_large = [dict(row, bytes=row['bytes'] * 2) for row in sample]
+        self.assertFalse(assess_cache_expansion(receipt, too_large, 712, seconds_limit=7200,
+                                              bytes_limit=CONFIG['cache_bytes'])['passed'])
+        with self.assertRaisesRegex(ValueError, '2 GiB'):
+            assess_cache_expansion(receipt, sample, 712, seconds_limit=7200, bytes_limit=3*1024**3)
+        for stage, override in [('train', 7200), ('cache-pilot', 7200), ('cache', 0),
+                                ('cache', 7201), ('cache', True), ('cache', 1.5)]:
+            with self.subTest(stage=stage, override=override), self.assertRaises(ValueError):
+                cache_time_budget(stage, override)
+
     def test_unreviewed_source_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / 'preprocess.py').write_text('pass\n')
@@ -84,6 +112,18 @@ class FreshReaderCoreTests(unittest.TestCase):
                     compile(generated, 'generated', 'exec')
                     self.assertNotIn('inputs.rglob', generated)
                     self.assertIn("with time_limit(300, 'attachment and decoder setup')", generated)
+                out = Path(d)/'override'
+                contract = builder.build(sources, out, 'synthetic', 'cache', cache_kernel='ozgung/cache',
+                                         plan_fingerprint='abc', cache_seconds=7200)
+                self.assertEqual(contract['effective_stage_seconds'], 7200)
+                self.assertEqual(contract['config']['cache_seconds'], 3600)
+                self.assertEqual(contract['config']['training_seconds'], 5400)
+                generated = ''.join(json.loads((out/'notebook.ipynb').read_text())['cells'][1]['source'])
+                self.assertIn('STAGE_BUDGET = 7200', generated)
+                self.assertIn('CACHE_SECONDS_OVERRIDE = 7200', generated)
+                with self.assertRaisesRegex(ValueError, 'stage cache'):
+                    builder.build(sources, Path(d)/'bad-override', 'synthetic', 'train',
+                                  cache_kernel='ozgung/cache', plan_fingerprint='abc', cache_seconds=7200)
 
     def test_training_bounds_are_predeclared(self):
         self.assertEqual(CONFIG['image_size'], 224)
@@ -210,8 +250,23 @@ class FreshReaderMLTests(unittest.TestCase):
                     np.testing.assert_array_equal(z['x'][0,0,:,0,0], [0,30,60])
                     self.assertFalse(z['x'][1:].any())
                     self.assertEqual(z['x'].shape, (6,4,3,224,224))
-                again = prepare_cache(data, 'unused', 'unused', out, pilot=False)
+                # A changed resource budget must preserve the exact original
+                # failed gate, private plan and existing array hashes.
+                receipt_path = out/'cache-pilot.json'
+                receipt = json.loads(receipt_path.read_text()); receipt['gate']['passed'] = False
+                receipt_path.write_text(json.dumps(receipt))
+                original_receipt = receipt_path.read_bytes()
+                original_plan = (out/'plan-private.json').read_bytes()
+                with self.assertRaisesRegex(ValueError, 'explicit full-cache'):
+                    prepare_cache(data, 'unused', 'unused', out, pilot=False)
+                again = prepare_cache(data, 'unused', 'unused', out, pilot=False, cache_seconds=7200)
                 self.assertEqual(again['new_studies'], 0)
+                self.assertEqual(receipt_path.read_bytes(), original_receipt)
+                self.assertEqual((out/'plan-private.json').read_bytes(), original_plan)
+                revised = json.loads((out/'cache-revised-gate.json').read_text())
+                self.assertFalse(revised['original_gate']['passed'])
+                self.assertTrue(revised['gate']['passed'])
+                self.assertEqual(revised['effective_cache_seconds'], 7200)
                 bad_out = Path(d)/'bad-cache'
                 prep.load_series = lambda *a: (volume, {'n_bad': 1})
                 with self.assertRaisesRegex(ValueError, 'strict decoding'):

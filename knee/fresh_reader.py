@@ -94,6 +94,38 @@ def budget_gate(count, total, seconds, byte_count, *, seconds_limit, bytes_limit
             'seconds_limit': seconds_limit, 'bytes_limit': bytes_limit}
 
 
+def cache_time_budget(stage, override=None, *, default=CONFIG['cache_seconds']):
+    """An operational full-cache limit; never insert it into the data plan."""
+    if override is not None:
+        if stage != 'cache' or type(override) is not int or not 0 < override <= 7200:
+            raise ValueError('cache-seconds requires stage cache and an integer in 1..7200')
+        return override
+    return default
+
+
+def assess_cache_expansion(pilot_receipt, sample, total, *, seconds_limit, bytes_limit):
+    """Reassess measured decode + nondecode work without changing the old gate."""
+    if pilot_receipt.get('status') != 'PASS' or pilot_receipt.get('failures', 0) != 0:
+        raise ValueError('Full cache requires a successful decoding pilot')
+    overhead = pilot_receipt['elapsed_seconds'] - pilot_receipt['new_decode_seconds']
+    decode = sum(row['seconds'] for row in sample)
+    byte_count = sum(row['bytes'] for row in sample)
+    if not all(math.isfinite(v) for v in (overhead, decode, byte_count)) or overhead < 0:
+        raise ValueError('Invalid measured pilot timing or size')
+    if bytes_limit > CONFIG['cache_bytes']:
+        raise ValueError('Full cache retains the original 2 GiB ceiling')
+    gate = budget_gate(len(sample), total, decode, byte_count,
+                       seconds_limit=seconds_limit, bytes_limit=bytes_limit)
+    gate['estimated_decode_seconds_with_margin'] = gate['estimated_seconds_with_margin']
+    gate['pilot_nondecode_seconds'] = overhead
+    gate['estimated_seconds_with_margin'] += overhead
+    gate['passed'] = (gate['estimated_seconds_with_margin'] <= seconds_limit and
+                      gate['estimated_bytes_with_margin'] <= bytes_limit)
+    gate['original_gate_passed'] = pilot_receipt['gate']['passed']
+    gate['basis'] = '1.5x full-split decode projection + measured pilot nondecode overhead; 1.25x bytes'
+    return gate
+
+
 def make_plan(data_dir, weak_path, config):
     """Use the existing baseline splitter, then subset its fixed assignments."""
     from knee.experiment import choose_studies, report_group
@@ -190,13 +222,14 @@ def patient_exclusions(plan, data_dir, table, *, deadline_at=None):
     return plan
 
 
-def prepare_cache(data_dir, weak_path, source_dir, output_dir, *, pilot=True, config=None):
+def prepare_cache(data_dir, weak_path, source_dir, output_dir, *, pilot=True, config=None, cache_seconds=None):
     import cv2
     import numpy as np
     import pandas as pd
     config = dict(CONFIG if config is None else config)
+    effective_cache_seconds = cache_time_budget('cache-pilot' if pilot else 'cache', cache_seconds, default=config['cache_seconds'])
     started = time.monotonic()
-    deadline = config['pilot_seconds'] if pilot else config['cache_seconds']
+    deadline = config['pilot_seconds'] if pilot else effective_cache_seconds
     data_dir, output_dir = Path(data_dir), Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     cache_dir = output_dir / 'arrays'
@@ -222,16 +255,38 @@ def prepare_cache(data_dir, weak_path, source_dir, output_dir, *, pilot=True, co
         raise ValueError('Existing cache plan differs; use a separate output directory')
     write_json(plan_path, plan)
     records = plan['records']
-    if not pilot:
-        gate = json.loads((output_dir / 'cache-pilot.json').read_text())
-        if gate['plan_fingerprint'] != plan['fingerprint'] or not gate['gate']['passed']:
-            raise ValueError('Full cache requires a passing pilot for this exact plan')
     selected = pilot_order(records, config['pilot_studies']) if pilot else records
     index_path = output_dir / 'cache-index-private.json'
     index = json.loads(index_path.read_text()) if index_path.exists() else {}
+    revised_gate = None
+    if not pilot:
+        pilot_path = output_dir / 'cache-pilot.json'
+        pilot_receipt = json.loads(pilot_path.read_text())
+        if pilot_receipt['plan_fingerprint'] != plan['fingerprint']:
+            raise ValueError('Full cache requires a pilot for this exact plan')
+        sample = []
+        for record in pilot_order(records, config['pilot_studies']):
+            if record['uid'] not in index:
+                raise ValueError('Pilot cache is incomplete')
+            item = index[record['uid']]
+            path = cache_dir / item['file']
+            if path.stat().st_size != item['bytes'] or file_sha256(path) != item['sha256']:
+                raise ValueError('Cached pilot array changed')
+            sample.append(item)
+        revised_gate = assess_cache_expansion(pilot_receipt, sample, len(records),
+            seconds_limit=effective_cache_seconds, bytes_limit=config['cache_bytes'])
+        write_json(output_dir / 'cache-revised-gate.json', {
+            'plan_fingerprint': plan['fingerprint'], 'original_pilot_sha256': file_sha256(pilot_path),
+            'original_gate': pilot_receipt['gate'], 'cache_seconds_override': cache_seconds,
+            'effective_cache_seconds': effective_cache_seconds, 'gate': revised_gate})
+        if not pilot_receipt['gate']['passed'] and cache_seconds is None:
+            raise ValueError('Failed original time gate requires an explicit full-cache budget override')
+        if not revised_gate['passed']:
+            raise ValueError('Full cache fails the revised measured time/disk gate')
     new_seconds, new_count, new_bytes = 0., 0, 0
     audit = {'status': 'RUNNING', 'plan_fingerprint': plan['fingerprint'], 'environment': environment(),
-             'selected_studies': len(selected), 'selected_series': 0, 'missing_slots': 0, 'failures': 0}
+             'selected_studies': len(selected), 'selected_series': 0, 'missing_slots': 0, 'failures': 0,
+             'effective_cache_seconds': effective_cache_seconds, 'cache_seconds_override': cache_seconds}
     report_path = output_dir / ('cache-pilot.json' if pilot else 'cache-complete.json')
     try:
         for record in selected:
@@ -280,7 +335,7 @@ def prepare_cache(data_dir, weak_path, source_dir, output_dir, *, pilot=True, co
             if len(index) % 8 == 0:
                 print(json.dumps({'event': 'cache_progress', 'completed': len(index), 'seconds': time.monotonic() - started}), flush=True)
         sample = [index[r['uid']] for r in pilot_order(records, config['pilot_studies'])]
-        audit['gate'] = budget_gate(len(sample), len(records), sum(s['seconds'] for s in sample),
+        audit['gate'] = revised_gate or budget_gate(len(sample), len(records), sum(s['seconds'] for s in sample),
                                    sum(s['bytes'] for s in sample), seconds_limit=config['cache_seconds'],
                                    bytes_limit=config['cache_bytes'])
         audit.update(status='PASS', cached_studies=len(index), cache_bytes=sum(v['bytes'] for v in index.values()),
@@ -596,11 +651,13 @@ def main():
     parser.add_argument('--output', required=True)
     parser.add_argument('--data'); parser.add_argument('--weak-labels'); parser.add_argument('--cache')
     parser.add_argument('--resume')
+    parser.add_argument('--cache-seconds', type=int)
     args = parser.parse_args()
+    cache_time_budget(args.stage, args.cache_seconds)
     if args.stage == 'train':
         train(args.cache, args.sources, args.output, resume=args.resume)
     else:
-        prepare_cache(args.data, args.weak_labels, args.sources, args.output, pilot=args.stage == 'cache-pilot')
+        prepare_cache(args.data, args.weak_labels, args.sources, args.output, pilot=args.stage == 'cache-pilot', cache_seconds=args.cache_seconds)
 
 
 if __name__ == '__main__':
