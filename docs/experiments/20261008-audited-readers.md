@@ -266,3 +266,33 @@ selection and short-series repetition, keep whole-empty/model/output checks, and
 propagate fatal resource errors. Strict decoding comparisons remain audit-only.
 Fresh source-pinned synthetic and label-blind real qualification will precede any
 new blend entry. These are concrete defects, not proof of the hidden failure cause.
+
+## Corrected Raptor/blend qualification and entry, 02:19UTC
+
+Repaired Raptor v2rehearsal (notebookversion1,source2d8bf13) PASS67studies,
+319selectedslots,4130uniqueslices/4142validsampledframes,16missingslots and
+9publicsequencepreferencesubstitutions. Zero realdecode/header/empty/resource
+failures; all67 strictpixelcomparisonsPASS; all16syntheticstressesPASS;
+within-run repeat error0. Runtime368.300s, peakCUDA8,247,560,192bytes.
+
+Visible standalone probabilities differ from the previous common-environment
+Raptor run by at most4.03523445e-5 despite matchingpackageversions/T4. Allvisible
+rankingsunchanged. ScientificAST, weights and publicpixelparitymatch. Different
+allocation/autotunehistory plausiblyexplains smallFP16drift, but isnotproven;
+cross-run1e-6probabilityequalityfailed and mustnotbeclaimed. Independentreview
+found no concrete preprocessing/modelissue.
+
+Renewedcommonblend `ozgung/knee-reference-blend-rehearsal-v3-20261008` v1
+PASS70.819s, exactwithin-runrepeats, all3strictRaptorpixelcomparisonsPASS and
+zeroresource/emptyfailures. Comparedwitholdcommonrun:ConvNeXtprobabilitiesexact,
+Raptormaxdrift3.027916e-5/ranksidentical, finalfixedblendbyte-identical.
+QualificationSHA`1dee9b7992a4e0e0af350c62cbef29a4f8b4615eb310ccb326872eda363360ca`.
+
+Final `ozgung/knee-reference-blend-submission-20261008` v2 (source962ab80)
+PASS61.766s/peakCUDA8,180,779,008bytes; exactsamevisibleCSV SHA
+`2aa5bde70b03e720b21435b9137d9b7560ff4256c4b6ae7059e12538f1fb9d25`.
+Submitted02:18:01UTC as**56929332**, pending; twoentriesremaintoday.
+Corrected standalone56927932 is also pending/scoring. No new publicscore yet.
+Receipts: `outputs/kaggle/raptor-production-rehearsal-v2-result/`,
+`outputs/kaggle/reference-blend-rehearsal-v3-result/`, and
+`outputs/kaggle/reference-blend-submission-v2-result/`.
