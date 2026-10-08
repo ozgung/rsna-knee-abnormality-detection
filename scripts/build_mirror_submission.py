@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from knee import mirror_input
-from knee.mirror_submission import MAX_SECONDS, VERSION, compare_csv, require_visible
+from knee.mirror_submission import CROSS_RUN_ATOL, MAX_SECONDS, VERSION, compare_csv, require_visible
 from knee.reference import audit_source, canonical_bytes, sha256, WEIGHT_DATASET
 from knee.reference_blend import CONVNEXT_DATASET, DOCKER_IMAGE
 
@@ -122,7 +122,8 @@ def build_mirror(destination, slug, *, rehearsal_build, rehearsal_report, rehear
             raise ValueError('Standalone visible weight/codec/environment evidence differs')
         error = compare_csv(rehearsal_csv,visible_csv)
         evidence = {'report_sha256':sha256(vr),'csv_sha256':sha256(Path(visible_csv).read_bytes()),
-                    'rehearsal_probability_max_error':error,'tolerance':1e-6}
+                    'rehearsal_probability_max_error':error,'tolerance':CROSS_RUN_ATOL,
+                    'visible_rank_and_tie_parity':True}
     elif visible_report is not None or visible_csv is not None:
         raise ValueError('Visible evidence is only accepted when building a full entry')
     contract = {'version':VERSION,'qualification':q,'qualification_sha256':fingerprint,

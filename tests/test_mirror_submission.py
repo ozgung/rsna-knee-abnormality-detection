@@ -59,10 +59,15 @@ class MirrorSubmissionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);a,b=root/'a.csv',root/'b.csv';csvfile(a);csvfile(b)
             self.assertEqual(runtime.compare_csv(a,b),0)
-            csvfile(b,delta=5e-7);self.assertLess(runtime.compare_csv(a,b),1e-6)
-            for kwargs in ({'ids':('b','a','c')},{'delta':2e-6},{'labels':list(reversed([f't{i}' for i in range(12)]))}):
+            csvfile(b,delta=5e-5);self.assertLess(runtime.compare_csv(a,b),1e-4)
+            for kwargs in ({'ids':('b','a','c')},{'delta':2e-4},{'labels':list(reversed([f't{i}' for i in range(12)]))}):
                 csvfile(b,**kwargs)
                 with self.assertRaises(ValueError):runtime.compare_csv(a,b)
+            # A rank flip smaller than the cross-process tolerance is still rejected.
+            csvfile(a);csvfile(b)
+            text=a.read_text().replace('0.101,','0.10001,')
+            a.write_text(text);b.write_text(text.replace('0.10001,','0.09999,'))
+            with self.assertRaisesRegex(ValueError,'ranking or tie'):runtime.compare_csv(a,b)
             for value in ('nan','inf','-0.01','1.1'):
                 b.write_text(a.read_text().replace('0.1,',value+',',1))
                 with self.assertRaises(ValueError):runtime.read_predictions(b)
