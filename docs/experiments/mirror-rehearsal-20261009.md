@@ -34,3 +34,7 @@ KNEE_RAPTOR_SOURCE=/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/rese
 ```
 
 Local verification:230/230fixture-enabled tests PASS, default smoke PASS (no backend forward), source compilation/diff checks PASS;7focused mirror tests PASS, including the actual pinned decoder on synthetic DICOM files and header-descriptor cleanup after resource failure. Full test log is preserved in the primary workspace at `outputs/analysis/mirror-rehearsal-20261009/tests.log`. Actual checkpoint compatibility, compression diversity, CUDA parity/runtime, visible predictions and any score remain pending the parent-run qualification. No commit, remote launch, upload or submission was performed by this implementation task.
+
+## Actual GPU qualification
+
+`ozgung/knee-mirror-rehearsal-20261009`v1, source2a92be1, completedPASS. Authentic receipt downloaded and validated:67/67 strict pixel comparisons PASS; CPU/GPU windows and within-run repeats exact;17synthetic stress cases PASS;6,090unique slices decoded with zero pixel/resource errors. Application elapsed489.952s, peakCUDA3,300,294,656bytes and hostRSS2,527,678,464bytes. Sequential p95 projection for1,300studies is4,377.729s (~73minutes), informational and not a hidden-runtime guarantee. Sixteen missing slots retained public masks. Results: `outputs/kaggle/mirror-rehearsal-20261009-result/reference-rehearsal/`. Standalone visible parity remains a separate qualification; no new public score.
