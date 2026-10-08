@@ -53,6 +53,7 @@ Use `/Users/ozgun/miniconda3/bin/kaggle kernels status OWNER/SLUG`, `kernels log
 - `/root/dicom_loader`: implementation inmanagedworktree `/Users/ozgun/.codex/worktrees/coverage-inference/rsna-knee-abnormality-detection` from6af8902. OwnTRAIN04image-onlyinference/export/rehearsalbuilder; keep healthyraw/cacheparity, stripprivateevidencefrompublishedweights, testcorrupt/missinginputs. No launches orcommits; parentreviews/commits/integrates. Do not archive untilchangesandevidencepreserved.
 - `/root/raptor62`: read-onlypubliccheckpoint/rules/provenanceresearch; fastestpermittedpath>.950, includingresolvingdeferredOAIweights. Notesunderignored `outputs/analysis/strategy-refresh-20261009/`. No GPUlaunches ortrackededits.
 - `/root/training_strategy` (Astrahigh): read-onlyowntraining/labels/validation-gatereview; nonduplicativewithpubliccheckpointresearch. Notesunderignored `outputs/analysis/training-strategy-20261009/`. No launches ortrackededits.
+- Pending modeling decision: Astra reports that batch2 targetwise loss normalization may underweight sparse targets and cancel confidence for singly observed targets. It is quantifying the mismatch and prioritizing global train-denominator normalization versus denser supervision. Do not alter the active reference; review this finding before the controller reaches the pending consensus launch. No alternative recipe has been selected yet.
 
 ## Completed qualifications and limits
 
