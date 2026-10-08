@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Last updated: **2026-10-08 (Europe/Istanbul; 00:04 UTC)**. Read this first, then [README](README.md) and [AGENTS](AGENTS.md).
+Last updated: **2026-10-08 (Europe/Istanbul; 00:14 UTC)**. Read this first, then [README](README.md) and [AGENTS](AGENTS.md).
 
 ## Current snapshot
 
@@ -18,7 +18,7 @@ Last updated: **2026-10-08 (Europe/Istanbul; 00:04 UTC)**. Read this first, then
 | --- | --- | --- |
 | PM/SETUP/ENV/DATA/VAL/PIPE/TRAIN/SUBMIT-01 | done | First trained baseline, real-data audits, offline parity and scored entry preserved. |
 | SUBMIT-02 | done | Four-head ensemble public0.757; no further head-seed sweeps. |
-| REF-02 | active | Separate ConvNeXt and plain Raptor rehearsals passed. Await standalone ConvNeXt score. Common-environment fixed50/50 rank-blend visible rehearsal packaging fix pending; require pass and cross-run component parity before one prospective blend entry. |
+| REF-02 | active | Separate ConvNeXt and plain Raptor rehearsals passed. Await standalone ConvNeXt score. Common-environment fixed50/50 rank-blend rehearsalv2 passed; ranks exactly match earlier component results. Fixed blend entry56925712 is PENDING; both scored candidates now awaiting evaluation. |
 | TRAIN-02 | active pilot | Fresh ImageNet ConvNeXt CPU64 cache job running. Require measured gate.passed before expanding to512train/200weak-validation cache. Then CUDA throughput gate and<=90min/4epochs; select only by weak BCE. |
 | TRAIN-03 | conditional | Scale only if pilot beats training-only prior and throughput justifies it. Measure compact-cache transfer before Colab expansion; preserve >=8KaggleGPUh for qualification. |
 
@@ -26,9 +26,10 @@ Last updated: **2026-10-08 (Europe/Istanbul; 00:04 UTC)**. Read this first, then
 
 - **Entry56924358 PENDING** as of00:00UTC October8. `ozgung/knee-public-reader-submission-20261008`v1; submittedOctober7 23:50:09UTC. Exact Apache-2.0 public ConvNeXt threefold reader. Notebook COMPLETE and visible parity exact. Preserve version/attachments. Poll `kaggle competitions submissions rsna-knee-abnormality-detection --format json`.
 - **CPU64 pilot RUNNING**, launchedOctober7 ~23:57UTC: `ozgung/knee-fresh-cache-pilot-20261008`v1, source`1f1d788`. Command `kaggle kernels push -p outputs/kaggle/fresh-cache-pilot --timeout 2100`. Internal1800s; expected `fresh_reader_cache/cache-pilot.json` and private plan/index/arrays; early failure `fresh-reader-failure.json`. No GPU training yet. Require `gate.passed == true`, then exact plan digest for next stage. Full commands in pilot protocol.
-- **Blend visible rehearsal FAILED before inference:** `ozgung/knee-reference-blend-rehearsal-20261008`v1, source`57bb203`, external/internal3600s. QualificationSHA`86f3456e0f385414fdaa528c30d1f56501337fad8ff583160ab450472994ee96`. Failed at8.34s because codec guard counted bothcp311/cp312 wheels. Fix selects exactthreecp312-compatible packages; regression and v2 retry pending. No training or predictions.
+- **Blend entry56925712 PENDING; final notebookv1 COMPLETE:** `ozgung/knee-reference-blend-submission-20261008`, launched00:10UTC, source`50f2803`, external28800s/internal28000s. RuntimePASS104.80s onvisible3; saved CSV exactly matches rehearsal, SHA`2aa5bde70b03e720b21435b9137d9b7560ff4256c4b6ae7059e12538f1fb9d25`. Entry submitted00:13:49UTC; fourdailyentriesremaining. QualificationSHA`f77fc5da880386f5a1f34f7f8386f5e043aeace3c4cf3149e54dc7187af8b5c8`. Rehearsalv1 failedbeforeinference due bothPythonABIs counted; fixedexact3cp312wheel selection+regression. v2rehearsal79.99s,zeroerrors/fallback,repeat0,projected22,340.51swithmargin,peakCUDA8.181GB. Cross-environment probability maxerrorConvNeXt2.812e-8/Raptor2.576e-4; allvisible ranks and finalblend exactly unchanged. Rawcross-environmentpixelidentity was not established. Receipts `outputs/kaggle/reference-blend-rehearsal-v2-result/reference-blend/`.
+
 - Poll jobs with `kaggle kernels status OWNER/SLUG`; read `kaggle kernels logs`; completed output via `kaggle kernels output`. Stop through notebook running-job controls if needed. Bounded jobs stop internally/external timeout; no recurring automation exists.
-- CLI authentication works. AtOctober7 23:36UTC: KaggleGPU28.91h,TPU20h; refreshOctober10 00:00UTC. ColabUI351.8compute units and zero sessions; expiryOctober18 historical/unverified. No local/Colab training active. Last freeMacdisk31GiB; initial localcache2GiB. Three lifetime entries; daily count must be rechecked after UTC reset.
+- CLI authentication works. AtOctober7 23:36UTC: KaggleGPU28.91h,TPU20h; refreshOctober10 00:00UTC. ColabUI351.8compute units and zero sessions; expiryOctober18 historical/unverified. No local/Colab training active. Last freeMacdisk31GiB; initial localcache2GiB. Four lifetime entries; fourdailyremaining at00:13UTCafterreset.
 
 ## Qualified reference evidence
 
@@ -40,14 +41,14 @@ Last updated: **2026-10-08 (Europe/Istanbul; 00:04 UTC)**. Read this first, then
 
 - Live community audit found accessible0.949 notebooks above Pilkwang0.891, both sharing an OAI-derived CoAtNet. OAI/model eligibility is unresolved, **not explicitly prohibited**; defer that checkpoint for now. ConvNeXt dataset Apache-2.0 and complete source; plain Raptor CC0 with ImageNet and competition training per author. Do not claim their gold scores are independent.
 - Predeclared one50/50 per-target percentile-rank blend with average ties, no gold/public weight search. Both readers run sequentially with actual hiddenIDs and strict failures. Estimated full blend4.58h with margin from separate environments; common-environment rehearsal required.
-- Fresh ImageNet pilot preserves original2,000/300 assignments then subsets512/200; originalStevenv1 SHA pinned. No gold evaluation; patient/report exclusions beforecache. Four fixed windows per six slots at224px, unknown0.5masked, confidence-weighted per-target macroBCE, EMA. CPU measured time/disk gates precede fullcache; CUDA64batch gate precedes at most4epochs/90min. Resumable own optimizer/RNG/order/checkpoints with cumulative budget; new source binds resume. Latest device metadata integrated`367ac30` for future builds, existingCPU64 remains source`1f1d788`.
+- Fresh ImageNet pilot preserves original2,000/300 assignments then subsets512/200; originalStevenv1 SHA pinned. No gold evaluation; patient/report exclusions beforecache. Four fixed windows per six slots at224px, unknown0.5masked, confidence-weighted per-target macroBCE, EMA. CPU measured time/disk gates precede fullcache; CUDA64batch gate precedes at most4epochs/90min. Resumable own optimizer/RNG/order/checkpoints with cumulative budget; new source binds resume. Latest device metadata integrated`367ac30`; direct attachment search/setup deadlines integrated`b736da6` for future builds. RunningCPU64 remains source`1f1d788`. Nested deadline cleanup fixed`9196c69`,1000subprocess expirations exercised before next build.
 - Prior low score is consistent with frozen224px three-series representation versus tuned multi-sequence public encoders; exact causal effects untested. Nonfat-suppressed sagittal/coronal coverage4,266/3,406studies suggests complementary inputs; metadata fluid/fat flags alone cannot distinguish T1/PD/T2.
 - No current approval blocker. No purchases, fullrawdownload, hostmessages or credential extraction. Earlier private prediction-fixture upload was rejected and never uploaded; safer own weights-only artifact succeeded.
 - `knee/model.py` remains an untrained toy; real pipelines are separate. Unit tests do not establish competitive quality or a full pipeline.
 
 ## Latest verification and handoff
 
-- Before blend integration: ML suite84tests,82exercised PASS/2optional source skips; dependency-free smoke PASS. Freshpilot independently reviewed; all resume/digest/macro-loss fixes addressed. CUDA training and resume still unverified.
-- Blend isolated-agent suite80/80 with real snapshots/receipts; parent integrated suite95tests:92exercised PASS,3optional source/receipt skips (`outputs/research/2026-10-08/tests-blend-integrated.log`). Generated notebook compiles,225,109bytes,private/offline with exactlytwo model datasets.
+- Aftercodecfix: full ML suite96/96PASS withallthreeauditedsource/receipt environment variables enabled; dependency-free smoke previouslyPASS. Aftersetupchange`b736da6`, suite abortedexit142 atnesteddeadlinecleanup test; fix`9196c69`verifiedbyfullsuite102/102PASS including1000nestedexpiry checks. CUDAtraining/resume stillunverified.
+- Latestpassinglog`outputs/research/2026-10-08/tests-integrated-sources.log`; failingtimeoutlog`tests-final-setup.log`. Fixedblend notebookcompiles,private/offline,exactlytwo modeldatasets. Localmatched-baseline helper preserved`outputs/analysis/fresh-pilot-baselines/compare_frozen_on_plan.py`, awaiting actualremoteplan; no refit/golduse.
 - Three managed agent worktrees active: `model-provenance`, `score-strategy`, `reference-rehearsal`; all commits integrated, independent blend review in progress. Preserve ignored evidence before archive. Prior47agentoutputs already preserved at`outputs/agent-archives/20261008/`.
 - Next: inspectCPU64receipt and resource gate; inspect shared-environment blend parity; launch fullcache or fixedblendentry only after their checks. Await standaloneConvNeXt score. Continue authorized experiments; target0.950 remains unachieved.

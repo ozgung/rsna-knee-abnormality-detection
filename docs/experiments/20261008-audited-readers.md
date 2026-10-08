@@ -94,3 +94,31 @@ Previous dependency-free smoke PASS. Independent review found no training source
 blocker after resume/digest/macro-loss fixes. Blend component contract/rank tests
 passed; actual mixed-ABI asset directory exposed a missing packaging case, now
 being covered. These checks do not establish model quality or score>0.950.
+
+## 00:13 UTC checkpoint
+
+Codecfix`50f2803`selects exactlythethreeauditedcp312/purePythonwheels whileignoring
+cp311copies. FullparentMLsuite96/96PASS withauditedsources/receipts enabled.
+Blendv2rehearsalPASS79.99s,zeroerrors/fallback,rawrepeat0,bothcomponentrankorders
+andfinalequalrankblendmatchoriginalstandalonevisibleCSVsexactly. ConvNeXtprobability
+maxdifference2.812e-8; Raptor2.576e-4 acrosssoftwareversions,consistentwithsmallFP16
+variation,notclaimed1e-6cross-environmentparity. Estimated1,300runtime22,340.51s
+with25%marginfromonlythreevisiblewarmupstudies; peakCUDA8.181GB.
+
+Finalblendnotebookv1launched00:10UTC,source`50f2803`,preservesqualifiedcodeenvironment,
+threewheelhashes andfourcheckpointidentities. VisibleauditprintedPASS104.80s;
+competitionentrynotyetsent. Evidenceunder`outputs/kaggle/reference-blend-*-result/`.
+
+CPU64isdecoding/writingarrays. Nextstagebuildernowusesexplicitsource/cachepaths
+andboundedsetup(`b736da6`),butparentfullsuitecaughtnestedSIGALRMcleanup race(exit142).
+Fixrequiredbeforeusingnewbuilder; currentCPU64doesnotusethisnewhelper. NoGPUtrainingyet.
+
+At 00:14 UTC, the final blend notebook was COMPLETE. Saved submission SHA
+`2aa5bde70b03e720b21435b9137d9b7560ff4256c4b6ae7059e12538f1fb9d25` matched
+the rehearsal exactly. **Entry 56925712** submitted at **00:13:49 UTC**, PENDING;
+four daily entries remain after the UTC reset. Standalone entry 56924358 also pending.
+
+Nested timeout cleanup fixed in `9196c69`: expired enclosing timers are not rearmed.
+Parent full suite **102/102 PASS**, including 1,000 nested expirations across subprocesses.
+CPU64 has reached 40 cached studies with no reported failure. Next CPU duration will
+be determined from the completed measured gate; training remains unlaunched.
