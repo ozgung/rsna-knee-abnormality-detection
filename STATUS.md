@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-08, 00:39 UTC** (Europe/Istanbul). Read this first, then [README](README.md) and [AGENTS](AGENTS.md).
+Updated **2026-10-08, 00:51 UTC** (Europe/Istanbul). Read this first, then [README](README.md) and [AGENTS](AGENTS.md).
 
 ## Current snapshot
 
@@ -18,15 +18,15 @@ Updated **2026-10-08, 00:39 UTC** (Europe/Istanbul). Read this first, then [READ
 | REF-02 | Scoring | Standalone ConvNeXt and fixed ConvNeXt/Raptor blend passed offline checks and were submitted. Await scores; preserve versions and inputs. |
 | TRAIN-02 cache | Running | Complete the 712-study CPU cache within the explicit 2-hour cap and unchanged 2 GiB limit. Require complete coverage and hash checks. |
 | TRAIN-02 CUDA diagnostic | PASS | 32 cached training studies, 64 successful updates in 98.21s; finite training loss decreased. No validation, gold or saved trained weights. |
-| TRAIN-02 fit | Gated | Complete cache -> measured CUDA throughput gate -> at most 4 epochs / 90 minutes on 512 train and 200 weak validation. Select only by weak BCE; compare the exact same validation cohort. |
+| TRAIN-02 fit | Prepared, gated | Cache-only notebook built at `outputs/kaggle/fresh-train`, source `fa8082d`. Complete cache -> measured CUDA gate -> at most 4 epochs / 90 minutes, 512 train / 200 weak validation. Select only by weak BCE; fixed train64 diagnostics and selected logits support paired comparison. |
 | TRAIN-03 | Conditional | Scale only if actual learning and held-out improvement justify it. Benchmark transfer/hardware before Colab expansion; reserve >=8 Kaggle GPU hours for qualification. |
 
 ## Live jobs and resources
 
 | Job | State and reproducibility |
 | --- | --- |
-| Entry **56924358** | PENDING at 00:33 UTC. `ozgung/knee-public-reader-submission-20261008` v1, submitted October 7 at 23:50:09 UTC. Standalone public ConvNeXt three-fold reader; notebook COMPLETE and exact visible parity. |
-| Entry **56925712** | PENDING at 00:33 UTC. `ozgung/knee-reference-blend-submission-20261008` v1, submitted October 8 at 00:13:49 UTC. Fixed 50/50 percentile-rank blend; notebook COMPLETE, source `50f2803`, internal 28,000s / external 28,800s. Four daily entries remained after submission. |
+| Entry **56924358** | PENDING at 00:49 UTC. `ozgung/knee-public-reader-submission-20261008` v1, submitted October 7 at 23:50:09 UTC. Standalone public ConvNeXt three-fold reader; notebook COMPLETE and exact visible parity. |
+| Entry **56925712** | PENDING at 00:49 UTC. `ozgung/knee-reference-blend-submission-20261008` v1, submitted October 8 at 00:13:49 UTC. Fixed 50/50 percentile-rank blend; notebook COMPLETE, source `50f2803`, internal 28,000s / external 28,800s. Four daily entries remained after submission. |
 | Full CPU cache | `ozgung/knee-fresh-cache-20261008` v1 launched **00:21 UTC**, source `ca6ff83`. Command: `kaggle kernels push -p outputs/kaggle/fresh-cache --timeout 7500`. Effective internal cap 7,200s; reuses CPU64 arrays. Build-contract source SHA `bd1a5733a89d5650e698555a05cb0ffab5a5b1eb37235d410bc329832b192e31`. Expected `fresh_reader_cache/cache-complete.json`, `cache-revised-gate.json`, private plan/index/arrays; early failure `fresh-reader-failure.json`. |
 | CUDA32 diagnostic | **COMPLETE/PASS**, `ozgung/knee-fresh-cuda-probe-20261008` v1, launched **00:33 UTC**, source `bf2cbe5`. Command: `kaggle kernels push -p outputs/kaggle/fresh-cuda-probe --timeout 900`. 600s cap, only CPU64 cache input, generic ImageNet download. Build source SHA `eb8556b5a206e80a671d58b8d87a647d713ecc1c9ac37a5a0ed8f9cedfbfe589`. Receipt: `outputs/kaggle/fresh-cuda-probe-result/fresh_reader_probe/probe-report.json`. |
 
@@ -54,7 +54,7 @@ Updated **2026-10-08, 00:39 UTC** (Europe/Istanbul). Read this first, then [READ
 
 ## Latest verification and next action
 
-- **108/108 full ML tests pass**, with audited sources/receipts enabled; dependency-free smoke PASS. Log: `outputs/research/2026-10-08/tests-probe-integrated.log`. Real CUDA diagnostic PASS; full fitting and resume remain unverified.
+- **116/116 full ML tests pass**, with audited sources/receipts enabled; dependency-free smoke PASS. Log: `outputs/research/2026-10-08/tests-evidence-integrated.log`. Real CUDA diagnostic PASS; full fitting and resume remain unverified.
 - Fixed two observed packaging issues: mixed Python-ABI codec selection and a nested SIGALRM cleanup race. The latter passed 1,000 nested expirations across subprocesses. Current data-plan-preserving budget override is `ca6ff83`.
-- Active implementation: `reference-rehearsal` agent adds selected-best weak prediction evidence, training diagnostics and cache-only training attachments; `score-strategy` independently reviews. No recipe, split or selection change. Preserve worktrees' ignored evidence before archive. Earlier 47 outputs are under `outputs/agent-archives/20261008/`.
-- Next: inspect the CUDA diagnostic and full-cache result/revised gate; launch bounded fitting only after complete cache checks. Full-cache log streaming returned two transient500 errors, while API/UI report RUNNING; do not infer completion or failure from missing logs. Continue score checks at sensible intervals. Target >0.950 remains unmet.
+- Evidence/packaging implementation `fa8082d` integrated and independently reviewed (32/32 focused checks). No recipe, split or selection change; no implementation active. Preserve worktrees' ignored evidence before archive. Earlier 47 outputs are under `outputs/agent-archives/20261008/`.
+- Next: inspect the CUDA diagnostic and full-cache result/revised gate; launch bounded fitting only after complete cache checks. Full-cache stream is now live: setup7.32s, cache104 at551.22s preprocessing, checked00:50:36 UTC; local stream session38256. Earlier500/empty logs resolved without restart. Fallback to a GPU worker was considered but not launched; receipt `outputs/research/2026-10-08/cache-worker-investigation.json`. Continue score checks at sensible intervals. Target >0.950 remains unmet.
