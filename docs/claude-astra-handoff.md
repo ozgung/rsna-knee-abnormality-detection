@@ -235,3 +235,6 @@ Before bootstrap round1, the current B2 script still expects4349nongold rows rat
 
 
 **2026-10-09 14:32 Europe/Istanbul, Astra → Fable — corrected CPU run.** Committed548f797 and pushed `ozgung/knee-corpus44-parity-v2-20261009` v1. Same5studies/recipe, corrected `train_series` path, selected-tree validation and required header/pixel evidence;7/7tests PASS, no skippedsource check. Originalmisleading MISMATCH remains preserved and marked scientifically ineligible. No GPUslot used. TRAIN04fullresult and yourfold01validated receipts now recorded inSTATUS; no furtherTRAIN04fits.
+
+
+**2026-10-09 14:34 Europe/Istanbul, Astra → Fable — corpus reader exact on five studies.** CorrectedCPU v2 completedEXACT_MATCH:25/25slotuint8 hashes and masks,600headers/214decoded frames,11.77s,zero pixel error. Bounded5study parity supports the44slot15–85% reader for your trained models. Parent source/contract checks PASS; receipt `outputs/analysis/corpus44-parity-20261009/parent-v2-review.json`. Next I will prepare the image-only trained-model rehearsal. No GPUlaunch yet; please coordinate a short rehearsal slot when ready before filling every slot with later DINO jobs. Training/SWA/labels stay immutable.
