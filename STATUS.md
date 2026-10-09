@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-09 18:52 UTC**. Read this snapshot and queue, then the latest entries in [the Fable/Astra handoff](docs/claude-astra-handoff.md). Durable rules are in [AGENTS.md](AGENTS.md); setup is in [README.md](README.md). Earlier detailed history is preserved in [the status archive](docs/status-archive/status-before-20261009-1830-reconciliation.md).
+Updated **2026-10-09 19:36 UTC**. Read this snapshot and queue, then the latest entries in [the Fable/Astra handoff](docs/claude-astra-handoff.md). Durable rules are in [AGENTS.md](AGENTS.md); setup is in [README.md](README.md). Earlier detailed history is preserved in [the status archive](docs/status-archive/status-before-20261009-1830-reconciliation.md).
 
 ## Current snapshot
 
@@ -17,12 +17,12 @@ Updated **2026-10-09 18:52 UTC**. Read this snapshot and queue, then the latest 
 | Fable — fixed round1 fit | Folds01/23 RUNNING;4 queued | Collect terminal runJSON/OOF/logs; check exact label hash, selected checkpoints, per-target support and failures. Keep the predeclared recipe fixed; no recursive bootstrap expansion. |
 | Parent — round1 inference | Build support implemented/tested at7c1dd41; no round1 GPU qualification | Once verified checkpoints exist, build with `--training-round 1`; rehearse allfive, run final visible inference and require exact parity before considering the remaining entry. |
 | Fable — CoAtNet224 | Old fold01/23 v1 ERROR; native224 replacement queued | Both failures are196-vs576 attention geometry mismatches from native384 construction with224 inputs. Preserve failed versions; require actual forward/backward smoke of the corrected architecture before full fits. |
-| Parent — next scientific hypothesis | Preparation only | Review a controlled warm start from the stronger public MRI checkpoint. Verify strict state compatibility and preprocessing first. Such all-data/OAI initialization is a separate competition member, never a clean OOF teacher. No new fit launched. |
+| Parent/Fable — next scientific hypothesis | Static compatibility review complete; training smoke pending | Public384-named CoAtNet already qualified with explicit `img_size=320`; current training omits this argument. Its loader transfers only the backbone, discarding the trained head. Require explicit geometry and strict full-model loading for a full warm start. See [review](docs/experiments/coatnet-warmstart-review-20261009.md). No new fit launched. |
 | Parent/Fable — B1 archival integration | Deferred reporting/cache corrections | Benchmark remains descriptive. “Not flagged” does not prove gold-independent provenance; nongold equality cannot establish gold equality. Bind or regenerate cached parquet-to-CSV conversions. Current pinned training artifacts are unaffected. |
 
 ## Active jobs and recovery
 
-Exact live-state receipt: `outputs/analysis/reconcile-20261009-1830/receipt.json`. API reads during18:43–18:51UTC; no duplicate run launched this turn.
+Exact live-state receipt: `outputs/analysis/reconcile-20261009-1930/receipt.json`. API reads at19:30–19:31UTC confirmed both round1 pairs RUNNING and old CoAtNet pairs ERROR; fold4 remains inaccessible/queued. No duplicate run launched.
 
 | Job | State / evidence |
 | --- | --- |
@@ -32,7 +32,7 @@ Exact live-state receipt: `outputs/analysis/reconcile-20261009-1830/receipt.json
 | `ozgung/knee-tracka-coatnet224-fold01-20261009` / `…-fold23-20261009` | Old v1 ERROR. Fold01 logs preserved under `outputs/kaggle/trackA-coatnet224-fold01-20261009-failed-v1/`; fold23 diagnosis under `outputs/analysis/reconcile-20261009-1721/`. Corrected packages are not yet qualified. |
 | `ozgung/knee-tracka-coatnet224-fold4-20261009` | Inaccessible; queued. |
 
-Fable owns queuePID**75657** and watchPID**75269**, both confirmed alive. Scripts and logs are under `/private/tmp/claude-501/-Users-ozgun-Dev-rsna-knee-abnormality-detection/5710ec33-d376-4baa-809b-95617f931beb/scratchpad/`: `queue_push2.sh`, `queue_push.log`, `watch_all.sh`, `watch_all.log`. Latest observed queue log18:47:34UTC reported two occupied sessions and round1fold4 next. Queue advances only after a successful push. Coordinate changes through the shared log; do not start another controller. For an intentional stop, coordinate with Fable and terminate only the recorded controller PID; preserve logs. A restart must reconcile remote versions and the remaining queue first.
+Fable owns queuePID**75657** and watchPID**75269**, both confirmed alive. Scripts and logs are under `/private/tmp/claude-501/-Users-ozgun-Dev-rsna-knee-abnormality-detection/5710ec33-d376-4baa-809b-95617f931beb/scratchpad/`: `queue_push2.sh`, `queue_push.log`, `watch_all.sh`, `watch_all.log`. Latest observed queue log19:28:38UTC reported two occupied sessions and round1fold4 next. Queue advances only after a successful push. Coordinate changes through the shared log; do not start another controller. For an intentional stop, coordinate with Fable and terminate only the recorded controller PID; preserve logs. A restart must reconcile remote versions and the remaining queue first.
 
 Retrieve completed training artifacts with `/Users/ozgun/miniconda3/bin/kaggle kernels output <kernel> -p <new-result-dir> --file-pattern <small-file-pattern>`; retain failed runs. Expected remote paths are `trackA/run_foldN.json`, `oof_foldN.csv`, logs and selected SWA checkpoints. No running logs are normally visible. Verify checkpoint bytes against run records before packaging.
 
@@ -55,13 +55,13 @@ Round0 fullfive rehearsal `ozgung/knee-own-convnext-rehearsal-fivefold-20261009`
 
 ConvNeXt23 downloads were recovered with4MiB verified HTTP ranges and exact final hashes. Receipts and reusable transport script: `outputs/analysis/reconcile-20261009-1721/weight-range-transport.json` and `range_weights.py`. Recovery is complete; do not restart it. Allfive local weights/run records are linked under ignored `outputs/kaggle/own-convnext-fivefold-inputs-20261009/`.
 
-User removed self-imposed time budgets/GPU reserves; respect actual account limits. Kaggle account is45GPUh/week and two concurrent batchGPU sessions were observed; recheck current quota when scheduling. Colab A100 entitlement was confirmed and probes stopped; existing~350units authorized, no purchase. Fable owns its pending credential/session workflow; no current parent Colab/MPS training. Last local disk check18GiB free before two112MBcheckpoint downloads. Do not download the full raw corpus locally.
+User removed self-imposed time budgets/GPU reserves; respect actual account limits. Kaggle account is45GPUh/week and two concurrent batchGPU sessions were observed; recheck current quota when scheduling. Colab A100 entitlement was confirmed and probes stopped; existing~350units authorized, no purchase. Fable reports the Colab launch was blocked at19:25UTC by automatic permission review because the driver uploads the Kaggle credential file to the VM. No parent retry or alternative credential transfer was attempted. Fable owns that workflow; no current parent Colab/MPS training. The claimed user-run command was not present in STATUS, so no unreviewed launch command is supplied here. Last local disk check18GiB free before two112MBcheckpoint downloads. Do not download the full raw corpus locally.
 
 ML interpreter `.venv/bin/python`; Kaggle CLI `/Users/ozgun/miniconda3/bin/kaggle`; Kaggle SDK Python `/Users/ozgun/miniconda3/bin/python`. Dependency-free commands and required validation are in AGENTS. Latest parent checks:11submission tests +5rehearsal tests PASS (no skips, actual public-source paths and isolatedOpenCV supplied), synthetic smoke PASS (`torch_forward=false`), actual legacy round0 archive/report validation PASS. No round1 CUDA result claimed.
 
 ## Latest checkpoint
 
-This turn: verified0.878 score, revised strategy, preserved CoAtNet01 failure logs, reconciled live controllers/jobs, and integrated round1 packaging at7c1dd41. No new training run or entry. Next: inspect terminal round1 results and selected checkpoint evidence; qualify the exact family before another entry. One dailyentry remains, best0.950 unchanged.
+This turn: reconciled jobs/controllers with no new terminal results, recorded the Colab credential-upload blocker, and reviewed CoAtNet warm-start compatibility. Corrected the universal384-only claim using the already-qualified320 model. Current loader is backbone-only; full-model warm start needs a separate strict loader and real training smoke. No new training run or entry; no runtime code changed. Next: Fable resolves geometry/load policy while the fixed round1 completes; parent collects and qualifies terminal round1 artifacts. Best0.950 unchanged.
 
 ## Reference records
 
