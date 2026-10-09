@@ -37,3 +37,7 @@ The builder attaches only the competition, the original MaViT dataset, the exist
 Focused local checks cover UID/split projection without accessing supervision fields, exact train order/disjointness, malformed membership, authentic v3 versus old/tampered receipts, isolated offline import, and mocked production call identity/order. Failure fixtures cover decode/inference errors, resource/deadline errors, repeat drift/nonfinite error, safe telemetry, output isolation, arrays unchanged, resource-snapshot failure and exhausted budget. Existing real-byte/source-AST/fatal-concurrency tests remain part of the full suite. Local mocks do not establish GPU or hidden-test success.
 
 Local verification before handoff: **301/301 full fixture tests passed**, no skips; the six focused diagnostic tests, dependency-free smoke and `git diff --check` passed. The genuine-v3 local build/import smoke produced a roughly 200 KB notebook without running inference. Logs and the non-launchable local smoke build are in ignored `outputs/analysis/mavit-hidden-failure-20261009/`; parent rebuilds from its committed revision before launch.
+
+## Launch
+
+Parent integrated as `f85e2ec` and reran all301 tests successfully in15.560s, plus synthetic smoke and diff checks. Launched `ozgung/knee-mavit-train2000-diagnostic-20261009` version1 at approximately08:00UTC, October9; CLI confirms RUNNING. Contract SHA256 `7faba8d7a73216ef19056b17b9cf28f514aa6ef999446ed5e8ef3953b7ef6594`. Result is pending. Expected active processing45–60minutes is informational; no assistant-imposed runtime budget.
