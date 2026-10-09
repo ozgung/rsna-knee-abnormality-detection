@@ -15,3 +15,9 @@ Build script `scripts/build_own_model_rehearsal.py` requires source,private mani
 ## Integrated candidate build
 
 Parent integrated2470ed3;5/5 focused checks passed with explicit source environment and isolatedtestOpenCV, including16reader stresses. Actualmodel architecture load remains prospectiveCUDA. Build `outputs/kaggle/own-convnext-rehearsal-fold01-20261009/`, notebookSHA `fcaa72ac5a9c655622b5302ffc34f070c8bf2f4e63af0a2d8a5fdd53f96801da`, contract `7a8ddac0021c34bedbd543e8b643d70b152adbe9974cfdea55ef9c088dc3de33`. Candidatefolds0/1; complete_family=false. The build was not launched because both known GPU sessions are active; requested priority through Fable's existing queue. No new polling controller or duplicateGPUjob.
+
+## Fold01 remote result
+
+Fable launched v1 of `ozgung/knee-own-convnext-rehearsal-fold01-20261009`; parent retrieved and verified COMPLETE/PASS on October9 at17:30UTC. Elapsed58.504s on TeslaT4/CUDA12.8, torch2.10.0, timm1.0.26. Strict loaded folds0/1; all25training slots, masks and windows exact; training probability and repeat errors exactly zero; finite missing-plane predictions, all16reader stresses PASS. Peak hostRSS1,943,810,048bytes; peakCUDA311,775,744bytes. Visible CSV SHA `0329fe72f5c3a9e569a0413f6e48c374c56051c3af48e63b55eb818fd1715871`. Parent contract/result and CSV hash validation PASS. Receipt `outputs/analysis/own-model-rehearsal-20261009/fold01-parent-review.json`; remote report and CSV in `outputs/kaggle/own-convnext-rehearsal-fold01-20261009-result/own_model_rehearsal/`.
+
+This is bounded two-fold execution evidence; the fullfive family still needs its exact checkpoint set exercised. No accuracy or hidden-test success claim follows from this pass. First-fold inference included7.6s warmup versus0.34s for the second fold; do not extrapolate a hidden runtime from that timing alone.
