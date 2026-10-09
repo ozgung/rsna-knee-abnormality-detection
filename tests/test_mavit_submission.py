@@ -19,8 +19,8 @@ from knee import mavit_submission as s, mavit_rehearsal as r
 
 ROOT=Path(__file__).resolve().parents[1]
 PARENT=Path(os.environ['KNEE_REFERENCE_PARENT']) if os.environ.get('KNEE_REFERENCE_PARENT') else None
-BUILD=PARENT/'outputs/kaggle/mavit-image-rehearsal-20261009v1' if PARENT else None
-RESULT=PARENT/'outputs/kaggle/mavit-image-rehearsal-20261009v1-result/mavit-rehearsal' if PARENT else None
+BUILD=PARENT/'outputs/kaggle/mavit-image-rehearsal-v3-20261009' if PARENT else None
+RESULT=PARENT/'outputs/kaggle/mavit-image-rehearsal-v3-20261009-result/mavit-rehearsal' if PARENT else None
 
 
 def builder():
