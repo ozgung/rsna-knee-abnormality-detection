@@ -121,6 +121,8 @@ Use `/Users/ozgun/miniconda3/bin/kaggle kernels status OWNER/SLUG`, `kernels log
 
 ## Latest session checkpoint
 
+2026-10-09 13:04 Europe/Istanbul: recorded the user's model-cost preference in AGENTS and shared it with Fable: Sol/Luna routine workers, Astra high for critical decisions, compact handoffs and evidence reuse. Documentation-only; content/diff checks, no runtime tests needed. Existing jobs unchanged; next remains smoke-result collection and Fable's full-fold adapter review.
+
 October9, 12:59 Istanbul: coordinated work split accepted and public smoke launched as v1 from281c7ff; CLI RUNNING. Parent12focused tests PASS, full313agent tests PASS, metadata build and exact source hashes PASS. MaViT57003785 has now failed hidden rerun with generic error/empty score; defer more MaViT entries until concrete new evidence. Quota before smoke37.57GPUh remains, resetOct10 00:00UTC. TRAIN04 recovery stillRUNNING. Pinned worktree could not be archived; retained safely. Next: collect smoke result, review Fable's gold-free checkpoint/export fix and avoid overlapping fullfold launches.
 
 October9, 13:00 Istanbul: synchronized with Fable's revised plan and recorded ownership/accepted user approvals in the shared log. The old600reserved rows may join new grouped CV; gold+related rows remain excluded. Flagged that the proposed verbatim fast path still gold-selects its primary checkpoint despite --oof_every, with exact repair requirements sent to Fable before scaling. Integrated four reviewed smoke files; agent313/313 tests PASS, parent12/12 focused tests PASS. No new GPU launch this turn and no duplicate fold0. Next: publish exact smoke interface, coordinate one smoke launch with Fable, and review their gold-free full-fold adapter.
