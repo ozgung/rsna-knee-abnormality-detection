@@ -58,3 +58,5 @@ Prospective correction: permit absolute cross-process probability error≤1e-4 (
 ## Submitted version
 
 Entry56978342 acceptedPENDING onOctober8at23:44:10UTC: `ozgung/knee-mirror-submission-20261009`v1, build85f3de4. Freshvisible qualification45.2801s and finalfullvisible45.9177s PASS. Both independently satisfy≤1e-4against the immutable67rehearsal CSV (8.6725e-5 and6.6340e-5 respectively), with identicalranks/ties. Their pairwisedifference1.29223e-4 is within the corresponding2e-4trianglebound; the fixedreferencepolicy was not relaxed. FinalCSV SHA7943d3acd89246fd5355607346ac06201d356f4881895d8fdf679bc175c143fc. Finalreceipt`outputs/analysis/mirror-submission-20261009/final-visible-verification.json`; hiddenresultpending, no scoreclaim.
+
+October9at02:06:44UTC: API confirmsentry56978342COMPLETE, publicscore**0.949**, emptyerror. Thisisourreproducedresult, +0.012vs62-windowblend0.937. Receipt`outputs/analysis/mirror-submission-20261009/entry-latest.json`. Targetstrictlyabove0.950remainsunmet; frozenVersiacandidatewasrecordedbeforethisscore.
