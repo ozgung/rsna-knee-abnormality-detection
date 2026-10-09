@@ -51,3 +51,7 @@ New private offline notebooks `ozgung/knee-mavit-visible-v3-20261009` v1 and `oz
 Repaired **entry 57003785** was submitted at **2026-10-09 09:28:35.770 UTC** and is pending. Two daily submissions remain. Original entry 56989116 remains failed and preserved. The broad PASS supports retrying the qualified narrow repair; it neither establishes the original hidden cause nor guarantees the new hidden rerun.
 
 Receipts are in `outputs/analysis/mavit-hidden-failure-20261009/`: `broad-result-review.json`, `final-production-review.json`, `remote-final-review.json`, `entry-v3-latest.json`. Full outputs are under `outputs/kaggle/mavit-{train2000-diagnostic,visible-v3,submission-v3}-20261009-result/`. No runtime changes were made during this requalification; the existing 301-test result remains applicable. Official rules were fetched at09:24UTC and match the07:44 snapshot.
+
+### Hidden result,09:58UTC
+
+Entry57003785 returned COMPLETE with empty score and the generic unhandled notebook rerun error. The narrow malformed-element repair and2,000-study PASS did not resolve the hidden failure. Preserve both submitted notebooks and failures; no further resubmission or broad GPU diagnostic is planned without concrete new evidence. Primary effort returns to the own-training campaign. Exact error is in `outputs/analysis/mavit-hidden-failure-20261009/entry-v3-latest.json`.
