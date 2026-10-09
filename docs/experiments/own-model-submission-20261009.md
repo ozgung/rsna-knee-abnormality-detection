@@ -1,6 +1,6 @@
 # Own five-fold ConvNeXt final inference package
 
-October 9, 2026: own round0 entry57016778 submitted after fullfive rehearsal and final visible CUDA checks passed. Scoring is pending. Parent owns qualification, launches and entries; the implementation worker performed build-only work. Exact evidence and entry details are below. See [rehearsal protocol/result](own-model-rehearsal-20261009.md).
+October 9, 2026: own round0 entry57016778 submitted after fullfive rehearsal and final visible CUDA checks passed. Public score is **0.878**, below the existing0.950 best. Parent owns qualification, launches and entries; the implementation worker performed build-only work. Exact evidence and entry details are below. See [rehearsal protocol/result](own-model-rehearsal-20261009.md).
 
 `scripts/build_own_model_submission.py` accepts a fresh destination, slug, `--rehearsal-build`, `--rehearsal-report` and `--rehearsal-csv`. It rejects any subset or non-PASS result before packaging. The completed rehearsal must qualify ordered folds 0–4, all 25 raw/corpus slot comparisons, window/probability/repeat parity, strict SWA loading and existing reader stresses. Notebook, contract, definitions, scientific dependency closure, codecs, environment and visible CSV are hash-bound; the archived executable must match its exact reconstruction. Any scientific dependency change requires another rehearsal. The archived closure is checked separately from the added final runtime and metadata-reader modules.
 
@@ -16,7 +16,7 @@ A SHA256 fingerprint of the known ordered visible IDs triggers byte-exact CSV co
 
 Verification in the managed worktree: primary `.venv/bin/python -m unittest discover -s tests -p test_own_model_submission.py -v` passed **8/8**, including static-three-row sample with four hidden studies, metadata/order/schema failures, NaN/range failures, subset rejection before build, hash drift, scientific source drift even after notebook rehashing, immutable output directories, attachment closure and isolated import of embedded modules. Synthetic builder fixtures deliberately mock the reader digest; they establish builder behavior, not real qualification or CUDA inference. `.venv/bin/python -m knee.smoke` passed on synthetic data with `torch_forward=false`.
 
-Qualification and final visible execution are complete. Next inspect the pending hidden entry. Full hidden runtime and predictive performance remain unverified.
+Qualification and final visible execution are complete. Hidden scoring returned0.878; hidden runtime was not exposed. The planned blind public-member fusion is deferred.
 
 ## Actual final run and entry
 
@@ -26,7 +26,7 @@ Parent integrated204757d and reran8/8 focused tests plus synthetic smoke. Fullfi
 
 Submitted this frozen version as **entry57016778**, October9 at17:56:30.437UTC. API confirmed PENDING, empty score. CLI reports **one submission remaining today**. This is the first own full-pool five-fold round0 probe; public best remains0.950. Current training uses4345 eligible nongold/nonrelated studies, generic pretrained initialization, fixed public blended report supervision,10epochs/fold and top3SWA selected on report-mask heldout folds. Fold export AUCs0.880946/0.882341/0.881449/0.878534/0.889545 measure noisy report labels, not the hidden competition score.
 
-No hidden performance or fullhidden runtime guarantee follows from bounded rehearsal and visiblePASS. Next: inspect entry57016778 status/score/error; preserve this immutable reference before interpreting round1 or proposing fixed public-member fusion. Do not repeat this submission blindly.
+On October9 at18:43UTC, entry57016778 was observed COMPLETE with publicscore **0.878**. Preserve this immutable reference for the fixed round1 comparison. The planned equal-rank public-member fusion is deferred because the standalone deficit is large and complementary gain has not been demonstrated. Fullhidden runtime was not returned. Do not repeat this submission.
 
 
 ## Round 1 build-only support

@@ -2,6 +2,18 @@
 
 The user replaces the previous >0.950 milestone with **top 10 in the competition**. Current public AUC **0.962+** is a provisional waypoint, not a guaranteed final rank or private score. Our verified best remains 0.950 from public checkpoints. No additional training or submission was launched for this research update.
 
+## Current priority after the own-model result (2026-10-09 18:45 UTC)
+
+Own round0 entry57016778 scored **0.878**, versus the fixed public-method best0.950. The five-fold raw/corpus and final-visible checks passed exactly, and the public result is broadly consistent with the model's descriptive gold results. This makes an undetected gross inference mismatch less likely; it does not prove every hidden input is handled identically or establish the causal source of the accuracy gap. The five report-mask validation AUCs0.879–0.890 were not evidence of a0.95-class clinical model.
+
+1. **Finish the already-running fixed round1 comparison.** Exact bootstrap labels passed the artifact audit. Keep its recipe, folds and parameters fixed; package its actual fitted weights with explicit kernel/label binding and image-only qualification. Report its validation as biased by globalOOF teacher exposure. No recursive bootstrap expansion or gold-selected label switch. One October9 entry remains; assess round1 as a standalone comparison if qualified.
+2. **Cancel the blind round0/public equal-rank fusion probe.** A0.071 standalone deficit against the0.949 public member does not support spending the remaining entry without complementarity evidence. DINO likewise stays deferred after both its standalone weakness and the measured negative blend result.
+3. **Test the corrected CoAtNet geometry before full fits.** Fable owns the native224 model replacement. Require a real forward/backward smoke; then use the fixed family comparison already planned. Larger architecture or resolution may help, but neither is established as the explanation for the gap.
+4. **Prioritize a controlled domain-initialization comparison over another generic backbone sweep.** The existing0.949 public MRI member is a stronger starting point than our0.878 ImageNet-initialized model. Audit compatible backbone/state mapping and public checkpoint provenance, then design a small warm-start adaptation with the same preprocessing and a fixed label/loss policy. Public all-data/OAI initialization must be a separately identified competition member, never an independent OOF teacher or clean local-validation claim. This is the next hypothesis to prepare, not a launched run or an explanation attributed to top teams.
+5. **Require predictive evidence before adding cost or model count.** Use the observed round1 and CoAtNet results to choose the next controlled change. Keep the0.950 artifact intact. Top10 remains the target; there is no evidence yet that the current own-training recipe is close to0.962.
+
+The earlier plan below is historical context. The user has since released the former600reserved studies for new CV, yielding4,345 eligible nongold/nonrelated studies; historical TRAIN04 splits remain frozen. TRAIN04 and MaViT expansion were retired after their recorded outcomes. These current priorities supersede the older pending-job and reserved-split statements below.
+
 ## Current evidence
 
 A fresh authenticated leaderboard read shows leaders at 0.964, ranks 7–9 at 0.962, and rank 10 at 0.961 (displayed precision). The user reports our rank near 500. The threshold will move; use rank and current official results rather than treating0.962 as a permanent success criterion. [Leaderboard](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/leaderboard).
