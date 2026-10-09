@@ -61,3 +61,30 @@ Four-fold pooled report AUC on3,476 distinct heldout studies: **0.880448 → 0.8
 | Fracture | 214 / 2944 / 318 | +0.01879 | +0.02418 |
 
 Evidence: `outputs/analysis/round1-fold23-parent-audit-20261009/audit.json` and `audit.py`. Per-target AUC and supports reproduce receipts within1e-12. Fullfive image-only qualification remains pending fold4. Current checkpoint transport status is in [STATUS](../../STATUS.md).
+
+## Fullfive training artifacts accepted
+
+Final fold4 audit:45 checks PASS. Fold4 report AUC0.889545→0.900207,869studies, selectedSWA epochs[9,8,7]. All4,345 eligible studies are covered exactly once in the pooled validation predictions. All12 targets improve on fold4 and in the fullfive pooled comparison; fold0MCL remains the sole negative fold/target change.
+
+Pooled raw-report AUC: **0.882137 → 0.893651**, delta+0.011513. Fable's0.867392→0.879288 comparison also reproduces: it evaluates thresholded `labels_v1_blend` targets, whereas this audit uses raw `train_labels_v1 y_`; both use the same addressed-cell masks. These are different target definitions, not an unexplained discrepancy. Neither is independent clinical CV because globalOOF exposure and checkpoint selection remain. No gold-driven changes or automatic round2 follow from these numbers.
+
+| Target | Positive / negative / unaddressed | Round0 pooled | Round1 pooled |
+| --- | --- | ---: | ---: |
+| ACL | 518 / 3619 / 208 | 0.924557 | 0.934517 |
+| MCL | 110 / 3971 / 264 | 0.840993 | 0.857991 |
+| Medial Meniscus | 1663 / 2498 / 184 | 0.867032 | 0.881485 |
+| Lateral Meniscus | 607 / 3490 / 248 | 0.809857 | 0.823530 |
+| Medial OA | 744 / 3376 / 225 | 0.895330 | 0.902972 |
+| Lateral OA | 366 / 3731 / 248 | 0.847164 | 0.860241 |
+| PF OA | 884 / 3228 / 233 | 0.846098 | 0.852816 |
+| Effusion | 1086 / 3018 / 241 | 0.924584 | 0.929704 |
+| Synovitis | 448 / 1710 / 2187 | 0.947710 | 0.954293 |
+| Baker's | 540 / 2199 / 1606 | 0.903804 | 0.918102 |
+| Contusion | 841 / 3107 / 397 | 0.877239 | 0.890511 |
+| Fracture | 269 / 3682 / 394 | 0.901277 | 0.917645 |
+
+Final checkpoint112,185,311bytes SHA `2ae47c3e8afed5a4ab3e8ffaca92c59899d84820f8ccc637871898354e3dbaeb` verified. Allfive weights and run records staged in `outputs/kaggle/own-convnext-r1-fivefold-inputs-20261009/`. Immutable fullfive rehearsal built from6b289e5 at `outputs/kaggle/own-convnext-r1-rehearsal-fivefold-20261009/`: notebookSHA `1f5be813a5b19f767cb13ed12c519c54e81adb6e69298e05553d79406fc8fdba`, contractSHA `256b8623d0820c66cca19ea687e70ed428443f4e6bcd26049d2fd8d5ba618630`. Actual launch was rejected by Kaggle's two-session GPU limit; no runtime qualification or entry yet.
+
+Parent held the remaining long-fit queue and installed a one-shot rehearsal launcher for the next real free slot, leaving both running fits intact. The first direct push rejection and launcher startup failures are retained under `outputs/analysis/reconcile-20261009-2330/`; see STATUS for exact live state and recovery. The launcher retries only explicit capacity rejection, stops on unknown push outcome, and avoids duplicating an existing job.
+
+Fullfive audit and metrics: `outputs/analysis/round1-fold4-parent-audit-20261009/audit.json`. No inference source changed; actual metadata/build/hash checks passed, existing runtime tests were not repeated. Fullfive GPU rehearsal and final-visible equality remain mandatory before submission.
