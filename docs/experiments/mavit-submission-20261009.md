@@ -1,6 +1,6 @@
 # Standalone MaViT production packaging — October 9, 2026
 
-Implemented for review; **standalone visible and hidden execution remain unrun**. This is one public MaViT model with raw sigmoid outputs, not a fusion or training experiment. Training lineage, predictive quality and independence remain unknown. No claim above the current0.949 best follows from successful execution.
+Implemented, reviewed and qualified on visible data; **entry56989116 is pending; hidden execution and public score remain unverified**. This is one public MaViT model with raw sigmoid outputs, not a fusion or training experiment. Training lineage, predictive quality and independence remain unknown. No claim above the current0.949 best follows from successful execution.
 
 The authentic [MaViT67 rehearsal](mavit-rehearsal-20261009.md) passed162.977s on a TeslaT4:67/67 exact healthy volume/mask/position comparisons, exact same-model public probabilities, repeat error0,16stress checks, and zero masked/decoder/resource failures. It observed SciPy1.16.3, CUDA12.8 and cuDNN91002. Source/rehearsal revision `678d31c`; complete strict CPU checkpoint SHA256 `7acd2a990a89c7a7d73ec0488badc5058a61b0c77142742c532ebc196749bdbc`. Authentic build/result are under `outputs/kaggle/mavit-image-rehearsal-20261009v1{,-result}/`; parent independently verified them. No repeat67 run is needed.
 
@@ -62,3 +62,21 @@ KNEE_REFERENCE_PARENT=/Users/ozgun/Dev/rsna-knee-abnormality-detection \
 ```
 
 Ignored local checks and smoke builds: `outputs/analysis/mavit-submission-20261009/`. Rebuild after integration; do not upload pre-review smoke packages. No commits, launches, submissions, checkpoint/image downloads or STATUS edits were performed by this implementation task. Parent owns the actual visible/full execution, parity review and any subsequent submission.
+
+## Real standalone qualification
+
+Parent integrated five exact reviewed files as1581c7c;294/294 fixture tests passed with zero skips, plus synthetic smoke/compile/import and independent8focused tests. The independent review reproduced and cleared a late-output cleanup defect; original1e-6 tolerances and scientific bytes were unchanged.
+
+Visible notebook `ozgung/knee-mavit-visible-20261009v1`v1 completedPASS51.158seconds. Independent17check review confirmed archived source/build/receipt/environment and official3ID/12target schema. Its CSV is byte-identical to the immutable67 result; repeat error0. ReportSHA `df3d1021e5a8cf549bb83777f59afb2334d10c234964dd4fcfb706ac00a33c26`.
+
+Full-mode notebook `ozgung/knee-mavit-submission-20261009`v1, built fromc62d631, completedPASS51.311seconds on the visible data. Parent confirmed exact immutable67 predictions, repeat0, exact root/nested CSV and official coverage. Full receiptSHA `cac1a7ac53e3ec4734ce66a4d7687665af8ec346e28e8cd3b0bfbbe8b44c7921`; finalCSV SHA `3073b05627cee80ed9a3c745d354fd4cfc1cc862a23425caab838640fb48bec6`.
+
+Both modes use qualification `8dafd8783324474399b43d641b0c12c1a4c6f47721be75c5301b4ca71d3fc8ee` and sourcebundle `c4bdbfa2e607e204b497f8fdba1c274dfdd95511d2b387ddd69003f178617349`. Full notebookSHA `4bed725af0e1409d5eab9fbaf36184859e9344ba4bd1216a47af3aaf73f7ff75`. Results `outputs/kaggle/mavit-{visible-20261009v1,submission-20261009}-result/`; reviews `outputs/analysis/mavit-submission-20261009/`.
+
+Prospective accuracy comparison: exact raw-probability standalone versus immutable mirror0.949, conditional on pending fusion not already achieving>0.950. No local gold/sealed evaluation or blend-weight search; unknown public training lineage limits independent validation claims. October9at03:36UTC Kaggle allowed four additional entries. Full-mode visible success does not establish hidden execution or accuracy.
+
+## Competition entry
+
+Independent full-mode18check review passed, then official SDK confirmed remote current_version_number1 and parent compared the retrieved remote executable exactly with the reviewed build. Submitted immutable `ozgung/knee-mavit-submission-20261009`v1 as **entry56989116** at2026-10-09 03:40:40.807UTC. API03:40:53UTC PENDING, empty score/error; three daily submissions remain. Entry receipt `outputs/analysis/mavit-submission-20261009/entry-latest.json`; independent full review `independent-full-review.json`, remote version/executable review `remote-version-review.json` in the same directory. Fusion56986393 remains pending; best mirror0.949 unchanged.
+
+The CLI version-suffixed pull returned403; supported owner/slug retrieval succeeded, and its metadata version1 and exact executable were separately verified through the SDK. No retry submission or source change occurred. Wait for the actual public result before deciding on the prospectively described mirror–MaViT blend.
