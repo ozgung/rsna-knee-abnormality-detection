@@ -123,3 +123,9 @@ The user-authorized next experiment uses the full eligible pool with group-disjo
 public folds, excluding gold and related studies; historical reserved roles here
 apply only to this fixed smoke. Fable owns full-fold orchestration, with a separate
 prospective protocol and gold-free checkpoint selection. Do not launch duplicate folds.
+
+## Real CUDA result — October9,10:26UTC verified
+
+Private v1 completed and `require_result` passed against the immutable build contract. All10 updates were accepted, no AMP overflow skips, nonzero encoder/nonbias-head movement and exact checkpoint save/reload predictions. Runtime70.6559s; peak allocated CUDA5,683,744,256bytes, hostRSS2,738,987,008bytes. Initial train BCE0.754692 fell to0.660012/0.638015 after epochs1/2. Training-only thresholded-soft macroAUC was0.661530/0.718516, all12targets defined. The cohort-mean prevalence BCE is0.463394; the smoke is not a competitive-model or held-out validation result. No fitted weights were exported.
+
+Report: `outputs/kaggle/public-training-smoke-20261009-result/public_training_smoke/smoke-report.json`; reconciliation receipt: `outputs/analysis/reconcile-20261009-1025/receipt.json`. Generic initial tensor hash `cb3175833c8122324aea80d6084d8c5c6b4b76f55c42203bb815085f9379f27b`; first-observed selected-corpus hash `775127431414c1bd1a0f20e0378f98e32e725c9d9b4c2330e4c0344e3d72d7a8`. Fable already owns fullfold training; no duplicate fold launch follows this PASS.
