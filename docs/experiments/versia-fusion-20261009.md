@@ -1,6 +1,6 @@
 # Frozen Versia fusion: common rehearsal and full packaging
 
-Implemented locally; the new composite has **not yet run on CUDA or been submitted**. Parent owns review, launch, receipt retrieval and submission. Existing scientific modules, checkpoints and scored notebooks are unchanged. The frozen specification predates the newly scored mirror entry; no target weight is selected from our labels or scores.
+Implemented, reviewed and qualified on CUDA. Entry **56986393** was submitted October 9 at02:35:44UTC and is awaiting evaluation; no fusion score is known yet. Existing scientific modules, checkpoints and scored notebooks are unchanged. The frozen specification predates the newly scored mirror entry; no target weight is selected from our labels or scores.
 
 The fixed [published source](https://www.kaggle.com/code/evgendvorkin/rsna-versia-5) snapshot is `outputs/analysis/mirror-fusion-spec-20261009/spec.json`, SHA `61931a5687982af68f50df34a6a67fbbc76ff875869758f08e0d8b3dac41a4cd`. Mirror retains native320/K94, two-view mean probabilities and its reviewed partial-input policy. ConvNeXt retains16 windows, paired fat/nonfat candidate-list copying before best-series selection, three pinned folds, batch4/four workers and the normal last remainder. The official test CSV order determines batching and mirror tie breaking; source metadata order still resolves equal series-size candidates.
 
@@ -61,3 +61,14 @@ KNEE_RAPTOR_SOURCE=/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/rese
 ```
 
 Local four-worker tests need the normal process/IPC permission allowed by the reviewed shell execution; restricted sandbox IPC can fail independently of code. Final fixture-enabled suite: **262/262 PASS**; dependency-free smoke PASS (`torch_forward:false`); source compile and diff checks PASS. The full log is `outputs/analysis/versia-fusion-20261009/tests-full.log`. Parent and independent read-only source reviews found no blocker; real common CUDA probabilities/runtime remain untested. A temporary build-only smoke artifact resides in primary ignored `outputs/analysis/versia-fusion-20261009/build-smoke-v1/`; it predates final review and must not be launched. No private/generated artifacts are stored outside primary ignored outputs after temporary test directories are removed.
+
+
+## Qualified runs and submission
+
+Common rehearsal `ozgung/knee-versia-fusion-visible-20261009` v1 (source4e2d62d) passed in111.242seconds. Both component repeats were exact. Against the immutable67 references, mirror maximum absolute drift was0.000009626150131225586 with unchanged pairwise ranks/ties; ConvNeXt was exact. All three independent ConvNeXt tensor comparisons were exact. The repeated batch2 diagnostic was exact within its shape; versus batch3 its maximum drift was0.00007164478302001953, with unchanged pair ranks. It did not alter production predictions. Zero resource/decode/whole-empty failures occurred. Aggregate evidence: `outputs/analysis/versia-fusion-visible-20261009/result-review.json`.
+
+Final notebook `ozgung/knee-versia-fusion-submission-20261009` v1 (build7d290ae, science4e2d62d) passed its actual full-mode visible execution in72.351seconds. Parent and agent independently verified complete component receipts, official3-study/12-target order and coverage, exact frozen fusion recomputation and root/nested CSV equality. Mirror drift versus the same immutable67 reference was0.00001621246337890625; ConvNeXt remained exact. The final ranked CSV was also byte-identical to the common rehearsal. No tolerance was changed. Peak component CUDA allocation was4.168GB and reservation5.922GB on the visible cohort; these are not hidden-test memory bounds.
+
+Shared qualification SHA256: `2eeed70189b2a9b8467cd1eae73dc8b14d651989381eeaf803baadd5a19261d0`. Source bundle: `1c8e3b3fd9d52b948266284b1e0e7ccf160d52e55976ac2f6e75817059abe077`. Final CSV: `ae4adade688869371eaea39a29a8fcdb6d52378429a237d7a64d3af20b609e8a`. Final notebook: `cb224fb28d9fff30187d72b22af581789b330fe52dc5993cfdbae33578853648`.
+
+Entry56986393 was accepted at02:35:44.190UTC; API verified PENDING with empty score/error at02:36:06UTC. The CLI reported four submissions remaining today. This is the first October9UTC entry. Preserve current best0.949 until the new score is returned. Exact result and entry receipts: `outputs/analysis/versia-fusion-submission-20261009/{result-review,entry-latest}.json`; build/results under `outputs/kaggle/versia-fusion-submission-20261009*`. Hidden runtime, score and rank stability remain unverified.
