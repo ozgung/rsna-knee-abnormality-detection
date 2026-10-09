@@ -8,13 +8,16 @@ builder=importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(builder)
 READER='synthetic-reader';FROZEN='e331776e19800ef584c653cb9bb90698ff708027b0f9f483ce7afb18338a2f35'
 
 
-def fixture():
+def fixture(training_round=None):
     sources={n:(builder.ROOT/n).read_text() for n in builder.FILES};model='pass\n'
     members=[{'fold':f,'kernel':final.KERNELS[0 if f<2 else (1 if f<4 else 2)],'run_file':f'run_fold{f}.json',
               'run_sha256':'a'*64,'checkpoint_file':f'fold{f}.pt','checkpoint_sha256':'b'*64,'selected_epochs':[8,9,7]} for f in range(5)]
     c={'complete_family':True,'settings':final.own.SETTINGS,'members':members,'model_source_sha256':smoke.SOURCE_SHA,
        'reader_sha256':FROZEN,'model_definitions_sha256':smoke.digest(model.encode()),
        'sources':{n:smoke.digest(s.encode()) for n,s in sources.items()},'codecs':builder.CODECS}
+    if training_round is not None:
+        c.update(training_round=training_round,labels_file=final.LABEL_PINS[training_round][0],labels_sha256=final.LABEL_PINS[training_round][1])
+        for m in members:m['kernel']=final.ROUND_KERNELS[training_round][0 if m['fold']<2 else (1 if m['fold']<4 else 2)]
     report={'status':'PASS','contract_sha256':smoke.digest(smoke.canonical(c)),'qualified_folds':list(range(5)),
             'train_studies':5,'test_studies':3,'settings':final.own.SETTINGS,'labels_read':False,
             'training_parity':[{'slots':[{'exact_hash_match':True,'mask_match':True} for _ in range(5)],'windows_exact':True} for _ in range(5)],
@@ -94,8 +97,8 @@ class OwnSubmissionTests(unittest.TestCase):
                 with self.assertRaises(ValueError):builder.build(root/'new','own-test',rehearsal_build=root,rehearsal_report=root/'report.json',rehearsal_csv=root/'absent')
             self.assertFalse((root/'new').exists())
 
-    def archive(self,root):
-        sources,model,c,report=fixture()
+    def archive(self,root,training_round=None):
+        sources,model,c,report=fixture(training_round)
         code=("import time,sys,hashlib\nfrom pathlib import Path\nSTARTED=time.monotonic()\n"
           f"SOURCES={sources!r}\nCONTRACT={c!r}\nREADER={READER!r}\nMODEL={model!r}\n"
           "base=Path('/kaggle/working/own_model_code')\nfor name,source in SOURCES.items():\n"
@@ -107,7 +110,7 @@ class OwnSubmissionTests(unittest.TestCase):
         receipt={'notebook_sha256':smoke.digest(blob),'notebook_bytes':len(blob),'contract_sha256':smoke.digest(smoke.canonical(c)),
                  'candidate_folds':list(range(5)),'complete_family':True}
         meta={'enable_internet':False,'enable_gpu':True,'is_private':True,'dataset_sources':[*smoke.CORPORA,'goodpjw2008/rsna-knee-2-5d-convnext-reader'],
-              'kernel_sources':[smoke.IDENTITY_KERNEL,*final.KERNELS],'competition_sources':['rsna-knee-abnormality-detection'],
+              'kernel_sources':[smoke.IDENTITY_KERNEL,*final.training_policy(c)],'competition_sources':['rsna-knee-abnormality-detection'],
               'model_sources':[],'docker_image':builder.DOCKER_IMAGE}
         (root/'notebook.ipynb').write_bytes(blob)
         for n,v in [('build-contract.json',c),('build-receipt.json',receipt),('kernel-metadata.json',meta)]:
@@ -153,5 +156,45 @@ class OwnSubmissionTests(unittest.TestCase):
             b=json.loads((root/'build-receipt.json').read_text());b.update(notebook_sha256=smoke.digest(blob),notebook_bytes=len(blob))
             (root/'build-receipt.json').write_text(json.dumps(b))
             with self.assertRaisesRegex(ValueError,'scientific dependency changed'):builder.archived(root)
+
+    def test_round_policy_rejects_wrong_round_label_and_filename(self):
+        self.assertEqual(final.training_policy({}),final.KERNELS)
+        for number in (0,1):
+            _,_,c,r=fixture(number);final.require_qualification(c,r)
+            for delta in ({'training_round':2},{'training_round':True},{'training_round':'1'},
+                          {'labels_file':'wrong.parquet'},{'labels_sha256':'f'*64},
+                          {'training_round':1-number}):
+                with self.assertRaises(ValueError):final.training_policy(c|delta)
+            cc=copy.deepcopy(c);cc['members'][0]['kernel']='ozgung/arbitrary'
+            r['contract_sha256']=smoke.digest(smoke.canonical(cc))
+            with self.assertRaises(ValueError):final.require_qualification(cc,r)
+        with self.assertRaises(ValueError):final.training_policy({'training_round':1})
+
+    def test_round1_record_exact_labels_selection_folds_and_full_epochs(self):
+        _,_,c,_=fixture(1);m=c['members'][0]
+        r={'fold':0,'smoke':False,'checkpoint_kind':'swa_topk','checkpoint_file':m['checkpoint_file'],
+           'checkpoint_sha256':m['checkpoint_sha256'],'selected_epochs':m['selected_epochs'],
+           'train_returncode':0,'epochs_completed':10,'epochs_requested':10,'stopped_by_time_budget':False,
+           'train_knee_original_sha256':smoke.SOURCE_SHA,'params':{'ARCH':final.own.ARCH,'RES':'256'},'export':{'k_eval':16},
+           'labels_file':final.LABEL_PINS[1][0],'labels_sha256':final.LABEL_PINS[1][1],'selection':final.SELECTION,
+           'folds_sha256':final.FOLDS_SHA,'excluded_ids_sha256':final.EXCLUDED_SHA}
+        final.verify_training_run(r,m,1)
+        for delta in ({'labels_sha256':smoke.LABEL_SHA},{'labels_file':'labels_v1_blend.parquet'},
+                      {'selection':'gold AUC'},{'epochs_completed':9},{'epochs_requested':11},
+                      {'folds_sha256':'f'*64},{'excluded_ids_sha256':'f'*64},{'stopped_by_time_budget':True}):
+            with self.assertRaises(ValueError):final.verify_training_run(r|delta,m,1)
+        with self.assertRaises(ValueError):final.verify_training_run(r,m,0)
+        with self.assertRaises(ValueError):final.verify_training_run(r,m|{'kernel':final.KERNELS[0]},1)
+
+    def test_round1_synthetic_archive_and_final_attach_exact_family(self):
+        real_digest=smoke.digest
+        with tempfile.TemporaryDirectory() as d,patch.object(smoke,'digest',side_effect=lambda v:FROZEN if v==READER.encode() else real_digest(v)):
+            root=Path(d);self.archive(root,1)
+            builder.build(root/'new','own-round1-test',rehearsal_build=root,rehearsal_report=root/'report.json',rehearsal_csv=root/'visible.csv')
+            meta=json.loads((root/'new/kernel-metadata.json').read_text())
+            self.assertEqual(meta['kernel_sources'],final.ROUND_KERNELS[1])
+            self.assertFalse(any(k in meta['kernel_sources'] for k in final.KERNELS))
+            contract=json.loads((root/'new/build-contract.json').read_text())['rehearsal_contract']
+            self.assertEqual(contract['training_round'],1);self.assertEqual(contract['labels_sha256'],final.ROUND1_LABEL_SHA)
 
 if __name__=='__main__':unittest.main()

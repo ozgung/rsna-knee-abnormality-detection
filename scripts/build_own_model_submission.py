@@ -40,7 +40,7 @@ def archived(build):
         "sys.path.insert(0,str(base))\nfrom knee.own_model_rehearsal import run\n"
         "run('/kaggle/input','/kaggle/working/own_model_rehearsal',CONTRACT,READER,MODEL,started=STARTED)\n")
     if code!=expected:raise ValueError('Archived executable differs from exact reconstruction')
-    expected_kernels=[smoke.IDENTITY_KERNEL,*final.KERNELS]
+    expected_kernels=[smoke.IDENTITY_KERNEL,*final.training_policy(c)]
     if (meta.get('enable_internet') is not False or meta.get('enable_gpu') is not True or meta.get('is_private') is not True or
         meta.get('dataset_sources')!=[*smoke.CORPORA,'goodpjw2008/rsna-knee-2-5d-convnext-reader'] or
         meta.get('kernel_sources')!=expected_kernels or meta.get('competition_sources')!=['rsna-knee-abnormality-detection'] or
@@ -105,7 +105,7 @@ def build(destination,slug,*,rehearsal_build,rehearsal_report,rehearsal_csv):
     if len(blob)>900000:raise ValueError('Notebook source limit')
     meta={'id':'ozgung/'+slug,'title':slug.replace('-',' ').title(),'code_file':'notebook.ipynb','language':'python','kernel_type':'notebook',
           'is_private':True,'enable_gpu':True,'enable_tpu':False,'enable_internet':False,'competition_sources':['rsna-knee-abnormality-detection'],
-          'dataset_sources':['goodpjw2008/rsna-knee-2-5d-convnext-reader'],'kernel_sources':final.KERNELS,'model_sources':[],
+          'dataset_sources':['goodpjw2008/rsna-knee-2-5d-convnext-reader'],'kernel_sources':final.training_policy(original),'model_sources':[],
           'docker_image':DOCKER_IMAGE,'machine_shape':'NvidiaTeslaT4'}
     receipt={'build_only':True,'notebook_sha256':smoke.digest(blob),'notebook_bytes':len(blob),
              'contract_sha256':smoke.digest(smoke.canonical(contract)),'qualified_folds':list(range(5)),'production_cuda_tested':False}

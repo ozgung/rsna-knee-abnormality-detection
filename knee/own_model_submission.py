@@ -9,16 +9,50 @@ SERIES_COLUMNS=['StudyInstanceUID','SeriesInstanceUID','Fluid_Sensitive','Fat_Su
 KERNELS=['ozgung/knee-tracka-convnext-fold01-20261009','ozgung/knee-tracka-convnext-fold23-20261009','ozgung/knee-tracka-convnext-fold4-20261009']
 
 
+ROUND1_LABEL_SHA='b260412732573fa9601907501b753f73d7d4725c3d0942cb463428510c1d48f4'
+LABEL_PINS={0:('labels_v1_blend.parquet',smoke.LABEL_SHA),1:('labels_bootstrap_v1.parquet',ROUND1_LABEL_SHA)}
+ROUND_KERNELS={0:KERNELS,1:['ozgung/knee-tracka-convnext-r1-fold01-20261009',
+                          'ozgung/knee-tracka-convnext-r1-fold23-20261009','ozgung/knee-tracka-convnext-r1-fold4-20261009']}
+SELECTION='masked macro AUC of the FULL held-out fold vs report labels (train_labels_v1 y_/m_), not gold'
+FOLDS_SHA='12bebc897a549d660cf5e6ab597c9a8d8f84dc887b4abd4c99b67fb4a25cb3ae'
+EXCLUDED_SHA='44834d7638eb60142a668a7597bd3093fe569e13b6f77e60a9c185a4ac3206f1'
+
+
+def training_policy(contract):
+    """Absent metadata is legacy round0; round1 always requires its exact label pin."""
+    number=contract.get('training_round',0)
+    if type(number) is not int or number not in ROUND_KERNELS:raise ValueError('Unsupported training round')
+    filename,sha=LABEL_PINS[number]
+    explicit=any(k in contract for k in ('training_round','labels_file','labels_sha256'))
+    if explicit and (contract.get('labels_file')!=filename or contract.get('labels_sha256')!=sha):
+        raise ValueError('Training round label pin differs')
+    return ROUND_KERNELS[number]
+
+
+def verify_training_run(record,member,training_round):
+    """Build-time only: preserve gold-free selection and the exact fitted inputs."""
+    policy={'training_round':training_round,'labels_file':LABEL_PINS.get(training_round,(None,None))[0],
+            'labels_sha256':LABEL_PINS.get(training_round,(None,None))[1]}
+    kernels=training_policy(policy);filename,sha=LABEL_PINS[training_round]
+    own.verify_run(record,member)
+    if (member['kernel']!=kernels[0 if member['fold']<2 else (1 if member['fold']<4 else 2)] or
+        record.get('labels_file')!=filename or record.get('labels_sha256')!=sha or record.get('selection')!=SELECTION or
+        record.get('epochs_requested')!=10 or record.get('stopped_by_time_budget') is not False or
+        record.get('folds_sha256')!=FOLDS_SHA or record.get('excluded_ids_sha256')!=EXCLUDED_SHA):
+        raise ValueError('Fitted training round/labels/selection/folds differ')
+
+
 def require_qualification(contract,report):
     if (contract.get('complete_family') is not True or contract.get('settings')!=own.SETTINGS or
         [m['fold'] for m in contract.get('members',[])]!=list(range(5)) or
         contract.get('model_source_sha256')!=smoke.SOURCE_SHA or
         contract.get('reader_sha256')!='e331776e19800ef584c653cb9bb90698ff708027b0f9f483ce7afb18338a2f35'):
         raise ValueError('Complete frozen five-fold family required')
+    kernels=training_policy(contract)
     own.require_result(report,contract)
     if any(len(r['slots'])!=5 for r in report['training_parity']):raise ValueError('All25 slot parity checks required')
     for m in contract['members']:
-        if (m['kernel']!=KERNELS[0 if m['fold']<2 else (1 if m['fold']<4 else 2)] or
+        if (m['kernel']!=kernels[0 if m['fold']<2 else (1 if m['fold']<4 else 2)] or
             m['run_file']!=f"run_fold{m['fold']}.json" or Path(m['checkpoint_file']).name!=m['checkpoint_file'] or
             len(m['selected_epochs'])!=3 or len(set(m['selected_epochs']))!=3 or
             any(type(e) is not int or e not in range(10) for e in m['selected_epochs']) or

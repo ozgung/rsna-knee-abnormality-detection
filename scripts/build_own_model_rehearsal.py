@@ -3,6 +3,7 @@ import argparse,ast,json,re,subprocess,sys
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
 from knee import own_model_rehearsal as own
+from knee import own_model_submission as final
 from knee import corpus44_parity as parity
 from knee import public_training_smoke as smoke
 from knee import raptor_input
@@ -12,7 +13,11 @@ FILES=('knee/__init__.py','knee/own_model_rehearsal.py','knee/corpus44_parity.py
        'knee/raptor_input.py','knee/reference.py','knee/fresh_reader_setup.py')
 
 
-def build(destination,slug,*,public_model_source,public_reader_source,manifest,smoke_contract,parity_report,parity_review,result,folds):
+def build(destination,slug,*,public_model_source,public_reader_source,manifest,smoke_contract,parity_report,parity_review,result,folds,training_round=0):
+    if type(training_round) is not int or training_round not in final.LABEL_PINS:raise ValueError('Unsupported training round')
+    label_file,label_sha=final.LABEL_PINS[training_round]
+    round_policy={'training_round':training_round,'labels_file':label_file,'labels_sha256':label_sha}
+    kernels=final.training_policy(round_policy)
     out=Path(destination)
     if out.exists():raise ValueError('New immutable build directory required')
     if not re.fullmatch('[a-z0-9]+(?:-[a-z0-9]+)*',slug):raise ValueError('Invalid slug')
@@ -34,11 +39,10 @@ def build(destination,slug,*,public_model_source,public_reader_source,manifest,s
         runfile=f'run_fold{fold}.json';record=json.loads((result/runfile).read_text())
         name=record['checkpoint_file'];path=result/name
         if Path(name).name!=name:raise ValueError('Checkpoint filename unsafe')
-        member={'fold':fold,'kernel':'ozgung/knee-tracka-convnext-fold01-20261009' if fold<2 else
-                ('ozgung/knee-tracka-convnext-fold23-20261009' if fold<4 else 'ozgung/knee-tracka-convnext-fold4-20261009'),
+        member={'fold':fold,'kernel':kernels[0 if fold<2 else (1 if fold<4 else 2)],
             'run_file':runfile,'run_sha256':smoke.file_sha(result/runfile),'checkpoint_file':name,
             'checkpoint_sha256':smoke.file_sha(path),'selected_epochs':record['selected_epochs']}
-        own.verify_run(record,member)
+        final.verify_training_run(record,member,training_round)
         patched=Path(public_model_source).with_name('train_knee_patched.py')
         smoke.require_file(patched,record['train_knee_patched_sha256'])
         nodes=[n for n in ast.parse(patched.read_text()).body if isinstance(n,(ast.FunctionDef,ast.ClassDef)) and n.name in
@@ -58,6 +62,7 @@ def build(destination,slug,*,public_model_source,public_reader_source,manifest,s
         'limits':['five training studies and three visible test studies; no hidden test qualification',
             'public mask/window gap and series boundary behavior retained; noTTA',
             'subsetfold mean is a wiring proof; production family requires allfive qualifiedfolds']}
+    contract.update(round_policy)
     entry=("import time,sys,hashlib\nfrom pathlib import Path\nSTARTED=time.monotonic()\n"
         f"SOURCES={sources!r}\nCONTRACT={contract!r}\nREADER={reader!r}\nMODEL={model!r}\n"
         "base=Path('/kaggle/working/own_model_code')\nfor name,source in SOURCES.items():\n"
@@ -94,4 +99,5 @@ if __name__=='__main__':
     for name in ('public-model-source','public-reader-source','manifest','smoke-contract','parity-report','parity-review','result'):
         p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--folds',required=True)
+    p.add_argument('--training-round',type=int,choices=(0,1),default=0)
     print(json.dumps(build(**vars(p.parse_args())),indent=2))
