@@ -80,3 +80,7 @@ Prospective accuracy comparison: exact raw-probability standalone versus immutab
 Independent full-mode18check review passed, then official SDK confirmed remote current_version_number1 and parent compared the retrieved remote executable exactly with the reviewed build. Submitted immutable `ozgung/knee-mavit-submission-20261009`v1 as **entry56989116** at2026-10-09 03:40:40.807UTC. API03:40:53UTC PENDING, empty score/error; three daily submissions remain. Entry receipt `outputs/analysis/mavit-submission-20261009/entry-latest.json`; independent full review `independent-full-review.json`, remote version/executable review `remote-version-review.json` in the same directory. Fusion56986393 remains pending; best mirror0.949 unchanged.
 
 The CLI version-suffixed pull returned403; supported owner/slug retrieval succeeded, and its metadata version1 and exact executable were separately verified through the SDK. No retry submission or source change occurred. Wait for the actual public result before deciding on the prospectively described mirror–MaViT blend.
+
+## Hidden rerun failure
+
+Entry56989116 completed with no score and Kaggle’s generic unhandled notebook error, first seen04:15UTC and reverified07:35:26UTC. Successful visible/67 qualification did not establish hidden robustness. The failed version and original tolerances remain preserved; no traceback or confirmed cause is available. Decoder/metadata and lifecycle audits resumed after the account usage interruption. Receipt `outputs/analysis/resume-20261009-0735/state.json`. No blind resubmission.

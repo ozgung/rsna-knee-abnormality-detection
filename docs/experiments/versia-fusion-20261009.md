@@ -72,3 +72,7 @@ Final notebook `ozgung/knee-versia-fusion-submission-20261009` v1 (build7d290ae,
 Shared qualification SHA256: `2eeed70189b2a9b8467cd1eae73dc8b14d651989381eeaf803baadd5a19261d0`. Source bundle: `1c8e3b3fd9d52b948266284b1e0e7ccf160d52e55976ac2f6e75817059abe077`. Final CSV: `ae4adade688869371eaea39a29a8fcdb6d52378429a237d7a64d3af20b609e8a`. Final notebook: `cb224fb28d9fff30187d72b22af581789b330fe52dc5993cfdbae33578853648`.
 
 Entry56986393 was accepted at02:35:44.190UTC; API verified PENDING with empty score/error at02:36:06UTC. The CLI reported four submissions remaining today. This is the first October9UTC entry. Preserve current best0.949 until the new score is returned. Exact result and entry receipts: `outputs/analysis/versia-fusion-submission-20261009/{result-review,entry-latest}.json`; build/results under `outputs/kaggle/versia-fusion-submission-20261009*`. Hidden runtime, score and rank stability remain unverified.
+
+## Public result
+
+Entry56986393 completed with public score **0.950** and emptyerror, reverified2026-10-09 07:35:26UTC. This improves mirror0.949 by0.001 at displayed precision, but does not exceed the requested0.950 threshold. Receipt `outputs/analysis/resume-20261009-0735/state.json`. Submitted recipe remains immutable.
