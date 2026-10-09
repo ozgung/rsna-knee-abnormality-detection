@@ -1,6 +1,6 @@
 # MaViT image-only qualification — October 9, 2026
 
-Implemented, locally tested on synthetic DICOMs and pinned source fixtures; **real 67-study CUDA qualification is RUNNING**. This adds an independent public model component rehearsal only. It does not train, blend, submit, or claim predictive quality above the scored mirror. The prospective reason is a distinct encoder that may complement existing models; image quality, statistical independence and training lineage remain unverified.
+Implemented, locally tested on synthetic DICOMs and pinned source fixtures; **real 67-study CUDA qualification passed**. This adds an independent public model component rehearsal only. It does not train, blend, submit, or claim predictive quality above the scored mirror. The prospective reason is a distinct encoder that may complement existing models; image quality, statistical independence and training lineage remain unverified.
 
 The [public notebook](https://www.kaggle.com/code/hengck23/mavit-288-baseline-01-1-5sec-study-1gpu) uses the [hengck23 dataset](https://www.kaggle.com/datasets/hengck23/hengck23-rnsa-knee), with MIT declared. Its checkpoint passed the separate CPU audit: 341/341 exact state entries, all finite, strict load, 79,601,008 bytes, SHA256 `7acd2a990a89c7a7d73ec0488badc5058a61b0c77142742c532ebc196749bdbc`. The builder requires the authentic CPU receipt SHA256 `8d694907b0cf70504da2b33644db1ea3a18a057365987bfa59b4f8ac55a2d1e6` and unchanged CPU-audited helper sources. Published training cohort/label provenance is unknown. The original published speed claim is not a measured result here.
 
@@ -58,3 +58,11 @@ Checks cover inverse AST, actual tiny DICOM decoding/intensity/orientation/later
 Local check logs/build smoke are ignored under `outputs/analysis/mavit-rehearsal-20261009/` in the primary repository. No changes to existing qualified modules, active training sources or STATUS; no commits or remote actions performed by this implementation task.
 
 Parent integrated as678d31c and launched `ozgung/knee-mavit-image-rehearsal-20261009v1`v1 at~03:20UTC; API RUNNING03:22UTC. Build and launch receipts are under the paths above. This is not yet a successful image qualification.
+
+## Authentic GPU result
+
+`ozgung/knee-mavit-image-rehearsal-20261009v1`v1 completed; parent verification03:26UTC passed the original qualifier, exact archive/runtime hashes and official visible CSV coverage/schema/order. Setup-inclusive162.977seconds,67/67 exact input tensors and public predictions, repeat error0,16stress checks passed.320selected views/82missing views/10,296frames, no masked/decoder/resource failures. T4 peak0.855GB allocated/1.537GB reserved; host2.730GB. Observed SciPy1.16.3 is mandatory for subsequent production.
+
+Measured production78.77seconds, mean1.176seconds/study,p951.491seconds;1300-study p95 projection1959seconds excludes platform queueing and is not a hidden-runtime guarantee. Receipt `outputs/kaggle/mavit-image-rehearsal-20261009v1-result/mavit-rehearsal/mavit-audit.json` SHA256 `6d1784a0e617fd5f343a240e3c743b235710e03e02f313a12301a114cbc0c5fc`; parent review `outputs/analysis/mavit-rehearsal-20261009/result-review.json`.
+
+No accuracy measured. Next: separately reviewed same-recipe standalone visible qualification and full entry, then one public-score observation if still useful toward the target. Do not infer complementarity from this execution result.
