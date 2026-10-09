@@ -9,7 +9,7 @@ import types
 
 from knee.mavit_checkpoint import SOURCE_HASHES, canonical, digest
 
-VERSION='mavit-active-reader-v2'
+VERSION='mavit-active-reader-v3'
 DEFINITIONS={'IOStats','_fopen','_pread','_read_whole','_make_pyd','NeedMore','scan_header','_ds','_us','fast_hdr',
  '_pydicom_major','_transform','_lerp_percentile','RawSlice','fast_raw','_pct_selftest','Cfg','_Ctx','_scan_full',
  '_knee_cs','_knee_header_values','_knee_get_laterality','_knee_materialize','_knee_percentile_context','_knee_to_u8',
@@ -47,7 +47,7 @@ def declared_catch(path,error):
     if isinstance(error,(ValueError,EOFError,OverflowError)):return True
     if path in ('_make_pyd.hdr_from_bytes','_knee_get_laterality') and isinstance(error,(TypeError,AttributeError,IndexError)):
         return True  # Original missing/malformed geometry defaults remain valid.
-    if type(error).__module__=='pydicom.errors' and type(error).__name__=='InvalidDicomError':return True
+    if type(error).__module__=='pydicom.errors' and type(error).__name__ in ('InvalidDicomError','BytesLengthException'):return True
     # These pixel exceptions must actually originate inside the pinned decoder.
     if path=='_Ctx.px' and isinstance(error,(AttributeError,RuntimeError,NotImplementedError)):
         tb=error.__traceback__

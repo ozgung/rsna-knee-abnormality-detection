@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-09, 10:44 +03** (Europe/Istanbul). Read this first, then [README](README.md) and [AGENTS](AGENTS.md).
+Updated **2026-10-09, 10:46 +03** (Europe/Istanbul). Read this first, then [README](README.md) and [AGENTS](AGENTS.md).
 
 ## Current snapshot
 
@@ -108,3 +108,5 @@ Use `/Users/ozgun/miniconda3/bin/kaggle kernels status OWNER/SLUG`, `kernels log
 ## Latest session checkpoint
 
 October9,10:44Istanbul: confirmednarrowMaViTrobustnessgap fromactualsyntheticDICOM: malformedUSRows raisespydicom.errors.BytesLengthException, abortingwhole study despitehealthyAxial; intendedpublicpixelhandlingmakesbadviewunusable. Notconfirmedhiddenfailurecause. ParentUIonlygenerichiddenerror/no traceback. Narrowv3repair/regression+separate2000train-onlydiagnostic areoneactiveimplementation; independentlyreview each, launchnew67first thenbroaderphase/ordinaldiagnostic withunchangedguards. No blindentry. LifecycleN1/2/67/1300PASSsynthetically. GlobalfitstillRUNNING;UIcreated6hago/running~16m, optimizerprogressunknown. Bestfusion0.950;39.65GPUhavailable. HeartbeatACTIVE.
+
+Early repair checkpoint10:46Istanbul: integrated narrow3file policyv3 slice after parent/Astra16/16focused tests,17runtime stresses and unchangedscientific-functionAST verification. Newrecognizedexceptiononlypydicom.BytesLengthException; healthy math/FP16/1e-6unchanged. Prior294fullsuite describesoldsource; fullsuite/newproductionfixtures await genuinev3receipt. Next commit/build/new67; broad2000implementationcontinues innewfiles.

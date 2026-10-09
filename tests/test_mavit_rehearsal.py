@@ -330,6 +330,16 @@ class ReaderTests(unittest.TestCase):
         CvError=type('error',(Exception,),{'__module__':'cv2','code':-4})
         self.assertTrue(m.fatal(CvError()));self.assertFalse(m.fatal(ValueError()))
 
+    def test_real_bytes_length_exception_masks_only_bad_view_and_rejects_old_receipt(self):
+        from pydicom.errors import BytesLengthException
+        self.assertTrue(m.declared_catch('_Ctx.px',BytesLengthException()))
+        self.assertFalse(m.declared_catch('_Ctx.px',AssertionError()))
+        self.assertEqual(r.stress_bytes_length(self.source),'PASS')
+        old=PARENT/'outputs/kaggle/mavit-image-rehearsal-20261009v1'
+        report=PARENT/'outputs/kaggle/mavit-image-rehearsal-20261009v1-result/mavit-rehearsal/mavit-audit.json'
+        if old.is_dir() and report.is_file():
+            with self.assertRaises(ValueError):r.require_rehearsal(json.loads((old/'mavit-contract.json').read_text()),json.loads(report.read_text()))
+
     def test_concurrent_early_declared_error_cannot_hide_later_fatal_or_unknown(self):
         import numpy as np
         import threading

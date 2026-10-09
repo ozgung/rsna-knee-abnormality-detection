@@ -28,7 +28,7 @@ PACKAGES={'torch':'2.10.0+cu128','timm':'1.0.26','einops':'0.8.2','numpy':'2.0.2
 SERIES_COLUMNS=['StudyInstanceUID','SeriesInstanceUID','Fluid_Sensitive','Fat_Suppression','Anatomical_Plane']
 STRESS_CASES={'healthy_public','missing_view','short_mask_no_retry','shape_tie_mask','unsafe_pixels_mask','black_view_mask_preserved',
               'whole_black_fatal','unknown_exception_fatal','memory_fatal','timeout_fatal','descriptor_fatal',
-              'missing_geometry_defaults','pixel_decode_mask','inner_program_error_fatal','multiframe_mask','whole_empty_fatal'}
+              'missing_geometry_defaults','pixel_decode_mask','inner_program_error_fatal','multiframe_mask','whole_empty_fatal','bytes_length_selected_view_mask'}
 
 
 def cpu_evidence(path,source_dir,root):
@@ -88,6 +88,44 @@ def predict(model,arrays):
         probability=torch.sigmoid(logits)
     values=probability.detach().float().cpu().numpy()[0]
     return validate_predictions(values)
+
+
+def stress_bytes_length(source):
+    """Real tiny synthetic DICOM bytes, separate temporary files; no competition mutation."""
+    import io
+    import tempfile
+    import numpy as np
+    from pydicom.dataset import FileDataset,FileMetaDataset
+    from pydicom.uid import ExplicitVRLittleEndian,MRImageStorage
+    prod=inputs.definitions(source,production=True);plain=inputs.definitions(source,production=False)
+    with tempfile.TemporaryDirectory() as tmp:
+        root=Path(tmp);bad_blob=None
+        for name in ('bad','healthy'):
+            directory=root/'synthetic'/name;directory.mkdir(parents=True)
+            for index in range(3):
+                meta=FileMetaDataset();meta.TransferSyntaxUID=ExplicitVRLittleEndian
+                meta.MediaStorageSOPClassUID=MRImageStorage;meta.MediaStorageSOPInstanceUID='1.2.3'
+                d=FileDataset(None,{},file_meta=meta,preamble=b'\0'*128);d.SOPClassUID=MRImageStorage;d.SOPInstanceUID='1.2.3'
+                d.Rows=8;d.Columns=8;d.SamplesPerPixel=1;d.PhotometricInterpretation='MONOCHROME2'
+                d.BitsAllocated=16;d.BitsStored=16;d.HighBit=15;d.PixelRepresentation=0
+                d.InstanceNumber=index;d.ImageLaterality='L';d.PixelData=(np.arange(64,dtype=np.uint16).reshape(8,8)+index*100).tobytes()
+                stream=io.BytesIO();d.save_as(stream,enforce_file_format=True);blob=stream.getvalue()
+                if name=='bad' and index==0:
+                    tag=b'\x28\x00\x10\x00US\x02\x00';at=blob.index(tag)
+                    blob=blob[:at]+b'\x28\x00\x10\x00US\x01\x00'+blob[at+8:at+9]+blob[at+10:];bad_blob=blob
+                (directory/f'{index}.dcm').write_bytes(blob)
+        rows=[dict(StudyInstanceUID='synthetic',SeriesInstanceUID=name,Anatomical_Plane=plane,Fluid_Sensitive=0,Fat_Suppression=0)
+              for name,plane in [('bad','Sagittal'),('healthy','Axial')]]
+        reader=prod.make_knee_dataset_reader(out_size=8,io_threads=2)
+        actual,counts=inputs.prepare(prod,reader,'synthetic',rows,root,production=True)
+        reference_reader=plain.make_knee_dataset_reader(out_size=8,io_threads=2)
+        expected,_=inputs.prepare(plain,reference_reader,'synthetic',rows[1:],root,production=False)
+        if (actual[1].tolist()!=[False,False,True,False,False,False] or counts['masked_views']!=1 or
+                counts['pixel_decode_failures']!=1 or not all(np.array_equal(a,b) for a,b in zip(actual,expected))):
+            raise ValueError('Recognized byte-length failure did not retain exact healthy view')
+        if plain._Ctx(plain.Cfg(fast=True,lut=True)).px(bad_blob,plain._scan_full(bad_blob))[0] is not None:
+            raise ValueError('Public malformed-pixel handling changed')
+    return 'PASS'
 
 
 def stress_inputs(source):
@@ -168,6 +206,7 @@ def stress_inputs(source):
             try:get()
             except error:checks[label]='PASS'
             else:raise ValueError('Required failure did not propagate')
+    checks['bytes_length_selected_view_mask']=stress_bytes_length(source)
     if set(checks)!=STRESS_CASES:raise ValueError('Synthetic MaViT checks incomplete')
     return {'status':'PASS','cases':checks,'uses_labels':False,'uses_raw_data':False}
 
