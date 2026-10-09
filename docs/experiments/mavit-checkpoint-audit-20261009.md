@@ -1,6 +1,6 @@
 # MaViT checkpoint-only CPU audit
 
-Implemented and locally tested; **the real checkpoint has not been downloaded, hashed, deserialized or executed here**. This package performs only a CPU checkpoint/architecture audit. Parent reviews, commits and decides when to launch; this task launches no job and creates no competition entry.
+The real CPU checkpoint audit completed **PASS** on Kaggle. Parent and independent reviewer verified the authentic receipt; the checkpoint stayed remote. This package performs only a storage/architecture audit and creates no competition entry.
 
 The source is [hengck23's MaViT288 notebook](https://www.kaggle.com/code/hengck23/mavit-288-baseline-01-1-5sec-study-1gpu) and its [public dataset](https://www.kaggle.com/datasets/hengck23/hengck23-rnsa-knee). Dataset metadata declares MIT; actual training lineage, labels, cohort and selection metric are unknown. Neither the filename `00000008.pth` nor generic MALA pretraining code establishes training provenance or accuracy. The [MALA project](https://github.com/qhfan/MALA) is the encoder attribution. Research/pre-audit evidence remains under primary ignored `outputs/analysis/post-fusion-research-20261009/`.
 
@@ -38,3 +38,12 @@ KNEE_REFERENCE_PARENT=/Users/ozgun/Dev/rsna-knee-abnormality-detection \
 ```
 
 Final fixture suite: **271/271 PASS**, with all source fixtures enabled and no skips. Dependency-free smoke, compile and diff checks PASS; the smoke exercised no tensor forward. Log location is primary ignored `outputs/analysis/mavit-checkpoint-audit-20261009/tests-full.log`. Temporary synthetic checkpoints are removed by tests. A build-only smoke artifact under the same primary analysis directory predates the last reviewed traversal fixes and must not be launched; rebuild from final integrated source. No generated/private artifacts need preservation from the isolated worktree beyond ordinary removable `__pycache__` files.
+
+
+## Real CPU result
+
+`ozgung/knee-mavit-checkpoint-audit-20261009` v1, sourceeabc93b, completed PASS, verified October9 around02:46UTC. Runtime21.150seconds; peak host RSS969,629,696bytes. Safe weights-only CPU loading succeeded. All341 model entries match: zero missing/unexpected keys, shape or dtype mismatches; strict loading and exact loaded-tensor equality passed. There are333float32 and8int64 tensors,19,861,632parameters and6,344buffer elements; all finite. Payload structural keys are only `epoch` and `model_state_dict`; the epoch value was not exported.
+
+The first-observed checkpoint SHA256 is `7acd2a990a89c7a7d73ec0488badc5058a61b0c77142742c532ebc196749bdbc`, size79,601,008bytes. This identity is now the frozen pin for any subsequent image qualification. Environment matched Python3.12/torch2.10.0+cu128/timm1.0.26, with einops0.8.2/numpy2.0.2/torchvision0.25.0+cu128. GPU visibility was disabled. Zero image forwards or training steps occurred.
+
+Authentic receipt: `outputs/kaggle/mavit-checkpoint-audit-20261009-result/mavit-checkpoint-audit/checkpoint-audit.json`. Independent review: `outputs/analysis/mavit-checkpoint-audit-20261009/result-review.json`. Contract SHA `372d9aba7641ea9b8a937e4a721bc91ddc39da6163c60941d6bbcec309375160`; notebook SHA `9227b11ff561d9c15edb5ab50882098e076d85b4ecf0da25f86a3e3d9777b40a`. Parent independently rechecked source/runtime/build/environment/state bindings. Decoder correctness, real image inference, predictive quality and training lineage remain unverified. The next task is a separate67-study image-only component qualification, not an immediate blend or score claim.
