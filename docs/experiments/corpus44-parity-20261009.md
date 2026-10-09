@@ -11,3 +11,13 @@ Acceptance: all25 slot uint8 hashes and masks agree exactly. Report includes per
 Build invocation from the isolated worktree uses `scripts/build_corpus44_parity.py DESTINATION SLUG --public-source ARCHIVED_SOURCE --manifest PRIVATE_MANIFEST --smoke-contract COMPLETED_SMOKE_BUILD_CONTRACT`. Build directory must be new. Parent may launch the built private CPU notebook after review; no launch is performed by the builder. Retrieve only `corpus44_parity/parity-report.json`; remote arrays remain attached read-only.
 
 Synthetic checks: exact/mask-only mismatch, full uint8 error without overflow, shape/mask rejection, unpinned source rejection and inverse-AST comparison proving only the two span literals changed. Build-time privacy check rejects embedding any smoke study ID.
+
+## Parent integration and CPU launch
+
+Integrated as4073230. Parent5/5 focused checks passed with `CORPUS44_PUBLIC_SOURCE` supplied (zero skips); synthetic CPU smoke and diff checks passed. Built at `outputs/kaggle/corpus44-parity-20261009/` and pushed with `kaggle kernels push -p outputs/kaggle/corpus44-parity-20261009`. Kaggle derived the actual slug from the human title: **`ozgung/corpus44-image-only-parity-hypothesis` v1**, confirmed RUNNING. Do not retry the intended slug. Future builder titles now match requested slugs; the launched notebook remains unchanged.
+
+Notebook SHA `e370c8ce3059d6a4ba4f0c744bb9bbe380c80b05fbc30a60de97a20b5d62adf7`, contract `f3d2771f62b34c2075fbc7782bdfb2b26fa6187f0167817d44b4757be6a62dc1`. PrivateCPU/offline; retrieve `corpus44_parity/parity-report.json` to `outputs/kaggle/corpus44-parity-20261009-result/`. No checkpoint or resume/controller. Preserve mismatch/error and inspect it; no automatic retry. Real pixel parity remains unverified.
+
+### First result is operationally invalid; narrow repair
+
+V1 finished6.89seconds with a reported MISMATCH, but all5 decoder counters were empty and every reconstructed slot was zero. Parent inspection found the adapter incorrectly used `train_images`; the verified competition directory is `train_series`. This is **not evaluated scientific parity**, preserved in `outputs/analysis/corpus44-parity-20261009/parent-v1-review.json`. The repair changes only that input path and adds selected-study/series metadata/directory preflight plus nonzero header/pixel decoding requirements. Pixel transformations, span/count hypothesis and exact comparison remain unchanged. Parent verified actual metadata categories and decoder counter names. No training was affected.

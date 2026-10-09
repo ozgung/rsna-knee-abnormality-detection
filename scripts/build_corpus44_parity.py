@@ -54,7 +54,7 @@ def build(destination,slug,*,public_source,manifest,smoke_contract):
         {'cell_type':'code','id':'run','metadata':{},'execution_count':None,'outputs':[],'source':entry.splitlines(True)}]}
     blob=(json.dumps(notebook,indent=2)+'\n').encode()
     if len(blob)>900000:raise ValueError('Notebook source limit')
-    metadata={'id':'ozgung/'+slug,'title':'Corpus44 Image Only Parity Hypothesis','code_file':'notebook.ipynb','language':'python','kernel_type':'notebook',
+    metadata={'id':'ozgung/'+slug,'title':slug.replace('-', ' ').title(),'code_file':'notebook.ipynb','language':'python','kernel_type':'notebook',
         'is_private':True,'enable_gpu':False,'enable_tpu':False,'enable_internet':False,
         'competition_sources':['rsna-knee-abnormality-detection'],
         'dataset_sources':[*smoke.CORPORA,'goodpjw2008/rsna-knee-2-5d-convnext-reader'],

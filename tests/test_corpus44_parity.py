@@ -4,6 +4,28 @@ from pathlib import Path
 from knee import corpus44_parity as parity
 
 class Corpus44Tests(unittest.TestCase):
+    def test_canonical_dicom_tree_and_missing_paths(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rows = {'study1': [{'StudyInstanceUID':'study1', 'SeriesInstanceUID':'series1',
+                'Fluid_Sensitive':'1', 'Anatomical_Plane':'Sagittal'}]}
+            # A legacy-looking train_images directory cannot qualify.
+            (root/'train_images/study1/series1').mkdir(parents=True)
+            with self.assertRaises(ValueError):parity.require_image_tree(root,['study1'],rows)
+            (root/'train_series').mkdir()
+            with self.assertRaises(ValueError):parity.require_image_tree(root,['study1'],rows)
+            (root/'train_series/study1').mkdir()
+            with self.assertRaises(ValueError):parity.require_image_tree(root,['study1'],rows)
+            (root/'train_series/study1/series1').mkdir()
+            self.assertEqual(parity.require_image_tree(root,['study1'],rows),root/'train_series')
+            with self.assertRaises(ValueError):parity.require_image_tree(root,['study1'],{'study1':[]})
+            broken={'study1':[rows['study1'][0]|{'Fluid_Sensitive':'unknown'}]}
+            with self.assertRaises(ValueError):parity.require_image_tree(root,['study1'],broken)
+    def test_zero_decode_cannot_qualify(self):
+        for counts in ({},{'headers':5},{'decoded_frames':44},{'headers':5,'decoded_frames':0,'decode_failures':44}):
+            with self.subTest(counts=counts),self.assertRaises(ValueError):parity.require_decode_evidence(counts)
+        parity.require_decode_evidence({'headers':1,'decoded_frames':1})
     def test_exact_and_mask_only_mismatch(self):
         import numpy as np
         a=np.zeros((44,336,336),np.uint8);m=np.zeros(44,np.uint8)

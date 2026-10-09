@@ -7,6 +7,7 @@ import importlib.metadata
 import json
 from pathlib import Path
 import resource
+import re
 import sys
 import time
 import types
@@ -51,6 +52,41 @@ def reader_module(code):
     module.__dict__.update(np=np,glob=glob,IMG=336,CROP_MM=140.,SLOTS=SLOTS,MAXS=44)
     exec(compile(code,'<pinned44-hypothesis>','exec'),module.__dict__)
     return module
+
+
+def require_image_tree(competition, selected, records):
+    """Fail before pixel comparison when canonical raw inputs are absent/invalid."""
+    image_root = Path(competition) / 'train_series'
+    if not image_root.is_dir():
+        raise ValueError('Canonical training DICOM directory missing')
+    if not selected or len(set(selected)) != len(selected) or set(records) != set(selected):
+        raise ValueError('Selected series coverage differs')
+    seen = set()
+    for uid in selected:
+        if not re.fullmatch(r'[A-Za-z0-9_.-]+', uid) or uid in ('.', '..'):
+            raise ValueError('Invalid selected study identity')
+        if not (image_root / uid).is_dir():
+            raise ValueError('Selected study DICOM directory missing')
+        rows = records[uid]
+        if not rows:
+            raise ValueError('Selected study has no series metadata')
+        for row in rows:
+            series = row.get('SeriesInstanceUID', '')
+            if (row.get('StudyInstanceUID') != uid or not isinstance(series, str) or
+                    not re.fullmatch(r'[A-Za-z0-9_.-]+', series) or series in ('.', '..') or
+                    series in seen or row.get('Fluid_Sensitive') not in ('0', '1') or
+                    row.get('Anatomical_Plane') not in ('Sagittal', 'Coronal', 'Axial')):
+                raise ValueError('Selected series metadata invalid')
+            seen.add(series)
+            if not (image_root / uid / series).is_dir():
+                raise ValueError('Selected series DICOM directory missing')
+    return image_root
+
+
+def require_decode_evidence(counters):
+    """Zero discovered/decode frames are operational failure, never parity evidence."""
+    if counters.get('headers', 0) <= 0 or counters.get('decoded_frames', 0) <= 0:
+        raise ValueError('No successful raw DICOM decoding evidence')
 
 
 def compare(volume, mask, expected, expected_mask):
@@ -123,6 +159,8 @@ def run(inputs,out,contract,code,*,started):
                 for row in csv.DictReader(f):
                     if row['StudyInstanceUID'] in records:
                         records[row['StudyInstanceUID']].append(row)
+            report['phase']='raw_input_contract';save()
+            image_root=require_image_tree(competition,selected,records)
             report['environment']={'python':sys.version.split()[0],'device':'cpu','packages':{p:importlib.metadata.version(p) for p in ('numpy','pydicom','opencv-python','pylibjpeg','pylibjpeg-libjpeg','pylibjpeg-openjpeg')}}
             import cv2
             cv2.setNumThreads(4)
@@ -142,8 +180,9 @@ def run(inputs,out,contract,code,*,started):
                     return order,tracked_pixel,resize
                 public._make_reader=tracked_factory
                 with guarded_reader(public,counters):
-                    volume,mask=public.build_study(uid,records,str(competition/'train_images'),public._make_reader())
+                    volume,mask=public.build_study(uid,records,str(image_root),public._make_reader())
                 public._make_reader=original_factory
+                require_decode_evidence(counters)
                 report.pop('active_ordinal');report.pop('active_reader_counts')
                 row=ids.index(uid);part=0 if row<3200 else 1;offset=row if part==0 else row-3200
                 slots=compare(volume,mask,vols[part][offset],masks[part][offset])
