@@ -37,9 +37,13 @@ def reference_gate(report):
 
 
 def build(sources,destination,slug,cache_receipts,*,cache_kernel,reference_result=None,reference_kernel=None,
-          objective=BATCH_OBJECTIVE):
+          objective=BATCH_OBJECTIVE,reference_dataset=None):
     if objective not in (BATCH_OBJECTIVE,GLOBAL_OBJECTIVE):raise ValueError('Unknown TRAIN04 objective')
     if objective==GLOBAL_OBJECTIVE and not reference_result:raise ValueError('Original reference initialization required')
+    if reference_dataset:
+        if objective!=GLOBAL_OBJECTIVE or not reference_result or not reference_kernel:
+            raise ValueError('Reference dataset transport requires the original global-objective reference')
+        reference_parts(reference_dataset,owner='ozgung')
     check_sources(sources);reference_parts(cache_kernel,owner='ozgung')
     receipts=Path(cache_receipts)
     plan=json.loads((receipts/'plan-private.json').read_text());validate_plan(plan)
@@ -87,7 +91,7 @@ def build(sources,destination,slug,cache_receipts,*,cache_kernel,reference_resul
     pins={n:file_sha256(receipts/n) for n in ('plan-private.json','cache-report.json','index-private.json')}
     contract={'revision':revision,'cache_kernel':cache_kernel,'cache_pins':pins,'reference_kernel':reference_kernel,
               'reference_pins':reference_pins,'reference_contract':reference_contract,
-              'reference_prefix':reference_prefix,'objective':objective,
+              'reference_prefix':reference_prefix,'objective':objective,'reference_dataset':reference_dataset,
               'config':CONFIG,'sources':{n:hashlib.sha256(s.encode()).hexdigest() for n,s in own.items()},
               'builder_sha256':file_sha256(__file__),'external':SOURCE_HASHES,
               'notebook_seconds':CONFIG['seconds'],'time_policy':'platform_limit_only'}
@@ -122,7 +126,10 @@ try:
             if file_sha256(cache/name)!=digest:raise ValueError('Cache attachment receipt changed')
         initial=None;label_paths=None
         if CONTRACT['reference_kernel']:
-            ref=notebook_root(inputs,CONTRACT['reference_kernel'],'coverage_training',list(CONTRACT['reference_pins']))
+            if CONTRACT['reference_dataset']:
+                ref=dataset_root(inputs,CONTRACT['reference_dataset'],list(CONTRACT['reference_pins']))
+            else:
+                ref=notebook_root(inputs,CONTRACT['reference_kernel'],'coverage_training',list(CONTRACT['reference_pins']))
             for name,digest in CONTRACT['reference_pins'].items():
                 if file_sha256(ref/name)!=digest:raise ValueError('Reference artifact changed')
             initial=ref/'initial.pt'
@@ -145,8 +152,9 @@ except BaseException as exc:
     meta={'id':'ozgung/'+slug,'title':slug.replace('-',' ').title(),'code_file':'notebook.ipynb','language':'python','kernel_type':'notebook',
           'is_private':True,'enable_gpu':True,'enable_tpu':False,'enable_internet':not bool(reference_kernel),
           'dataset_sources':['stevenleehans/rsna-knee-llm-report-labels','pilkwang/rsna-knee-llm-labels','lixin73/rsna-knee-llm-report-labels-sol56','laymond/rsna-knee-abnormality-qwen3-8b-weak-labels'] if reference_kernel and objective!=GLOBAL_OBJECTIVE else [],
-          'kernel_sources':[cache_kernel]+([reference_kernel] if reference_kernel else []),
+          'kernel_sources':[cache_kernel]+([reference_kernel] if reference_kernel and not reference_dataset else []),
           'competition_sources':[],'model_sources':[],'docker_image':DOCKER,'machine_shape':'NvidiaTeslaT4'}
+    if reference_dataset:meta['dataset_sources']=[reference_dataset]
     out=Path(destination);out.mkdir(parents=True,exist_ok=False)
     for name,value in [('notebook.ipynb',nb),('kernel-metadata.json',meta),('build-contract.json',contract)]:
         (out/name).write_text(json.dumps(value,indent=2)+'\n')
@@ -158,6 +166,8 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('sources','destination','slug','cache_receipts'):p.add_argument(name)
     p.add_argument('--cache-kernel',required=True);p.add_argument('--reference-result');p.add_argument('--reference-kernel')
+    p.add_argument('--reference-dataset')
     p.add_argument('--objective',choices=(BATCH_OBJECTIVE,GLOBAL_OBJECTIVE),default=BATCH_OBJECTIVE)
     a=p.parse_args();build(a.sources,a.destination,a.slug,a.cache_receipts,cache_kernel=a.cache_kernel,
-                           reference_result=a.reference_result,reference_kernel=a.reference_kernel,objective=a.objective)
+                           reference_result=a.reference_result,reference_kernel=a.reference_kernel,objective=a.objective,
+                           reference_dataset=a.reference_dataset)

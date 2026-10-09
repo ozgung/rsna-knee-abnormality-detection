@@ -279,6 +279,19 @@ class ObjectiveTests(unittest.TestCase):
             calls=[n for n in ast.walk(ast.parse(source)) if isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=='train']
             self.assertEqual(len(calls),1)
             self.assertNotIn('resume',[k.arg for k in calls[0].keywords])
+            with patch.object(builder,'check_sources'):
+                transported=builder.build(src,root/'assets','objective-assets',cache,cache_kernel='ozgung/synthetic-cache',
+                    reference_result=ref,reference_kernel='ozgung/synthetic-reference',objective=obj.GLOBAL_OBJECTIVE,
+                    reference_dataset='ozgung/synthetic-initial-assets')
+            self.assertEqual(transported['reference_pins'],result['reference_pins'])
+            self.assertEqual(transported['sources'],result['sources'])
+            self.assertEqual(transported['reference_contract'],result['reference_contract'])
+            meta=json.loads((root/'assets/kernel-metadata.json').read_text())
+            self.assertEqual(meta['dataset_sources'],['ozgung/synthetic-initial-assets'])
+            self.assertEqual(meta['kernel_sources'],['ozgung/synthetic-cache'])
+            self.assertFalse(meta['enable_internet'])
+            source=''.join(json.loads((root/'assets/notebook.ipynb').read_text())['cells'][1]['source'])
+            compile(source,'objective-assets','exec')
 
 
 if __name__=='__main__':unittest.main()
