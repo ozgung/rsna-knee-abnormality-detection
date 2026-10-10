@@ -1,13 +1,13 @@
 # Project status and session handoff
 
-Updated **2026-10-10 04:38 UTC**. Read this snapshot and queue, then the latest [Fable/Astra handoff](docs/claude-astra-handoff.md). Rules are in AGENTS.md, setup in README.md. Older details: [October10 archive](docs/status-archive/status-before-20261010-0435-reconciliation.md).
+Updated **2026-10-10 05:39 UTC**. Read this snapshot and queue, then the latest [Fable/Astra handoff](docs/claude-astra-handoff.md). Rules are in AGENTS.md, setup in README.md. Older details: [October10 archive](docs/status-archive/status-before-20261010-0435-reconciliation.md).
 
 ## Current snapshot
 
 - **Target: top10. Best public score: 0.950**, entry56986393. The user's0.962+ waypoint is provisional; last October9 leaderboard read put rank10 at0.961. No reproducible top10 method is established.
 - **ConvNeXt bootstrap round1 closed:** entry57028725 completed at **0.874**, versus round0 entry57016778 at0.878. Exact image-only qualification passed for both. Pooled raw-report AUC increased0.882137→0.893651, but that improvement did not transfer to the public metric. No further round1 fits, default fusion, or recursive bootstrap from this result. [Result and evidence](docs/experiments/own-model-r1-submission-20261010.md).
 - **Original-label CoAtNet224 is the primary own candidate.** Folds0/1/4 completed at raw-report AUC0.901842/0.902008/0.906643; parent57-check audit and allthree selected checkpoint hashes/metadata/finite tensors passed. Folds2/3 remain RUNNING. Gains support the combined architecture/resolution/training recipe, not backbone causality alone. [Audit](docs/experiments/coatnet224-partial-audit-20261010.md).
-- **Colab384 trained14epochs but failed during export and lost its session.** Epoch13 recovery dataset reports ready; actual restore remains unverified. Fable owns export-only recovery and persistence fixes. Colab API at04:33UTC reports **no active sessions**, resolving the previously listed unknown assignment's current presence, not proving past billing or a hard session cap.
+- **Colab384 trained14epochs but failed during export and lost its session.** Epoch13 backup downloaded and selectedSWA recovered onCPU; model forward/export and exact optimizer continuation remain unverified. [Recovery](docs/experiments/colab384-artifact-recovery-20261010.md). Fable owns export-only recovery and persistence fixes. Colab API at05:33UTC reports **no active sessions**, resolving the previously listed unknown assignment's current presence, not proving past billing or a hard session cap.
 - October10 usage: one of five entries, four remaining after57028725; recheck before submission. Official rules last verified October9:5entries/day, offline inference≤9h; entry/merge deadlineOctober15, final deadlineOctober22 at23:59UTC. No new terms or compute purchases.
 
 ## Ready queue and ownership
@@ -17,14 +17,14 @@ Updated **2026-10-10 04:38 UTC**. Read this snapshot and queue, then the latest 
 | Parent — CoAtNet224 qualification | Separate rehearsal implemented; subset0/1/4 built only | Collect and audit23 when complete, verify both weights, build fullfive and run short offline CUDA rehearsal at next free slot. Require exact reader/window/probability/repeat parity and fullfive PASS before final build. |
 | Parent — CoAtNet224 final wrapper | Implemented and reviewed;16 combined tests PASS | After real fullfive rehearsal PASS, build and run final-visible inference; require exact CSV parity before entry. [Preparation](docs/experiments/coatnet224-submission-preparation-20261010.md). |
 | Fable — existing training | Original-label23v2 and bootstrap-label01v1 RUNNING | Finish fixed comparisons. Bootstrap arm is diagnostic, not a default ensemble member. Preserve next free slot for short224 qualification, then384 export recovery before more long fits. |
-| Fable — Colab384 recovery | Training complete, export FAILED, backup ready | Pin and verify epoch13 state; recover selectedSWA and export with fewer workers. Fix inaccurate training provenance in export receipts. No retraining needed merely to recover completed training. |
+| Fable — Colab384 export | Parent recovered selectedSWA onCPU; export still pending | Use verified localstate/fingerprint or cross-check Kaggle recovery against it; export with fewerworkers and accurate originaltrainingprovenance. No retraining needed. |
 | Fable — Colab reliability | Accepted changes not parent-verified | Require resume identity/config/source/labels/folds binding, fail on missing explicit resume, verify processed version before success, retain previous verified version, reconcile assignment ownership before retry. |
 | Parent/Fable — next experiment | No new bootstrap generation approved | Gold58 remains descriptive, never a trigger for selecting labels/epochs. Propose training-only nested/crossfit evidence or a prospectively fixed comparison before recursive bootstrap. Public warm-start option remains a separate hypothesis. |
 | Fable — B1 archival integration | Deferred | Fix benchmark provenance claims and cached CSV hash binding. Current pinned training artifacts unaffected. |
 
 ## Live jobs and recovery
 
-Latest read-only receipt: `outputs/analysis/reconcile-20261010-0435/receipt.json`. No parent training launch, submission, controller or downloader this turn.
+Latest receipt: `outputs/analysis/reconcile-20261010-0535/receipt.json`. Both fits remainRUNNING. Parent recoverydownload andCPU reconstruction finished; no newtraining, submission, controller or active downloader.
 
 | Exact job | Verified state |
 | --- | --- |
@@ -42,7 +42,7 @@ Subset preparation build: `outputs/kaggle/own-coatnet224-rehearsal-fold014-20261
 
 Colab lost session: `knee-c384-f0-a1`; logs `outputs/colab/c384-fold0-loop.log`, failure snapshot `outputs/analysis/reconcile-20261010-0335/colab-export-failure.log`. It trained14epochs on bootstrap-v1,384px,k12/k24,batch8, with selectedSWA[13,12,11] and best logged reportAUC0.9184. Export worker was killed, then download returned404/401. OOM is plausible, not established. Loop32148/driver32151 exitedrc1; **do not restart the old loop**, whose first attempt starts fresh.
 
-Recovery dataset: **`ozgung/knee-colab-resume-c384-fold0` version14**, epoch13, about2.05GB including full resume/top-k state. Ready status verified, downloaded payload/restore not yet verified. Fable's `scripts/build_tracka_export_kaggle.py` supports rebuildingSWA from resume and fewer export workers. Current review finds K_TRAIN default8 and EPOCHS default10 do not represent the actual12/14 fit; current export sources and synthetic train_cmd must be separated from original training provenance. The existing parked package may target the old epoch3 backup: **verify exact attached dataset/state before any push.** Earlier two failed Colab attempts and backup remain archived; no blind retraining.
+Recovery dataset: **`ozgung/knee-colab-resume-c384-fold0` version14**, epoch13, about2.05GB including full resume/top-k state. Parent now downloaded exactserverlistedsize and safely loaded fullstate;14epochhistory/top3/modeltensor checks PASS. SelectedSWA recovered locally under `outputs/colab/coat384-fold0-recovery-20261010/`; exactoptimizercontinuation andmodelinference remain unverified. Detailed hashes/limits in recovery-review.json and linkedrecoverydocument. Fable's `scripts/build_tracka_export_kaggle.py` supports rebuildingSWA from resume and fewer export workers. Current review finds K_TRAIN default8 and EPOCHS default10 do not represent the actual12/14 fit; current export sources and synthetic train_cmd must be separated from original training provenance. The existing parked package may target the old epoch3 backup: **verify exact attached dataset/state before any push.** Earlier two failed Colab attempts and backup remain archived; no blind retraining.
 
 Old queuePID6782 was deliberately stopped; never restart `queue_push2.sh`, which would duplicate jobs. Launcher20983 successfully pushed round1 rehearsal and exited; oldwatch75269 is gone. Original logs remain under `/private/tmp/claude-501/-Users-ozgun-Dev-rsna-knee-abnormality-detection/5710ec33-d376-4baa-809b-95617f931beb/scratchpad/`. No replacement controller was started.
 
@@ -63,7 +63,7 @@ CoAtNet rehearsal commit **9bff86c**:8focused tests PASS, no skips, actual pinne
 
 Local Git only, no remote; branch `codex/token-efficient-instructions`. Parent commits reviewed changes. Preserve user AGENTS edits and Fable's untracked scripts. Main has a separate checkout and is not claimed current. Worktree `/Users/ozgun/.codex/worktrees/coatnet224-rehearsal/rsna-knee-abnormality-detection` contains the integrated rehearsal/final-wrapper source; app refused earlier archive because a pinned task/workspace protects it. No force removal.
 
-Final-wrapper code and tests are ready; no real final build or CUDA qualification is claimed. Parent16 combined tests passed with no skips; synthetic smoke passed and existing224 rehearsal source hashes are unchanged. Next meaningful checkpoint: original-label23 completion/fullfive qualification or384 recovery result. Round1 branch is closed. Update this handoff on changed evidence; avoid unchanged polling and duplicate jobs.
+Final-wrapper code and tests are ready; no real final build or CUDA qualification is claimed. Parent16 combined tests passed with no skips; synthetic smoke passed and existing224 rehearsal source hashes are unchanged. Next meaningful checkpoint: original-label23 completion/fullfive qualification or384 export result. Parent recovered384SWA without retraining;506 artifactchecks include486 per-tensorchecks, not model evaluations. Round1 branch is closed. Update this handoff on changed evidence; avoid unchanged polling and duplicate jobs.
 
 ## References
 
