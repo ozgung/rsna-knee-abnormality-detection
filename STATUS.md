@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-10 03:44 UTC**. Read this snapshot and queue, then the latest entries in [the Fable/Astra handoff](docs/claude-astra-handoff.md). Durable rules are in [AGENTS.md](AGENTS.md); setup is in [README.md](README.md). Earlier detailed history is preserved in [the status archive](docs/status-archive/status-before-20261009-1830-reconciliation.md).
+Updated **2026-10-10 03:46 UTC**. Read this snapshot and queue, then the latest entries in [the Fable/Astra handoff](docs/claude-astra-handoff.md). Durable rules are in [AGENTS.md](AGENTS.md); setup is in [README.md](README.md). Earlier detailed history is preserved in [the status archive](docs/status-archive/status-before-20261009-1830-reconciliation.md).
 
 ## Current snapshot
 
@@ -17,13 +17,13 @@ Updated **2026-10-10 03:44 UTC**. Read this snapshot and queue, then the latest 
 | Parent — fixed round1 fit | Allfive COMPLETE; full artifact/metric audit and weight hashes PASS | Retain exact fixed comparison; no recursive bootstrap expansion based on biased validation. |
 | Parent — round1 inference | Rehearsal/final PASS; entry57028725 PENDING | Inspect hidden score/failure when complete; do not resubmit. Best0.950 preserved. |
 | Fable/parent — CoAtNet224 | Folds0/1/4 COMPLETE, audited and checkpoint bytes verified; fold23v2 RUNNING | Finish fixed family; separately pinned224 rehearsal implemented and subsetbuild complete; fullfiveCUDA pending. [Partial audit](docs/experiments/coatnet224-partial-audit-20261010.md). |
-| Fable — Colab CoAtNet384 | `knee-c384-f0-a1` finished14epochs; SWA saved, export/recovery collection ongoing | Latest private dataset reports ready; actual restore still unverified. Active loop32148; Fable must apply accepted persistence corrections before nextfold. [Review](docs/experiments/colab-resume-review-20261010.md). |
+| Fable — Colab CoAtNet384 | `knee-c384-f0-a1` trained14epochs, then export FAILED and session lost | Latest private dataset reportsready; Fable preparing export-only recovery fromversion14. Loop32148/driver32151 exited; no restart. UnknownA100assignment remains; see recovery note below. [Review](docs/experiments/colab-resume-review-20261010.md). |
 | Parent/Fable — next scientific hypothesis | Static compatibility review complete; training smoke pending | Public384-named CoAtNet already qualified with explicit `img_size=320`; current training omits this argument. Its loader transfers only the backbone, discarding the trained head. Require explicit geometry and strict full-model loading for a full warm start. See [review](docs/experiments/coatnet-warmstart-review-20261009.md). No new fit launched. |
 | Parent/Fable — B1 archival integration | Deferred reporting/cache corrections | Benchmark remains descriptive. “Not flagged” does not prove gold-independent provenance; nongold equality cannot establish gold equality. Bind or regenerate cached parquet-to-CSV conversions. Current pinned training artifacts are unaffected. |
 
 ## Active jobs and recovery
 
-Latest receipt: `outputs/analysis/reconcile-20261010-0335/receipt.json`; reconciliation at03:36–03:44UTC. Entry57028725 remainsPENDING. CoAtNet01v3 and4v2 COMPLETE;23v2 and Fable’s new bootstrap-label01v1 RUNNING. Colab finished14epochs and savedSWA[13,12,11]; finalexports/collection pending. Private recovery dataset reportsready afterepoch13/version14 upload; no actual restore verified.
+Latest receipt: `outputs/analysis/reconcile-20261010-0335/receipt.json`; reconciliation at03:36–03:44UTC. Entry57028725 remainsPENDING. CoAtNet01v3 and4v2 COMPLETE;23v2 and Fable’s new bootstrap-label01v1 RUNNING. Colab trained14epochs/SWAsaved, then exportworker killed and session lost beforedownload; no localfinalweights. Fable owns export-only recovery frompersistedstate. Private recovery dataset reportsready afterepoch13/version14 upload; no actual restore verified.
 
 | Job | State / evidence |
 | --- | --- |
@@ -41,6 +41,10 @@ One-shot launcherPID**20983** accepted rehearsalv1 at02:37:40UTC (`launch-state.
 Retrieve completed training artifacts with `/Users/ozgun/miniconda3/bin/kaggle kernels output <kernel> -p <new-result-dir> --file-pattern <small-file-pattern>`; retain failed runs. Expected remote paths are `trackA/run_foldN.json`, `oof_foldN.csv`, logs and selected SWA checkpoints. No running logs are normally visible. Verify checkpoint bytes against run records before packaging.
 
 No parent downloader remains active. Final notebook completed; hidden competition rerun is pending. Allfive checkpoint transport completed; receipts under `outputs/analysis/reconcile-20261009-{2030,2130,2330}/`. Fullfive immutable rehearsal `outputs/kaggle/own-convnext-r1-rehearsal-fivefold-20261009/`, built from6b289e5: notebookSHA `1f5be813a5b19f767cb13ed12c519c54e81adb6e69298e05553d79406fc8fdba`, contractSHA `256b8623d0820c66cca19ea687e70ed428443f4e6bcd26049d2fd8d5ba618630`. Prior twofold build stays archived and was never launched. Fullfive CUDA qualification PASS62.333s; final-visible PASS55.198s, exact CSV SHA `d062b8a194d38d24d11051a504943c02b0c876f8d393492fc796a91078ca5f38`. Existing heartbeat continues; no duplicate automation.
+
+Colab update03:46UTC: export worker died bySIGKILL; OOM is plausible but not proven. The session then returned404/401 beforedownload; loop stoppedrc1, bothlocalcontrollerPIDs absent. Version14/epoch13 recoverydataset reportsready; Fable owns an export-only Kaggle recovery with fewerworkers. No localfinalcheckpoint/runJSON was recovered. Similar sessionlifetimes do not establish a hardaccountcap. CLI still lists unknownA100assignment `gpu-a100-s-kkb-usc1f2-2tuh9ado3sb85` with `[?]`; ownership/liveness/billing unverified, Fable reportedCLIstopfailure and alreadyrequesteduserUIcheck. Do not start anotherColabfit until thisassignment is reconciled. Failurelog preserved under `outputs/analysis/reconcile-20261010-0335/colab-export-failure.log`.
+
+The integrated `coatnet224-rehearsal` worktree remains attached: app archive refused because it is protected by a pinned task/workspace. Source is safely committed in9bff86c; no force removal.
 
 ## Frozen evidence and working decisions
 
@@ -71,7 +75,7 @@ ML interpreter `.venv/bin/python`; Kaggle CLI `/Users/ozgun/miniconda3/bin/kaggl
 
 ## Latest checkpoint
 
-This turn: entry57028725 remainspending. CoAtNet0/1/4 passed fresh57-check parentaudit and allthree checkpoint byte/metadata/finite-tensor checks. Fold4reportAUC0.906643 (+0.017099 vsConvNeXt0), with five mildly worse targets; notuniformimprovement. Separate224 rehearsal integrated and reviewed:8focusedtests PASS; subset0/1/4 built only, no newparentGPUfit orentry. Fullsuite had one sandboxsharedmemory failure; exacttest passed with processpermission (60optionalskips). Colab14epochsDONE/SWAsaved; finalexport/collectionpending, latestdatasetready. Fable owns nextfold persistence corrections and pairedlabelarm. Next: inspect hiddenresult; collect/audit remainingfolds, build fullfive224 and prioritize itsCUDAqualification before another longfit. CoAtNetfinalsubmission wrapper pending. Best0.950 unchanged.
+This turn: entry57028725 remainspending. CoAtNet0/1/4 passed fresh57-check parentaudit and allthree checkpoint byte/metadata/finite-tensor checks. Fold4reportAUC0.906643 (+0.017099 vsConvNeXt0), with five mildly worse targets; notuniformimprovement. Separate224 rehearsal integrated and reviewed:8focusedtests PASS; subset0/1/4 built only, no newparentGPUfit orentry. Fullsuite had one sandboxsharedmemory failure; exacttest passed with processpermission (60optionalskips). Colab14epochsDONE but exportFAILED/sessionlost beforedownload; latestdatasetready, actualrecoverability pending. UnknownA100assignment remainsbackendvisible; Fable already notifieduser, do not blindrelaunch. Fable owns nextfold persistence corrections and pairedlabelarm. Next: inspect hiddenresult; collect/audit remainingfolds, build fullfive224 and prioritize itsCUDAqualification before another longfit. CoAtNetfinalsubmission wrapper pending. Best0.950 unchanged.
 
 ## Reference records
 
