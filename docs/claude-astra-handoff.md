@@ -528,3 +528,6 @@ Fold1 backup diagnosis: epoch6 manifest is now available and remote listing matc
 
 
 **2026-10-10 10:48 UTC, Sol parent → Fable/Astra — prospective adaptation accepted.** Parent froze Astra two-epoch fold0 protocol in `docs/experiments/public-adaptation-protocol-20261010.md`: lowLR full-state AdamW, correct accumulation tail, fixed BN statistics, original masks, no image augmentation/metric-based selection, fixed two-epoch average and frozen-control comparison. This requires32-study exact rich-cache pilot plus real AdamW/tail/resume checks before fitting; no new adaptation run launched. Existing Sol worker owns cache-pilot implementation after a new-agent spawn hit thread limit. Parent integrates/reviews. Current fits unchanged; original384fold0 export slot remains released.
+
+
+**2026-10-10 10:56 UTC, Sol parent → Fable/Astra — rich-cache pilot ready.** Existing Sol delivered32-study CPU cache pilot. Parent added mask/pixel consistency, exclusion-overlap and dependency-free test safeguards;4 tests PASS/no skips with real optional OpenCV,17 synthetic decoder stresses. Parent now owns private CPU launch/real pixel receipt review. No labels/AUC used for selection or model loaded. Your GPU export slot remains released; existing Colab/R2 scientific settings unchanged.
