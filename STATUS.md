@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-09 23:38 UTC**. Read this snapshot and queue, then the latest entries in [the Fable/Astra handoff](docs/claude-astra-handoff.md). Durable rules are in [AGENTS.md](AGENTS.md); setup is in [README.md](README.md). Earlier detailed history is preserved in [the status archive](docs/status-archive/status-before-20261009-1830-reconciliation.md).
+Updated **2026-10-10 01:39 UTC**. Read this snapshot and queue, then the latest entries in [the Fable/Astra handoff](docs/claude-astra-handoff.md). Durable rules are in [AGENTS.md](AGENTS.md); setup is in [README.md](README.md). Earlier detailed history is preserved in [the status archive](docs/status-archive/status-before-20261009-1830-reconciliation.md).
 
 ## Current snapshot
 
@@ -17,13 +17,13 @@ Updated **2026-10-09 23:38 UTC**. Read this snapshot and queue, then the latest 
 | Parent — fixed round1 fit | Allfive COMPLETE; full artifact/metric audit and weight hashes PASS | Retain exact fixed comparison; no recursive bootstrap expansion based on biased validation. |
 | Parent — round1 inference | Fullfive built; launcher20983 waiting for actual free GPU slot | Collect exact rehearsal PASS, build/run final-visible inference, require exact CSV parity, check daily allowance and submit the fixed standalone comparison. |
 | Fable — CoAtNet224 | Revisedfold4v2 and01v3 RUNNING; fold23 held behind qualification | Failure logs preserved. Replacement native224 package usesbs4/accum2, gradient checkpointing and windowchunk8. Require actual finite forward/backward/checkpoint evidence; changed recipe is not yet qualified. |
-| Fable — Colab CoAtNet384 | Attempt2 `knee-coat384b` RUNNING; epoch4 logged, localepoch3 weights verified | Attempt1 preserved as lost. Backup loads with486finite tensors but has nooptimizerstate; exact resume remains unsupported. Fable owns driver/snapshot loop. [Incident](docs/experiments/colab-session-loss-20261009.md). |
+| Fable — Colab CoAtNet384 | New run `knee-c384-f0-a1` RUNNING after attempt2 loss | First full resume dataset ready (1.464GB); downloaded-byte/restore verification still pending. Active loop32148; Fable owns persistence identity/retention fixes. [Review](docs/experiments/colab-resume-review-20261010.md). |
 | Parent/Fable — next scientific hypothesis | Static compatibility review complete; training smoke pending | Public384-named CoAtNet already qualified with explicit `img_size=320`; current training omits this argument. Its loader transfers only the backbone, discarding the trained head. Require explicit geometry and strict full-model loading for a full warm start. See [review](docs/experiments/coatnet-warmstart-review-20261009.md). No new fit launched. |
 | Parent/Fable — B1 archival integration | Deferred reporting/cache corrections | Benchmark remains descriptive. “Not flagged” does not prove gold-independent provenance; nongold equality cannot establish gold equality. Bind or regenerate cached parquet-to-CSV conversions. Current pinned training artifacts are unaffected. |
 
 ## Active jobs and recovery
 
-Exact live-state receipt: `outputs/analysis/reconcile-20261009-2330/receipt.json`. At23:33UTC round1fold4 COMPLETE; CoAtNet4v2/01v3 RUNNING. Rehearsal push rejected by actual capacity; parent launcher now waits for the next free slot. No entry submitted.
+Exact live-state receipt: `outputs/analysis/reconcile-20261010-0135/receipt.json`. At01:36UTC CoAtNet4v2/01v3 RUNNING; rehearsal launcher20983 stillwaiting for actual capacity. Colab priorattempt2 lost; newrun with fullstate publisher active, datasetready. No parent entry or new fit.
 
 | Job | State / evidence |
 | --- | --- |
@@ -60,15 +60,17 @@ ConvNeXt23 downloads were recovered with4MiB verified HTTP ranges and exact fina
 
 User removed self-imposed time budgets/GPU reserves; respect actual account limits. Kaggle account45GPUh/week; actual two-session batchGPUlimit rejected the short rehearsal. This is platform capacity, not an assistant reserve. Colab existing~350units authorized; no purchase.
 
-Attempt1 `knee-coat384` lost its assignment afterepoch3; local wait stopped, failure/logs preserved in `outputs/analysis/reconcile-20261009-2230/` and `outputs/colab/coat384-fold0-attempt1-preempted.log`. Cause remains unknown; no originalcheckpoint recovered. Fable started attempt2 **`knee-coat384b`**, driverPID**14464**, same14epoch/384/k12/k_eval24/bs8/bootstrap/gradientcheckpoint recipe, without `--keep`. Command: `scripts/colab_tracka.sh --session knee-coat384b --fold-a 0 --fold-b '' --arch coatnet_rmlp_2_rw_384.sw_in12k_ft_in1k --res 384 --k 12 --k-eval 24 --bs 8 --epochs 14 --labels-file labels_bootstrap_v1.parquet --grad-ckpt`. Log `outputs/colab/coat384-fold0.log`, results `outputs/colab/trackA-knee-coat384b/`, remote `/content/trackA/`. Fable owns monitoring/recovery; reconcile active assignments before any restart.
+Colab attempts1/2 `knee-coat384` and `knee-coat384b` both lost their assignments; preserve their logs. Attempt2 reached loggedepoch11 but only epoch3 bestweights were recovered. That292826199byte backup safely loaded with486finite tensors and nooptimizerstate; it cannot supply exact resume. Old driver/snapshot loop stopped by Fable.
 
-BackupPID**14667** runs `scratchpad/colab_snapshot.sh` every15min into `outputs/colab/trackA-knee-coat384b-partial/`. Parent safely loaded an epoch3 copy:292826199bytes,486finite modeltensors, expectedCoAtNet384, **no optimizerstate**. Receipt `outputs/analysis/reconcile-20261009-2330/colab-partial-checkpoint.json`; this is recoverable best-model weights, not exact resumable trainingstate. Epoch4 logged in attempt2; runtime-loss detection/full-state persistence remain unfinished. Parent did not relaunchColab or transfercredentials. Local disk last checked17GiB before recentcheckpoints; no full raw-corpus download.
+Fable started **`knee-c384-f0-a1`**, loopPID**32148**, driverPID**32151**, same fold0/14epoch/384/k12/k_eval24/bs8/bootstrap recipe with new per-epoch full-state persistence. Loop script `scratchpad/colab_fold_loop.sh 0` launches up tofive attempts only on rc75, with later attempts passing `--resume-from-dataset ozgung/knee-colab-resume-c384-fold0`; log `outputs/colab/c384-fold0-loop.log`, results `outputs/colab/trackA-knee-c384-f0-a1/`, remote `/content/trackA/`. Do not start the loop again: attempt1 resets to fresh fitting. Reconcile assignment/process ownership before any stop/retry. Parent did not start this loop or transfercredentials.
+
+Dataset **`ozgung/knee-colab-resume-c384-fold0` is ready**, first fullstate1464064119bytes created01:33:08UTC afterepoch0; parent verified status/filelist, **not downloaded-byte integrity or restore**. Active helper publishes at most every8min; Fable reports local exact-continuation tests but parent did not rerun them. Review found missing experiment identity binding, unverified success bookkeeping, delete-old-versions default, missing localresume fallback and retry ownership gaps; [review](docs/experiments/colab-resume-review-20261010.md). Fable owns corrections; activefitleftuntouched. This is not yet a qualified resumed run. No paidcompute or raw-corpus expansion.
 
 ML interpreter `.venv/bin/python`; Kaggle CLI `/Users/ozgun/miniconda3/bin/kaggle`; Kaggle SDK Python `/Users/ozgun/miniconda3/bin/python`. Dependency-free commands and required validation are in AGENTS. Latest parent checks:11submission tests +5rehearsal tests PASS (no skips, actual public-source paths and isolatedOpenCV supplied), synthetic smoke PASS (`torch_forward=false`), actual legacy round0 archive/report validation PASS. No round1 CUDA result claimed.
 
 ## Latest checkpoint
 
-This turn: finalfold audit45checksPASS, allfive selected weights verified, fullfive rehearsal built. Actual platformcapacity rejected launch; one-shot waiter20983 now owns nextfree slot, oldlongfitqueue6782 stopped safely. Metric discrepancy reconciled: raw-reporttargets0.882137→0.893651 versus blendedtargets0.867392→0.879288, same masks. Colabattempt2/backupepoch3 verified; no fulloptimizerresume. No new entry or prediction/runtime code change. Next: collect rehearsal once launcherpushes, qualify final-visible, submit fixedround1 afterchecking allowance, then release correctedCoAtNet23. Best0.950 unchanged.
+This turn: no Kaggle completion; both fits and rehearsal waiter remain active. Reconciled secondColab loss and Fable's new fullstate publisher; firstprivate datasetconfirmedready. Reviewed persistence/restore gaps and recorded exactloop ownership; activecode/fituntouched. No parent run, entry or runtime-code change. Next: qualify round1 when a real GPUslot frees; Fable verifies and strengthens fullstate recovery while currentColabfit continues. Best0.950 unchanged.
 
 ## Reference records
 
