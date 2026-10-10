@@ -185,3 +185,94 @@ class ContributorSamplingTests(unittest.TestCase):
         groups=[actual[i:i+16] for i in range(0,len(actual),16)]
         self.assertEqual([len(g) for g in groups],[16,14])
         self.assertEqual([i for g in groups for i in g],actual)
+
+
+@unittest.skipUnless(importlib.util.find_spec('torch') and importlib.util.find_spec('numpy'),'optional torch/numpy absent')
+class NumericalDiagnosticTests(unittest.TestCase):
+    def test_complete_cancellation_diagnostics_and_resume_gate(self):
+        import torch
+        from knee.public_adaptation_pilot import gradient_comparison,evaluate_tail_reference,PilotCheckError
+        reference={'backbone.weight':torch.tensor([1e6,-1e6,1e-6,0.]),
+                   'att.weight':torch.tensor([2.,-3.]),'norm.weight':torch.tensor([0.,0.])}
+        actual={k:v.clone() for k,v in reference.items()}
+        actual['backbone.weight'][2]=1e-4; actual['norm.weight'][0]=2e-6
+        result=gradient_comparison(actual,reference)
+        self.assertEqual(result['parameters_compared'],3)
+        self.assertEqual(result['mismatched_elements'],2)
+        self.assertEqual(result['mismatched_parameters'],2)
+        self.assertEqual(result['worst_parameter'],'backbone.weight')
+        self.assertEqual(result['zero_reference_nonzero_actual'],1)
+        self.assertAlmostEqual(result['fitted_scale'],1.,places=10)
+        self.assertLess(result['relative_l2_error'],1e-9)
+        self.assertGreater(result['max_relative_error_nonzero_reference'],90.)
+        report={}
+        with self.assertRaises(PilotCheckError) as error:evaluate_tail_reference(report,actual,reference)
+        self.assertEqual(error.exception.check,'RESUME_NOT_QUALIFIED')
+        self.assertNotIn('tail_gradient_comparison',report)
+        report={'exact_resume_status':'PASS','save_reload_status':'PASS'}
+        with self.assertRaises(PilotCheckError) as error:evaluate_tail_reference(report,actual,reference)
+        self.assertEqual(error.exception.check,'TAIL_GRADIENT_MISMATCH')
+        self.assertEqual(report['exact_resume_status'],'PASS')
+        self.assertEqual(report['tail_gradient_comparison']['parameters_compared'],3)
+        wrong={k:v*(3/16) for k,v in reference.items()}
+        self.assertAlmostEqual(gradient_comparison(wrong,reference)['fitted_scale'],3/16,places=7)
+
+    def test_deep_model_exact_resume_before_reordered_reference(self):
+        import torch
+        from knee.public_adaptation_pilot import (optimizer_groups,training_mode,checkpoint_forward,masked_loss,
+            apply_update,save_state,restore_state,require_exact_state,bn_state,require_bn,evaluate_tail_reference)
+        class Deep(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.backbone=torch.nn.Sequential(torch.nn.Linear(3,16),torch.nn.Tanh(),torch.nn.Linear(16,16),
+                    torch.nn.Tanh(),torch.nn.Linear(16,4),torch.nn.BatchNorm1d(4))
+                self.norm=torch.nn.LayerNorm(4)
+                self.att=torch.nn.Sequential(torch.nn.Dropout(.2),torch.nn.Linear(4,2))
+            def head(self,features):return self.att(self.norm(features.mean(1)))
+        torch.manual_seed(42);model=Deep();bn=bn_state(model)
+        opt=torch.optim.AdamW(optimizer_groups(model),betas=(.9,.999),eps=1e-8,foreach=False)
+        windows=[torch.arange(24,dtype=torch.float32).reshape(1,8,3)/24 + i/10 for i in range(3)]
+        targets=[torch.tensor([[.2,.8]]),torch.tensor([[.4,.7]]),torch.tensor([[.3,.6]])]
+        masks=[torch.tensor([[1.,0.]]),torch.ones(1,2),torch.tensor([[0.,1.]])]
+        order=[1,0,2]
+        def accumulate(denominator):
+            training_mode(model);opt.zero_grad(set_to_none=True)
+            for i in order:(masked_loss(checkpoint_forward(model,windows[i]),targets[i],masks[i])/denominator).backward()
+            require_bn(model,bn)
+            return {n:p.grad.detach().clone() for n,p in model.named_parameters()}
+        with tempfile.TemporaryDirectory() as tmp:
+            before=Path(tmp)/'before.pt';after=Path(tmp)/'after.pt';replay=Path(tmp)/'replay.pt'
+            accumulate(3);apply_update(model,opt,0)
+            sampler={'epoch':1,'position':0,'order':order}
+            save_state(before,model,opt,sampler,1,{'pin':'deepfixture'})
+            actual=accumulate(3);apply_update(model,opt,1);sampler['position']=3
+            save_state(after,model,opt,sampler,2,{'pin':'deepfixture'})
+            restored,count=restore_state(before,model,opt,{'pin':'deepfixture'})
+            accumulate(3);apply_update(model,opt,count);restored['position']=3
+            save_state(replay,model,opt,restored,2,{'pin':'deepfixture'})
+            a=torch.load(after,weights_only=True);b=torch.load(replay,weights_only=True)
+            for key,check in [('model','RESUME_MODEL_MISMATCH'),('optimizer','RESUME_OPTIMIZER_MISMATCH'),
+                              ('rng','RESUME_RNG_MISMATCH'),('sampler','RESUME_SAMPLER_MISMATCH')]:
+                require_exact_state(a[key],b[key],check)
+            report={'exact_resume_status':'PASS','save_reload_status':'PASS'}
+            restore_state(before,model,opt,{'pin':'deepfixture'})
+            reference={k:v/3 for k,v in accumulate(1).items()}
+            # These different FP32 operation orders are measured independently.
+            from knee.public_adaptation_pilot import gradient_comparison
+            diagnostics=gradient_comparison(actual,reference)
+            self.assertEqual(diagnostics['parameters_compared'],len(actual))
+            self.assertAlmostEqual(diagnostics['fitted_scale'],1.,places=5)
+            self.assertLess(diagnostics['relative_l2_error'],1e-5)
+            self.assertEqual(report['exact_resume_status'],'PASS')
+
+    def test_forward_fingerprints_are_aggregate_and_detect_rng_change(self):
+        import torch
+        from knee.public_adaptation_pilot import forward_comparison
+        a=[{'input_sha256':'input'+str(i),'rng_sha256':'rng'+str(i),
+            'logits':torch.tensor([[i*.1,.2]]),'loss':torch.tensor(.4)} for i in range(3)]
+        b=[dict(v) for v in a]
+        result=forward_comparison(a,b)
+        self.assertTrue(all(result[k] for k in ('input_exact','rng_exact','logits_exact','raw_loss_exact')))
+        self.assertEqual(result['logits_max_abs_error'],0.)
+        self.assertNotIn('logits',result);self.assertNotIn('loss',result)
+        b[1]['rng_sha256']='different';self.assertFalse(forward_comparison(a,b)['rng_exact'])

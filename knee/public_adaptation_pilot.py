@@ -22,11 +22,15 @@ STATE_RTOL = 1e-5
 
 SAFE_CHECKS = frozenset({'LABEL_BYTES', 'LABEL_TARGET_SCHEMA', 'MASK_TARGET_SCHEMA',
     'LABEL_DUPLICATE_IDS', 'LABEL_SELECTED_COVERAGE', 'MASK_INVALID_VALUES',
-    'LABEL_OBSERVED_TARGET_INVALID', 'LABEL_NONCONTRIBUTING_STUDIES', 'LABEL_CONTRIBUTOR_COUNT'})
+    'LABEL_OBSERVED_TARGET_INVALID', 'LABEL_NONCONTRIBUTING_STUDIES', 'LABEL_CONTRIBUTOR_COUNT', 'BN_BUFFERS_CHANGED', 'RESUME_CONTRACT_MISMATCH',
+    'RESUME_SAMPLER_MISMATCH', 'RESUME_UPDATE_COUNTER_MISMATCH', 'RESUME_MODEL_MISMATCH',
+    'RESUME_OPTIMIZER_MISMATCH', 'RESUME_RNG_MISMATCH', 'RESUME_PREDICTION_MISMATCH',
+    'TAIL_GRADIENT_MISMATCH', 'TAIL_GRADIENT_INVALID', 'RESUME_NOT_QUALIFIED', 'TAIL_FORWARD_MISMATCH'})
 SAFE_STAGES = frozenset({'storage', 'cache_contract', 'cache_binding', 'source_lineage',
     'reader_policy', 'cache_index', 'public_definitions', 'label_preflight',
     'official_metadata', 'model_load', 'frozen_parity', 'optimizer_setup',
-    'full_updates', 'tail_reference', 'resume_continuation', 'reload_predictions'})
+    'full_updates', 'tail_reference', 'resume_continuation', 'reload_predictions',
+    'baseline_tail_update', 'resume_restore', 'tail_reference_restore', 'tail_gradient_comparison'})
 
 
 class PilotCheckError(ValueError):
@@ -114,7 +118,7 @@ def require_bn(model, expected):
     import torch
     actual = bn_state(model)
     if actual.keys() != expected.keys() or any(not torch.equal(actual[k], v) for k,v in expected.items()):
-        raise ValueError('BN buffers drifted')
+        raise PilotCheckError('BN_BUFFERS_CHANGED')
 
 
 def masked_loss(logits, targets, mask):
@@ -180,7 +184,7 @@ def save_state(path, model, optimizer, sampler, updates, contract):
 def restore_state(path, model, optimizer, contract):
     import torch
     state=torch.load(path,map_location='cpu',weights_only=True)
-    if state['contract'] != contract: raise ValueError('Resume contract differs')
+    if state['contract'] != contract: raise PilotCheckError('RESUME_CONTRACT_MISMATCH')
     model.load_state_dict(state['model'],strict=True); optimizer.load_state_dict(state['optimizer'])
     restore_rng(state['rng'])
     return state['sampler'],state['updates']
@@ -200,6 +204,107 @@ def assert_state_close(a,b, *, atol=STATE_ATOL, rtol=STATE_RTOL):
         return max([assert_state_close(x,y,atol=atol,rtol=rtol) for x,y in zip(a,b)]+[0.0])
     if a!=b: raise ValueError('State scalar differs')
     return 0.0
+
+
+def require_exact_state(actual, expected, check):
+    """Keep exact checks separately attributable without exposing exception text."""
+    try: return assert_state_close(actual, expected, atol=0, rtol=0)
+    except ValueError: raise PilotCheckError(check) from None
+
+
+def gradient_comparison(actual, reference):
+    """Complete preclip FP64 aggregate reductions; no gradient arrays exported."""
+    import math
+    import torch
+    if actual.keys() != reference.keys(): raise PilotCheckError('TAIL_GRADIENT_INVALID')
+    def empty():
+        return dict(error2=0.0,actual2=0.0,reference2=0.0,dot=0.0,max_abs_error=0.0,
+                    max_relative_error_nonzero_reference=0.0,mismatched_elements=0,
+                    mismatched_parameters=0,parameters_compared=0,elements_compared=0,
+                    zero_reference_elements=0,zero_reference_nonzero_actual=0)
+    def merge(total,local):
+        for key,value in local.items():
+            if key.startswith('max_'): total[key]=max(total[key],value)
+            else: total[key]+=value
+    def finish(stats):
+        x=dict(stats); actual_norm=math.sqrt(x.pop('actual2')); reference_norm=math.sqrt(x.pop('reference2'))
+        error=math.sqrt(x.pop('error2')); dot=x.pop('dot')
+        x.update(actual_norm=actual_norm,reference_norm=reference_norm,l2_error=error,
+                 relative_l2_error=error/reference_norm if reference_norm else (0.0 if not error else None),
+                 norm_ratio=actual_norm/reference_norm if reference_norm else None,
+                 cosine_similarity=dot/(actual_norm*reference_norm) if actual_norm and reference_norm else None,
+                 fitted_scale=dot/reference_norm**2 if reference_norm else None)
+        return x
+    totals=empty(); families={f:empty() for f in ('encoder','head')};worst=None;worst_stats=None
+    for name,a in actual.items():
+        b=reference[name]
+        if (not torch.is_tensor(a) or not torch.is_tensor(b) or a.shape!=b.shape or a.dtype!=b.dtype or
+                not torch.isfinite(a).all() or not torch.isfinite(b).all()):
+            raise PilotCheckError('TAIL_GRADIENT_INVALID')
+        a=a.detach().cpu(); b=b.detach().cpu(); x=a.double(); y=b.double(); d=x-y
+        local=empty(); zero=y==0; nonzero=~zero
+        local.update(error2=float(d.square().sum()),actual2=float(x.square().sum()),
+                     reference2=float(y.square().sum()),dot=float((x*y).sum()),
+                     max_abs_error=float(d.abs().max()) if a.numel() else 0.0,
+                     max_relative_error_nonzero_reference=float((d[nonzero].abs()/y[nonzero].abs()).max()) if nonzero.any() else 0.0,
+                     mismatched_elements=int((~torch.isclose(a,b,atol=STATE_ATOL,rtol=STATE_RTOL)).sum()),
+                     parameters_compared=1,elements_compared=a.numel(),zero_reference_elements=int(zero.sum()),
+                     zero_reference_nonzero_actual=int((zero&(x!=0)).sum()))
+        local['mismatched_parameters']=int(local['mismatched_elements']>0)
+        if worst is None or local['max_abs_error']>worst_stats['max_abs_error']: worst=name;worst_stats=local
+        merge(totals,local);merge(families['encoder' if name.startswith('backbone.') else 'head'],local)
+    return {**finish(totals),'worst_parameter':worst,'worst_tensor':finish(worst_stats) if worst_stats else {},
+            'per_family':{name:finish(v) for name,v in families.items()},'atol':STATE_ATOL,'rtol':STATE_RTOL}
+
+
+def evaluate_tail_reference(report, actual, reference):
+    """Exact replay is mandatory first; preserve all aggregates before rejection."""
+    if report.get('exact_resume_status')!='PASS' or report.get('save_reload_status')!='PASS':
+        raise PilotCheckError('RESUME_NOT_QUALIFIED')
+    comparison=gradient_comparison(actual,reference)
+    report['tail_gradient_comparison']=comparison
+    forward=report.get('reordered_reference_forward')
+    if forward is not None:
+        if not forward['rng_exact']: raise PilotCheckError('RESUME_RNG_MISMATCH')
+        if not all(forward[k] for k in ('input_exact','logits_exact','raw_loss_exact')):
+            raise PilotCheckError('TAIL_FORWARD_MISMATCH')
+    if comparison['mismatched_elements']: raise PilotCheckError('TAIL_GRADIENT_MISMATCH')
+    return comparison
+
+
+def state_fingerprint(state):
+    """Aggregate signature for saved RNG/forward tensors; values stay in memory."""
+    import torch
+    digest=hashlib.sha256()
+    def add(value):
+        if torch.is_tensor(value):
+            v=value.detach().cpu().contiguous()
+            digest.update(canonical_bytes([str(v.dtype),list(v.shape)]));digest.update(v.numpy().tobytes())
+        elif isinstance(value,dict):
+            for key in sorted(value): digest.update(key.encode());add(value[key])
+        elif isinstance(value,(list,tuple)):
+            for item in value: add(item)
+        else: digest.update(canonical_bytes(value))
+    add(state);return digest.hexdigest()
+
+
+def forward_comparison(actual, reference):
+    """Aggregate three-tail input/RNG/logit/raw-loss replay evidence only."""
+    import torch
+    if len(actual)!=3 or len(reference)!=3: raise PilotCheckError('TAIL_FORWARD_MISMATCH')
+    a_logits=torch.cat([v['logits'].flatten() for v in actual]);b_logits=torch.cat([v['logits'].flatten() for v in reference])
+    a_loss=torch.stack([v['loss'] for v in actual]);b_loss=torch.stack([v['loss'] for v in reference])
+    result={}
+    for name in ('input_sha256','rng_sha256'):
+        a=sha256(canonical_bytes([v[name] for v in actual]));b=sha256(canonical_bytes([v[name] for v in reference]))
+        result[name.replace('_sha256','_fingerprint')+'_actual']=a
+        result[name.replace('_sha256','_fingerprint')+'_reference']=b
+        result[name.replace('_sha256','_exact')]=a==b
+    result.update(logits_fingerprint_actual=state_fingerprint(a_logits),logits_fingerprint_reference=state_fingerprint(b_logits),
+                  raw_loss_fingerprint_actual=state_fingerprint(a_loss),raw_loss_fingerprint_reference=state_fingerprint(b_loss),
+                  logits_exact=torch.equal(a_logits,b_logits),raw_loss_exact=torch.equal(a_loss,b_loss),
+                  logits_max_abs_error=float((a_logits-b_logits).abs().max()),raw_loss_max_abs_error=float((a_loss-b_loss).abs().max()))
+    return result
 
 
 def tensor_max_error(a, b):
@@ -293,7 +398,7 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
             'precision':'FP32','cache_storage_bytes':452996096,'warmup_successful_updates':20,'accumulation':16,'tail_denominator':3,
             'updates':0,'contributing_studies':0,'reference_study_passes':3,'resumed_study_passes':3,
             'center_policy':'Inherited min/max valid-mask span, public fallback center; cross-slot and partial-mask windows preserved; no replacement if at least12 centers',
-            'cache_load_seconds':0.0,'training_window_seconds':0.0,'forward_backward_seconds':0.0,
+            'cache_load_seconds':0.0,'training_window_seconds':0.0,'forward_backward_seconds':0.0,'actual_forward_backward_passes':0,
             'free_disk_before':shutil.disk_usage(out).free}
     def save():
         report.update(elapsed_seconds=time.monotonic()-started,peak_cuda_bytes=torch.cuda.max_memory_allocated(),
@@ -382,7 +487,7 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
         def order(epoch): return np.random.default_rng(42+epoch).permutation(contributors).tolist()
         sampler={'epoch':0,'position':0,'order':order(0)}
         report['sampler_order_sha256']=sha256(canonical_bytes(sampler['order']))
-        def accumulate(chosen,epoch,denominator):
+        def accumulate(chosen,epoch,denominator,capture=None):
             training_mode(model); optimizer.zero_grad(set_to_none=True)
             for i in chosen:
                 tick=time.monotonic()
@@ -393,11 +498,17 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
                 torch.cuda.synchronize()
                 report['training_window_seconds']+=time.monotonic()-tick
                 tick=time.monotonic()
+                before_rng=state_fingerprint(rng_state()) if capture is not None else None
                 logits=checkpoint_forward(model,windows)
                 y=torch.from_numpy(ys[ids[i]])[None].to('cuda'); m=torch.from_numpy(ms[ids[i]])[None].to('cuda')
-                (masked_loss(logits,y,m)/denominator).backward()
+                loss=masked_loss(logits,y,m)
+                if capture is not None:
+                    capture.append({'input_sha256':state_fingerprint(windows), 'rng_sha256':before_rng,
+                                    'logits':logits.detach().cpu().clone(),'loss':loss.detach().cpu().clone()})
+                (loss/denominator).backward()
                 torch.cuda.synchronize()
                 report['forward_backward_seconds']+=time.monotonic()-tick
+                report['actual_forward_backward_passes']+=1
                 del windows,volume,mask,logits
             require_bn(model,original_bn)
         train_start=time.monotonic()
@@ -414,41 +525,41 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
         report['next_epoch_sampler_order_sha256']=sha256(canonical_bytes(sampler['order']))
         save_state(temporary[0],model,optimizer,sampler,2,contract)
         chosen=sampler['order'][:3]
-        accumulate(chosen,1,3)
+        stage='baseline_tail_update'
+        baseline_forward=[]
+        accumulate(chosen,1,3,capture=baseline_forward)
         actual_grad={n:p.grad.detach().cpu().clone() for n,p in model.named_parameters()}
         apply_update(model,optimizer,2); sampler['position']=3
+        report.update(updates=3,contributing_studies=33)
         save_state(temporary[1],model,optimizer,sampler,3,contract)
-        # Reopen saved full state; reference accumulates unscaled study losses,
-        # then divides by actual3. This would detect an accidental /16 tail.
-        stage='tail_reference'
+        # Qualify identical arithmetic BEFORE independently reordered scaling.
+        stage='resume_restore'
         restored,updates=restore_state(temporary[0],model,optimizer,contract)
-        if restored!={'epoch':1,'position':0,'order':order(1)} or updates!=2: raise ValueError('Sampler/counter resume differs')
-        accumulate(restored['order'][:3],restored['epoch'],1)
-        tail_error=0.0
-        for name,p in model.named_parameters():
-            p.grad.div_(3)
-            reference=p.grad.detach().cpu(); actual=actual_grad[name]
-            if not torch.allclose(actual,reference,atol=STATE_ATOL,rtol=STATE_RTOL): raise ValueError('Tail denominator reference failed')
-            tail_error=max(tail_error,float((actual-reference).abs().max()))
-        del actual_grad
+        if restored!={'epoch':1,'position':0,'order':order(1)}: raise PilotCheckError('RESUME_SAMPLER_MISMATCH')
+        if updates!=2: raise PilotCheckError('RESUME_UPDATE_COUNTER_MISMATCH')
+        require_bn(model,original_bn)
         stage='resume_continuation'
-        # Resume proof uses IDENTICAL /3 arithmetic, separately from reordered
-        # tail reference. Deterministic model/optimizer/RNG/sampler must be exact.
-        restored,updates=restore_state(temporary[0],model,optimizer,contract)
-        accumulate(restored['order'][:3],restored['epoch'],3)
+        replay_forward=[]
+        accumulate(restored['order'][:3],restored['epoch'],3,capture=replay_forward)
         apply_update(model,optimizer,updates); restored['position']=3
         save_state(temporary[2],model,optimizer,restored,3,contract)
         a=torch.load(temporary[1],map_location='cpu',weights_only=True)
         b=torch.load(temporary[2],map_location='cpu',weights_only=True)
-        model_error=tensor_max_error(a['model'],b['model'])
-        report['measured_resume_model_max_error']=model_error
+        report['measured_resume_model_max_error']=tensor_max_error(a['model'],b['model'])
         report['measured_resume_optimizer_max_error']=tensor_max_error(a['optimizer'],b['optimizer'])
-        model_error=assert_state_close(a['model'],b['model'],atol=0,rtol=0)
-        optimizer_error=assert_state_close(a['optimizer'],b['optimizer'],atol=0,rtol=0)
-        assert_state_close(a['rng'],b['rng'],atol=0,rtol=0)
-        assert_state_close(a['sampler'],b['sampler'],atol=0,rtol=0)
-        if a['updates']!=b['updates'] or b['updates']!=3: raise ValueError('Resume update count differs')
+        model_error=require_exact_state(a['model'],b['model'],'RESUME_MODEL_MISMATCH')
+        optimizer_error=require_exact_state(a['optimizer'],b['optimizer'],'RESUME_OPTIMIZER_MISMATCH')
+        require_exact_state(a['rng'],b['rng'],'RESUME_RNG_MISMATCH')
+        require_exact_state(a['sampler'],b['sampler'],'RESUME_SAMPLER_MISMATCH')
+        if a['updates']!=b['updates'] or b['updates']!=3: raise PilotCheckError('RESUME_UPDATE_COUNTER_MISMATCH')
         del a,b
+        report['identical_replay_forward']=forward_comparison(baseline_forward,replay_forward)
+        if not report['identical_replay_forward']['rng_exact']: raise PilotCheckError('RESUME_RNG_MISMATCH')
+        if not all(report['identical_replay_forward'][k] for k in ('input_exact','logits_exact','raw_loss_exact')):
+            raise PilotCheckError('TAIL_FORWARD_MISMATCH')
+        report.update(exact_resume_status='PASS',resume_model_max_error=model_error,
+                      resume_optimizer_max_error=optimizer_error,resume_rng_exact=True,resume_sampler_exact=True)
+        save()
         stage='reload_predictions'
         volume,mask=cached(0)
         probe_windows=sampled_windows(public,volume,mask,ids[0],1)
@@ -459,8 +570,37 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
         second=torch.load(temporary[2],map_location='cpu',weights_only=True)
         model.load_state_dict(second['model'],strict=True); del second
         with torch.no_grad(): actual=checkpoint_forward(model,probe_windows).detach().cpu()
-        prediction_error=assert_state_close(expected,actual,atol=0,rtol=0)
+        prediction_error=require_exact_state(expected,actual,'RESUME_PREDICTION_MISMATCH')
         del volume,mask,probe_windows
+        require_bn(model,original_bn)
+        report.update(save_reload_logit_max_error=prediction_error,save_reload_status='PASS',bn_buffers_unchanged=True)
+        save()
+        # Independently reordered reference has unchanged numeric tolerance.
+        # Restore the SAME pre-tail model/RNG; do not compare different updates.
+        stage='tail_reference_restore'
+        restored,updates=restore_state(temporary[0],model,optimizer,contract)
+        if restored!={'epoch':1,'position':0,'order':order(1)}: raise PilotCheckError('RESUME_SAMPLER_MISMATCH')
+        if updates!=2: raise PilotCheckError('RESUME_UPDATE_COUNTER_MISMATCH')
+        require_bn(model,original_bn)
+        stage='tail_reference'
+        reference_forward=[]
+        accumulate(restored['order'][:3],restored['epoch'],1,capture=reference_forward)
+        report['reordered_reference_forward']=forward_comparison(baseline_forward,reference_forward)
+        reference_grad={}
+        for name,p in model.named_parameters():
+            if p.grad is None: raise PilotCheckError('TAIL_GRADIENT_INVALID')
+            p.grad.div_(3)
+            reference_grad[name]=p.grad.detach().cpu()
+        stage='tail_gradient_comparison'
+        comparison=evaluate_tail_reference(report,actual_grad,reference_grad)
+        save()  # Outer failure handler also persists complete aggregates on mismatch.
+        tail_error=comparison['max_abs_error']
+        del actual_grad,reference_grad
+        if not all(report['reordered_reference_forward'][name] for name in ('input_exact','rng_exact','logits_exact','raw_loss_exact')):
+            raise PilotCheckError('TAIL_FORWARD_MISMATCH')
+        # Parameter-update probes refer to the qualified continuation, not the
+        # pre-tail state temporarily restored for the independent gradient check.
+        restored,updates=restore_state(temporary[2],model,optimizer,contract)
         require_bn(model,original_bn)
         changes={family:float((dict(model.named_parameters())[name].detach().cpu()-before).abs().max())
                  for family,(name,before) in probes.items()}
