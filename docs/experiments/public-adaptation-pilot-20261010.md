@@ -1,0 +1,13 @@
+# Public full-model AdamW qualification — October 10, 2026
+
+The prerequisite for the [fixed two-epoch adaptation](public-adaptation-protocol-20261010.md) is one disposable GPU pilot on the qualified32-study rich cache. Hypothesis: the inherited full public320-pixel model can execute the exact prospective optimizer/masking/BN/accumulation recipe and resume it without changing its computation. This measures mechanics, not model quality. No validation/AUC/gold tuning or retained pilot weights.
+
+Pin cache v1 output receipt/index/ordered membership/arrays, source227c001, exclusions and public checkpointSHA7e5315dad125b99fc65b340b3de41de628e9be51ff5835355dd61c86472244ef. Two prespecified studies must reproduce freshly decoded bytes, CUDA windows and frozen mirrored predictions. Fit only disposable updates with original explicit m_ masks and finite original blend targets, verified table hashes and schema alignment. No reports or y_ labels read.
+
+Use FP32 AdamW encoder/headLR1e-6/1e-5, decay.01 on matrix weights only,20-successful-update warmup,12 deterministic sampled windows,chunk4 nonreentrant gradient checkpoints, BN statistics frozen/affine trainable,head dropout.2. Two16-study updates precede a3-study tail with independent /3 denominator reference. Separately restore complete model/optimizer/RNG/sampler, repeat identical next-update arithmetic and require exact continuation and saved-model logits. Reject missing/nonfinite gradients, buffer drift, incomplete optimizer coverage, changed data, OOM or unsupported deterministic operations. Delete all disposable states on completion/failure.
+
+Acceptance: aggregate actual-CUDA PASS bound to reviewed source/config/cache/checkpoint with finite nonzero encoder/head updates, exact frozen/cache and deterministic continuation parity, unchangedBN and correcttail. Runtime/memory/disk measured for planning; expected a few minutes of training plus startup, no assistant time cap. No fulladaptation fit starts until this passes.
+
+Local checks:6 mechanics/packaging PASS in ML venv, optionalpyarrow skip; separate miniconda label-schema test PASS. BasePython2 packaging PASS/5 backend skips. Real original mask schema12 targets verified without reading values. Parent reviewed exact-resume separation from numerically reordered tail-gradient reference. Evidence `outputs/analysis/public-adaptation-pilot-20261010/{local-checks,original-mask-schema}.json`. ActualGPU pending.
+
+New code: `knee/public_adaptation_pilot.py`, `scripts/build_public_adaptation_pilot.py`, `tests/test_public_adaptation_pilot.py`. Parent commits before immutable finalbuild/private upload. No Colab allocation, new terms, purchases or competition entry.
