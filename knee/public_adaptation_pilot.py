@@ -18,6 +18,9 @@ LABEL_SHA = 'd2cdb8a37e0c4c491758d17c96e3bd4081f06b257c7849608df88590368e94e2'
 MASK_SHA = 'a134cfce2f751f90f4219d791a563ee677b6223ac28f32e456bb3759c1d3fba9'
 STATE_ATOL = 1e-6
 STATE_RTOL = 1e-5
+STREAM_RECEIPT_SHA = '17e8e3aeb7bcfab660e7fe9b6804a7bd513886fceb451a80ed3eadff3fc5fb64'
+STREAM_REVISION = '429997b7aa8bda1607e0dc6d5974ea1ca042508a'
+STREAM_BUNDLE_SHA = '017a63d249cb8d1aa969652f2645328dbc1f18b526627a871f558be2deead1a6'
 
 
 SAFE_CHECKS = frozenset({'LABEL_BYTES', 'LABEL_TARGET_SCHEMA', 'MASK_TARGET_SCHEMA',
@@ -25,12 +28,15 @@ SAFE_CHECKS = frozenset({'LABEL_BYTES', 'LABEL_TARGET_SCHEMA', 'MASK_TARGET_SCHE
     'LABEL_OBSERVED_TARGET_INVALID', 'LABEL_NONCONTRIBUTING_STUDIES', 'LABEL_CONTRIBUTOR_COUNT', 'BN_BUFFERS_CHANGED', 'RESUME_CONTRACT_MISMATCH',
     'RESUME_SAMPLER_MISMATCH', 'RESUME_UPDATE_COUNTER_MISMATCH', 'RESUME_MODEL_MISMATCH',
     'RESUME_OPTIMIZER_MISMATCH', 'RESUME_RNG_MISMATCH', 'RESUME_PREDICTION_MISMATCH',
-    'TAIL_GRADIENT_MISMATCH', 'TAIL_GRADIENT_INVALID', 'RESUME_NOT_QUALIFIED', 'TAIL_FORWARD_MISMATCH'})
+    'TAIL_GRADIENT_MISMATCH', 'TAIL_GRADIENT_INVALID', 'RESUME_NOT_QUALIFIED', 'TAIL_FORWARD_MISMATCH', 'GROUP_COUNT_MISMATCH',
+    'ARTIFACT_BINDING_MISMATCH', 'ARTIFACT_STATE_MISMATCH', 'STREAM_INPUT_MISMATCH',
+    'STREAM_CURSOR_MISMATCH', 'TAIL_GROSS_DISCREPANCY'})
 SAFE_STAGES = frozenset({'storage', 'cache_contract', 'cache_binding', 'source_lineage',
     'reader_policy', 'cache_index', 'public_definitions', 'label_preflight',
     'official_metadata', 'model_load', 'frozen_parity', 'optimizer_setup',
     'full_updates', 'tail_reference', 'resume_continuation', 'reload_predictions',
-    'baseline_tail_update', 'resume_restore', 'tail_reference_restore', 'tail_gradient_comparison'})
+    'baseline_tail_update', 'resume_restore', 'tail_reference_restore', 'tail_gradient_comparison',
+    'stream_binding', 'artifact_restore', 'artifact_export', 'artifact_expectation'})
 
 
 class PilotCheckError(ValueError):
@@ -129,7 +135,107 @@ def masked_loss(logits, targets, mask):
         raise ValueError('Invalid soft targets/masks')
     denominator = mask.sum()
     if denominator <= 0: raise ValueError('Noncontributing study')
-    return (torch.nn.functional.binary_cross_entropy_with_logits(logits.float(), targets, reduction='none') * mask).sum()/denominator
+    return (torch.nn.functional.binary_cross_entropy_with_logits(logits if logits.dtype==torch.float64 else logits.float(), targets, reduction='none') * mask).sum()/denominator
+
+
+
+def study_mean_backward(loss, actual_count):
+    """Production operation: one observed-cell study mean / actual group count."""
+    import torch
+    if type(actual_count) is not int or not 1 <= actual_count <= 16:
+        raise PilotCheckError('GROUP_COUNT_MISMATCH')
+    if loss.ndim != 0 or not torch.isfinite(loss): raise PilotCheckError('TAIL_GRADIENT_INVALID')
+    (loss / actual_count).backward()
+
+
+def require_group_counts(group_count, denominator, processed):
+    if (any(type(v) is not int for v in (group_count,denominator,processed)) or
+            not 1 <= group_count <= 16 or group_count != denominator or processed != group_count):
+        raise PilotCheckError('GROUP_COUNT_MISMATCH')
+
+
+def require_exact_gradients(actual, reference):
+    """Exact preclip tensor gate, independent of old elementwise tolerances."""
+    import torch
+    if actual.keys()!=reference.keys(): raise PilotCheckError('TAIL_GRADIENT_INVALID')
+    for name,a in actual.items():
+        b=reference[name]
+        if (not torch.is_tensor(a) or not torch.is_tensor(b) or a.shape!=b.shape or a.dtype!=b.dtype or
+                not torch.isfinite(a).all() or not torch.isfinite(b).all()):
+            raise PilotCheckError('TAIL_GRADIENT_INVALID')
+        if not torch.equal(a.cpu(),b.cpu()): raise PilotCheckError('TAIL_GRADIENT_MISMATCH')
+
+
+def stream_contract(receipt, contract):
+    if (sha256(canonical_bytes(receipt))!=STREAM_RECEIPT_SHA or receipt.get('contract')!=contract or
+            receipt.get('source_revision')!=STREAM_REVISION or receipt.get('source_bundle_sha256')!=STREAM_BUNDLE_SHA or
+            receipt.get('status')!='PASS' or receipt.get('completed_studies')!=32 or
+            not all(receipt.get(k) is True for k in ('byte_parity','sampled_window_parity','restart_exact',
+                'rng_unchanged','producer_failure_propagated','central_crop_after_quantization'))):
+        raise PilotCheckError('ARTIFACT_BINDING_MISMATCH')
+    return {'receipt_sha256':STREAM_RECEIPT_SHA,'source_revision':STREAM_REVISION,'bundle_sha256':STREAM_BUNDLE_SHA}
+
+
+
+def decode_metrics(records):
+    """Snapshot immutable completed producer records; caller owns report writes."""
+    completed=tuple(records)
+    counters={}
+    for _,_,items in completed:
+        for key,value in items:counters[key]=counters.get(key,0)+value
+    return {'decode_calls':len(completed),'decode_seconds':sum(end-start for start,end,_ in completed),
+            'stream_counters':counters}
+
+
+def scientific_config():
+    return {'precision':'FP32','seed':42,'windows':12,'chunk':4,'checkpointing':'nonreentrant-preserve-rng',
+            'encoder_lr':1e-6,'head_lr':1e-5,'warmup':20,'decay':.01,'betas':[.9,.999],'eps':1e-8,
+            'clip_norm':1.0,'dropout':.2,'bn_stats':'frozen','groups':[16,14],'next_tail':3,
+            'scaling':'per-study-observed-cell-mean / actual-group-count','labels_sha256':LABEL_SHA,
+            'masks_sha256':MASK_SHA,'prefetch':4,'lru':0,'decoder_cleanup_timeout_seconds':30.0,'reordered_relative_budget':1e-5}
+
+
+def recovery_binding(contract, stream):
+    import os
+    return {'cache':contract,'stream':stream,'scientific_config':scientific_config(),
+            'source_revision':os.environ.get('KNEE_SCIENTIFIC_REVISION',os.environ.get('KNEE_CODE_REVISION')),
+            'bundle_sha256':os.environ.get('KNEE_SOURCE_SHA256')}
+
+
+def validate_recovery_manifest(manifest, binding):
+    import re
+    fields={'schema','purpose','binding','checkpoint_file','checkpoint_bytes','checkpoint_sha256',
+            'updates_before','updates_after','consumed_before','consumed_after','expected','status'}
+    if (not isinstance(manifest,dict) or set(manifest)!=fields or manifest.get('schema')!=1 or manifest.get('purpose')!='disposable external recovery qualification' or
+            manifest.get('status')!='PASS' or manifest.get('binding')!=binding or manifest.get('checkpoint_file')!='recovery.pt' or
+            type(manifest.get('checkpoint_bytes')) is not int or manifest['checkpoint_bytes']<=0 or
+            [manifest.get(k) for k in ('updates_before','updates_after','consumed_before','consumed_after')]!=[2,3,0,3] or
+            not isinstance(manifest.get('expected'),dict) or set(manifest.get('expected',{}))!={'model','optimizer','rng','sampler','gradients','prediction','forward'} or
+            any(not isinstance(x,str) or not re.fullmatch('[0-9a-f]{64}',x)
+                for x in [manifest.get('checkpoint_sha256'),*manifest.get('expected',{}).values()])):
+        raise PilotCheckError('ARTIFACT_BINDING_MISMATCH')
+    return manifest
+
+
+def verify_recovery_artifact(root, expected_manifest, binding):
+    root=Path(root)
+    validate_recovery_manifest(expected_manifest,binding)
+    actual=json.loads((root/'recovery-manifest.json').read_text())
+    if actual!=expected_manifest: raise PilotCheckError('ARTIFACT_BINDING_MISMATCH')
+    checkpoint=root/'recovery.pt'
+    if checkpoint.stat().st_size!=actual['checkpoint_bytes'] or file_sha(checkpoint)!=actual['checkpoint_sha256']:
+        raise PilotCheckError('ARTIFACT_BINDING_MISMATCH')
+    return checkpoint
+
+
+def expected_fingerprints(state, gradients, prediction, forward):
+    return {**{k:state_fingerprint(state[k]) for k in ('model','optimizer','rng','sampler')},
+            'gradients':state_fingerprint(gradients),'prediction':state_fingerprint(prediction),
+            'forward':state_fingerprint(forward)}
+
+
+def verify_expected_fingerprints(actual, expected):
+    if actual!=expected: raise PilotCheckError('ARTIFACT_STATE_MISMATCH')
 
 
 def sampled_windows(public, volume, mask, sid, epoch):
@@ -268,7 +374,12 @@ def evaluate_tail_reference(report, actual, reference):
         if not forward['rng_exact']: raise PilotCheckError('RESUME_RNG_MISMATCH')
         if not all(forward[k] for k in ('input_exact','logits_exact','raw_loss_exact')):
             raise PilotCheckError('TAIL_FORWARD_MISMATCH')
-    if comparison['mismatched_elements']: raise PilotCheckError('TAIL_GRADIENT_MISMATCH')
+    import math
+    for metrics in [comparison,*comparison['per_family'].values()]:
+        values=[metrics['relative_l2_error'],metrics['fitted_scale']]
+        if (any(v is None or not math.isfinite(v) for v in values) or
+                metrics['reference_norm']<=0 or values[0]>1e-5 or abs(values[1]-1)>1e-5):
+            raise PilotCheckError('TAIL_GROSS_DISCREPANCY')
     return comparison
 
 
@@ -276,15 +387,22 @@ def state_fingerprint(state):
     """Aggregate signature for saved RNG/forward tensors; values stay in memory."""
     import torch
     digest=hashlib.sha256()
+    def token(value):
+        encoded=canonical_bytes(value);digest.update(len(encoded).to_bytes(8,'big'));digest.update(encoded)
     def add(value):
         if torch.is_tensor(value):
             v=value.detach().cpu().contiguous()
-            digest.update(canonical_bytes([str(v.dtype),list(v.shape)]));digest.update(v.numpy().tobytes())
+            token(['tensor',str(v.dtype),list(v.shape)])
+            raw=v.reshape(-1).view(torch.uint8).numpy().tobytes()
+            digest.update(len(raw).to_bytes(8,'big'));digest.update(raw)
         elif isinstance(value,dict):
-            for key in sorted(value): digest.update(key.encode());add(value[key])
+            token(['dict',len(value)])
+            for key in sorted(value,key=lambda k:(type(k).__name__,canonical_bytes(k))):
+                token([type(key).__name__,key]);add(value[key])
         elif isinstance(value,(list,tuple)):
+            token([type(value).__name__,len(value)])
             for item in value: add(item)
-        else: digest.update(canonical_bytes(value))
+        else: token([type(value).__name__,value])
     add(state);return digest.hexdigest()
 
 
@@ -371,7 +489,8 @@ def contributor_ordinals(ids, masks):
     return [i for i, sid in enumerate(ids) if any(masks[sid])]
 
 
-def run(public_source, decoder_source, manifest, checkpoint, cache, labels, masks, root, out, contract):
+def run(public_source, decoder_source, manifest, checkpoint, cache, labels, masks, root, out, contract, *,
+        streamed=False, qualified_stream=None, recovery_root=None, expected_manifest=None, export_recovery=False):
     import csv
     import importlib.metadata
     import numpy as np
@@ -386,12 +505,15 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
         raise ValueError('Pinned CUDA environment changed')
     out=Path(out); out.mkdir(parents=True,exist_ok=False); cache=Path(cache); root=Path(root)
     started=time.monotonic(); temporary=[out/'resume.pt',out/'reference.pt',out/'continued.pt']
+    decode_records=[]; gpu_intervals=[]
     report={'status':'RUNNING','purpose':'disposable AdamW mechanics only; no validation metrics',
             'contract':contract,'checkpoint_sha256':manifest['checkpoint_sha256'],
             'labels_sha256':LABEL_SHA,'masks_sha256':MASK_SHA,
             'mask_policy':'explicit original m_ observation masks; prospective correction to finite-only TrackA loader','source_revision':os.environ.get('KNEE_CODE_REVISION'),
             'bundle_sha256':os.environ.get('KNEE_SOURCE_SHA256'),'resume_state_atol':0.0,'resume_state_rtol':0.0,
             'tail_gradient_atol':STATE_ATOL,'tail_gradient_rtol':STATE_RTOL,
+            'elementwise_reordered_tolerance_role':'informational only; exact inline gate is zero',
+            'reordered_global_and_family_l2_scale_budget':1e-5,'exact_preclip_gradient_tolerance':0.0,
             'environment':{'torch':torch.__version__,'timm':importlib.metadata.version('timm'),
                            'cuda':torch.version.cuda,'device':torch.cuda.get_device_name(0)},
             'seed':42,'windows_per_study':12,'window_chunk':4,'checkpointing':'nonreentrant; preserve_rng_state',
@@ -401,12 +523,28 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
             'cache_load_seconds':0.0,'training_window_seconds':0.0,'forward_backward_seconds':0.0,'actual_forward_backward_passes':0,
             'free_disk_before':shutil.disk_usage(out).free}
     def save():
+        if streamed:report.update(decode_metrics(decode_records))
+        free_now=shutil.disk_usage(out).free
+        report['minimum_free_disk_bytes']=min(report.get('minimum_free_disk_bytes',free_now),free_now)
         report.update(elapsed_seconds=time.monotonic()-started,peak_cuda_bytes=torch.cuda.max_memory_allocated(),
                       peak_rss_bytes=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss*1024)
         (out/'qualification.json').write_text(json.dumps(report,indent=2,allow_nan=False)+'\n')
     save()
+    active_stream=None
+    state_contract=contract
     stage='storage'
     try:
+        if streamed:
+            if (recovery_root is None)!=(expected_manifest is None):raise PilotCheckError('ARTIFACT_BINDING_MISMATCH')
+            stage='stream_binding'
+            if qualified_stream!={'receipt_sha256':STREAM_RECEIPT_SHA,'source_revision':STREAM_REVISION,'bundle_sha256':STREAM_BUNDLE_SHA}:
+                raise PilotCheckError('ARTIFACT_BINDING_MISMATCH')
+            state_contract=recovery_binding(contract,qualified_stream)
+            report.update(source_revision=state_contract['source_revision'],packaging_revision=os.environ.get('KNEE_CODE_REVISION'))
+            report.update(input_mode='protected raw stream',qualified_cpu_stream=qualified_stream,scientific_config=scientific_config(),
+                          prefetch_limit=4,lru_capacity=0,decode_calls=0,decode_seconds=0.0,consumer_wait_seconds=0.0,observed_queue_peak=0,stream_counters={})
+        elif recovery_root is not None or export_recovery:
+            raise PilotCheckError('ARTIFACT_BINDING_MISMATCH')
         if shutil.disk_usage(out).free < 4*1024**3: raise OSError('Insufficient disposable state storage')
         stage='cache_contract'
         observed=cache_contract(json.loads((cache/'receipt.json').read_text()))
@@ -451,6 +589,8 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
         records={}
         with (root/'train_series.csv').open(newline='') as handle:
             for row in csv.DictReader(handle): records.setdefault(row['StudyInstanceUID'],[]).append(row)
+        if not (root/'train_series').is_dir() or any(not records.get(sid) or not (root/'train_series'/sid).is_dir() for sid in ids):
+            raise PilotCheckError('STREAM_INPUT_MISMATCH')
         random.seed(42); np.random.seed(42); torch.manual_seed(42); torch.cuda.manual_seed_all(42)
         torch.set_num_threads(4); torch.backends.cudnn.benchmark=False
         torch.backends.cudnn.deterministic=True; torch.backends.cudnn.allow_tf32=False; torch.backends.cuda.matmul.allow_tf32=False
@@ -487,12 +627,40 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
         def order(epoch): return np.random.default_rng(42+epoch).permutation(contributors).tolist()
         sampler={'epoch':0,'position':0,'order':order(0)}
         report['sampler_order_sha256']=sha256(canonical_bytes(sampler['order']))
-        def accumulate(chosen,epoch,denominator,capture=None):
+        def raw_read(i):
+            tick=time.monotonic()
+            volume,mask,c=prepare_study(public,decoder,ids[i],records,root/'train_series')
+            row=index[i]
+            if (c.get('decoded_unique_slices',0)<=0 or c.get('resource_errors',0) or
+                    volume.shape!=(96,384,384) or volume.dtype!=np.uint8 or mask.shape!=(96,) or
+                    str(mask.dtype)!=row['mask_dtype'] or sha256(volume.tobytes())!=row['volume_sha256'] or
+                    sha256(mask.tobytes())!=row['mask_sha256']):
+                raise PilotCheckError('STREAM_INPUT_MISMATCH')
+            end=time.monotonic();decode_records.append((tick,end,tuple(sorted(c.items()))))
+            return volume,mask
+        def start_stream(state):
+            from knee.public_study_stream import StudyStream
+            return StudyStream(state['order'],raw_read,contract=sha256(canonical_bytes(state_contract)),
+                               consumed_cursor=state['position'],prefetch=4,close_timeout=30.0)
+        def close_stream():
+            nonlocal active_stream
+            if active_stream is not None:
+                with active_stream._condition:
+                    report['observed_queue_peak']=max(report['observed_queue_peak'],len(active_stream._buffer))
+                    report['last_fetched_cursor']=active_stream.fetched_cursor
+                    report['last_consumed_cursor']=active_stream.consumed_cursor
+                active_stream.close();active_stream=None
+        def accumulate(chosen,epoch,denominator,capture=None,operation='helper',stream=None):
             training_mode(model); optimizer.zero_grad(set_to_none=True)
+            if operation!='reordered':require_group_counts(len(chosen),denominator,len(chosen))
+            processed=0
             for i in chosen:
                 tick=time.monotonic()
-                volume,mask=cached(i)
-                report['cache_load_seconds']+=time.monotonic()-tick
+                if stream is None:
+                    volume,mask=cached(i);report['cache_load_seconds']+=time.monotonic()-tick
+                else:
+                    volume,mask=next(stream);report['consumer_wait_seconds']+=time.monotonic()-tick
+                    with stream._condition:report['observed_queue_peak']=max(report['observed_queue_peak'],len(stream._buffer))
                 tick=time.monotonic()
                 windows=sampled_windows(public,volume,mask,ids[i],epoch)
                 torch.cuda.synchronize()
@@ -505,44 +673,96 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
                 if capture is not None:
                     capture.append({'input_sha256':state_fingerprint(windows), 'rng_sha256':before_rng,
                                     'logits':logits.detach().cpu().clone(),'loss':loss.detach().cpu().clone()})
-                (loss/denominator).backward()
-                torch.cuda.synchronize()
-                report['forward_backward_seconds']+=time.monotonic()-tick
-                report['actual_forward_backward_passes']+=1
+                if operation=='helper':study_mean_backward(loss,len(chosen))
+                elif operation=='inline':(loss/len(chosen)).backward()
+                elif operation=='reordered':loss.backward()
+                else:raise PilotCheckError('GROUP_COUNT_MISMATCH')
+                torch.cuda.synchronize();end=time.monotonic();gpu_intervals.append((tick,end))
+                report['forward_backward_seconds']+=end-tick
+                report['actual_forward_backward_passes']+=1;processed+=1
+                if stream is not None:stream.acknowledge()
                 del windows,volume,mask,logits
+            if operation!='reordered':require_group_counts(len(chosen),denominator,processed)
             require_bn(model,original_bn)
         train_start=time.monotonic()
-        stage='full_updates'
-        for update in range(2):
-            chosen=sampler['order'][sampler['position']:sampler['position']+16]
-            if len(chosen)!=[16,14][update]: raise ValueError('Accumulation membership differs')
-            accumulate(chosen,0,len(chosen))
-            counts,norm=apply_update(model,optimizer,update)
-            sampler['position']+=len(chosen); report['updates']+=1; report['contributing_studies']+=len(chosen)
-            report['last_gradient_counts']=counts; report['last_unclipped_grad_norm']=norm; save()
-        if sampler['position']!=30: raise ValueError('Contributor epoch coverage differs')
-        sampler={'epoch':1,'position':0,'order':order(1)}
+        if recovery_root is None:
+            if streamed:active_stream=start_stream(sampler)
+            stage='full_updates'
+            report['actual_group_denominators']=[]
+            for update in range(2):
+                chosen=sampler['order'][sampler['position']:sampler['position']+16]
+                if len(chosen)!=[16,14][update]: raise PilotCheckError('GROUP_COUNT_MISMATCH')
+                accumulate(chosen,0,len(chosen),stream=active_stream)
+                if active_stream is not None and active_stream.consumed_cursor!=sampler['position']+len(chosen):
+                    raise PilotCheckError('STREAM_CURSOR_MISMATCH')
+                counts,norm=apply_update(model,optimizer,update)
+                sampler['position']+=len(chosen); report['updates']+=1; report['contributing_studies']+=len(chosen)
+                report['actual_group_denominators'].append(len(chosen))
+                report['last_gradient_counts']=counts; report['last_unclipped_grad_norm']=norm; save()
+            close_stream()
+            if sampler['position']!=30: raise PilotCheckError('STREAM_CURSOR_MISMATCH')
+            sampler={'epoch':1,'position':0,'order':order(1)}
+        else:
+            stage='artifact_restore'
+            recovery=verify_recovery_artifact(recovery_root,expected_manifest,state_contract)
+            sampler,updates=restore_state(recovery,model,optimizer,state_contract)
+            if sampler!={'epoch':1,'position':0,'order':order(1)}:raise PilotCheckError('RESUME_SAMPLER_MISMATCH')
+            if updates!=2:raise PilotCheckError('RESUME_UPDATE_COUNTER_MISMATCH')
+            require_bn(model,original_bn)
+            report.update(updates=2,contributing_studies=0,actual_group_denominators=[],external_artifact_bytes_verified=True,
+                          reference_study_passes=0,resumed_study_passes=0)
         report['next_epoch_sampler_order_sha256']=sha256(canonical_bytes(sampler['order']))
-        save_state(temporary[0],model,optimizer,sampler,2,contract)
+        save_state(temporary[0],model,optimizer,sampler,2,state_contract)
         chosen=sampler['order'][:3]
         stage='baseline_tail_update'
         baseline_forward=[]
-        accumulate(chosen,1,3,capture=baseline_forward)
+        if streamed:active_stream=start_stream(sampler)
+        accumulate(chosen,1,3,capture=baseline_forward,stream=active_stream)
+        if active_stream is not None and active_stream.consumed_cursor!=3:raise PilotCheckError('STREAM_CURSOR_MISMATCH')
+        close_stream()
         actual_grad={n:p.grad.detach().cpu().clone() for n,p in model.named_parameters()}
         apply_update(model,optimizer,2); sampler['position']=3
-        report.update(updates=3,contributing_studies=33)
-        save_state(temporary[1],model,optimizer,sampler,3,contract)
+        report.update(updates=3,contributing_studies=33 if recovery_root is None else 3)
+        report['actual_group_denominators'].append(3)
+        save_state(temporary[1],model,optimizer,sampler,3,state_contract)
+        if recovery_root is not None:
+            stage='artifact_expectation'
+            state=torch.load(temporary[1],map_location='cpu',weights_only=True)
+            reloaded_sampler,reloaded_updates=restore_state(temporary[1],model,optimizer,state_contract)
+            if reloaded_sampler!={'epoch':1,'position':3,'order':order(1)}:raise PilotCheckError('RESUME_SAMPLER_MISMATCH')
+            if reloaded_updates!=3:raise PilotCheckError('RESUME_UPDATE_COUNTER_MISMATCH')
+            require_bn(model,original_bn)
+            volume,mask=cached(0);probe_windows=sampled_windows(public,volume,mask,ids[0],1)
+            model.eval()
+            with torch.no_grad():prediction=checkpoint_forward(model,probe_windows).detach().cpu()
+            observed_expected=expected_fingerprints(state,actual_grad,prediction,baseline_forward)
+            verify_expected_fingerprints(observed_expected,expected_manifest['expected'])
+            report.update(external_artifact_recovery_status='PASS',external_expected_fingerprints=observed_expected,
+                          status='PASS',bn_buffers_unchanged=True,exact_preclip_gradients=True,
+                          qualified_optimizer_updates=1,actual_optimizer_step_calls=1,external_next_study_forward_backward_passes=3,training_seconds=time.monotonic()-train_start,
+                          exact_resume_status='PASS',save_reload_status='PASS',updates=3,contributing_studies=3)
+            require_bn(model,original_bn);save()
+            return report
         # Qualify identical arithmetic BEFORE independently reordered scaling.
         stage='resume_restore'
-        restored,updates=restore_state(temporary[0],model,optimizer,contract)
+        restored,updates=restore_state(temporary[0],model,optimizer,state_contract)
         if restored!={'epoch':1,'position':0,'order':order(1)}: raise PilotCheckError('RESUME_SAMPLER_MISMATCH')
         if updates!=2: raise PilotCheckError('RESUME_UPDATE_COUNTER_MISMATCH')
         require_bn(model,original_bn)
         stage='resume_continuation'
         replay_forward=[]
-        accumulate(restored['order'][:3],restored['epoch'],3,capture=replay_forward)
+        accumulate(restored['order'][:3],restored['epoch'],3,capture=replay_forward,operation='inline')
+        report['identical_replay_forward']=forward_comparison(baseline_forward,replay_forward)
+        if not report['identical_replay_forward']['rng_exact']: raise PilotCheckError('RESUME_RNG_MISMATCH')
+        if not all(report['identical_replay_forward'][k] for k in ('input_exact','logits_exact','raw_loss_exact')):
+            raise PilotCheckError('TAIL_FORWARD_MISMATCH')
+        replay_grad={n:p.grad.detach().cpu().clone() for n,p in model.named_parameters()}
+        report['identical_preclip_gradient_max_error']=tensor_max_error(actual_grad,replay_grad)
+        require_exact_gradients(actual_grad,replay_grad);del replay_grad
+        report['independent_inline_gradients_exact']=True
+        report['stream_rng_unchanged_via_exact_cached_replay']=bool(streamed)
         apply_update(model,optimizer,updates); restored['position']=3
-        save_state(temporary[2],model,optimizer,restored,3,contract)
+        save_state(temporary[2],model,optimizer,restored,3,state_contract)
         a=torch.load(temporary[1],map_location='cpu',weights_only=True)
         b=torch.load(temporary[2],map_location='cpu',weights_only=True)
         report['measured_resume_model_max_error']=tensor_max_error(a['model'],b['model'])
@@ -553,10 +773,6 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
         require_exact_state(a['sampler'],b['sampler'],'RESUME_SAMPLER_MISMATCH')
         if a['updates']!=b['updates'] or b['updates']!=3: raise PilotCheckError('RESUME_UPDATE_COUNTER_MISMATCH')
         del a,b
-        report['identical_replay_forward']=forward_comparison(baseline_forward,replay_forward)
-        if not report['identical_replay_forward']['rng_exact']: raise PilotCheckError('RESUME_RNG_MISMATCH')
-        if not all(report['identical_replay_forward'][k] for k in ('input_exact','logits_exact','raw_loss_exact')):
-            raise PilotCheckError('TAIL_FORWARD_MISMATCH')
         report.update(exact_resume_status='PASS',resume_model_max_error=model_error,
                       resume_optimizer_max_error=optimizer_error,resume_rng_exact=True,resume_sampler_exact=True)
         save()
@@ -575,16 +791,24 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
         require_bn(model,original_bn)
         report.update(save_reload_logit_max_error=prediction_error,save_reload_status='PASS',bn_buffers_unchanged=True)
         save()
-        # Independently reordered reference has unchanged numeric tolerance.
+        changes={family:float((dict(model.named_parameters())[name].detach().cpu()-before).abs().max())
+                 for family,(name,before) in probes.items()}
+        if any(v<=0 or not np.isfinite(v) for v in changes.values()): raise ValueError('Group parameter update absent')
+        report['group_parameter_max_changes']=changes
+        save()
+        qualified_state=torch.load(temporary[2],map_location='cpu',weights_only=True)
+        expected_recovery=expected_fingerprints(qualified_state,actual_grad,actual,baseline_forward)
+        del qualified_state
+        # Reordered scaling is informational, with prospectively fixed global/family safeguard.
         # Restore the SAME pre-tail model/RNG; do not compare different updates.
         stage='tail_reference_restore'
-        restored,updates=restore_state(temporary[0],model,optimizer,contract)
+        restored,updates=restore_state(temporary[0],model,optimizer,state_contract)
         if restored!={'epoch':1,'position':0,'order':order(1)}: raise PilotCheckError('RESUME_SAMPLER_MISMATCH')
         if updates!=2: raise PilotCheckError('RESUME_UPDATE_COUNTER_MISMATCH')
         require_bn(model,original_bn)
         stage='tail_reference'
         reference_forward=[]
-        accumulate(restored['order'][:3],restored['epoch'],1,capture=reference_forward)
+        accumulate(restored['order'][:3],restored['epoch'],1,capture=reference_forward,operation='reordered')
         report['reordered_reference_forward']=forward_comparison(baseline_forward,reference_forward)
         reference_grad={}
         for name,p in model.named_parameters():
@@ -600,24 +824,44 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
             raise PilotCheckError('TAIL_FORWARD_MISMATCH')
         # Parameter-update probes refer to the qualified continuation, not the
         # pre-tail state temporarily restored for the independent gradient check.
-        restored,updates=restore_state(temporary[2],model,optimizer,contract)
+        restored,updates=restore_state(temporary[2],model,optimizer,state_contract)
         require_bn(model,original_bn)
-        changes={family:float((dict(model.named_parameters())[name].detach().cpu()-before).abs().max())
-                 for family,(name,before) in probes.items()}
-        if any(v<=0 or not np.isfinite(v) for v in changes.values()): raise ValueError('Group parameter update absent')
-        report.update(updates=3,contributing_studies=33,tail_gradient_max_error=tail_error,
+        report.update(updates=3,contributing_studies=33,tail_gradient_max_error=tail_error,qualified_optimizer_updates=3,actual_optimizer_step_calls=4,
                       resume_model_max_error=model_error,resume_optimizer_max_error=optimizer_error,
                       resume_rng_exact=True,resume_sampler_exact=True,bn_buffers_unchanged=True,
                       save_reload_logit_max_error=prediction_error,
                       group_parameter_max_changes=changes,training_seconds=time.monotonic()-train_start,
                       final_lrs={g['name']:g['lr'] for g in optimizer.param_groups},status='PASS')
+        if export_recovery:
+            stage='artifact_export'
+            recovery_manifest={'schema':1,'purpose':'disposable external recovery qualification','status':'PASS',
+                'binding':state_contract,'checkpoint_file':'recovery.pt','checkpoint_bytes':temporary[0].stat().st_size,
+                'checkpoint_sha256':file_sha(temporary[0]),'updates_before':2,'updates_after':3,
+                'consumed_before':0,'consumed_after':3,'expected':expected_recovery}
+            validate_recovery_manifest(recovery_manifest,state_contract)
+            temporary[0].replace(out/'recovery.pt')
+            (out/'recovery-manifest.json').write_text(json.dumps(recovery_manifest,indent=2)+'\n')
+            report.update(recovery_artifact_exported=True,recovery_manifest_sha256=sha256(canonical_bytes(recovery_manifest)),
+                          recovery_checkpoint_sha256=recovery_manifest['checkpoint_sha256'],recovery_checkpoint_bytes=recovery_manifest['checkpoint_bytes'])
         save()
     except Exception as error:
         report.update(status='FAIL',failure_type=type(error).__name__,**failure_diagnostic(stage,error))
         save()
         raise RuntimeError('AdamW qualification failed; inspect sanitized aggregate receipt') from None
     finally:
+        try:
+            if active_stream is not None:close_stream()
+        except Exception:
+            if report['status']=='PASS':report.update(status='FAIL',failure_stage='stream_binding',failure_check='STREAM_CURSOR_MISMATCH')
+            report['stream_cleanup_failed']=True
+        report['measured_decode_gpu_overlap_seconds']=sum(max(0,min(b,d)-max(a,c)) for a,b,_ in tuple(decode_records) for c,d in gpu_intervals)
+        report['decode_seconds_include_integrity_hash']=True
         for path in temporary: path.unlink(missing_ok=True)
-        report.update(disposable_states_deleted=all(not p.exists() for p in temporary),free_disk_after=shutil.disk_usage(out).free)
+        if report['status']!='PASS':
+            (out/'recovery.pt').unlink(missing_ok=True);(out/'recovery-manifest.json').unlink(missing_ok=True)
+        report.update(temporary_duplicates_deleted=all(not p.exists() for p in temporary),
+                      disposable_states_deleted=all(not p.exists() for p in temporary) and not (out/'recovery.pt').exists(),
+                      retained_private_recovery_checkpoint=(out/'recovery.pt').exists(),free_disk_after=shutil.disk_usage(out).free)
         save()
+        if report.get('stream_cleanup_failed'):raise RuntimeError('Stream cleanup failed; inspect sanitized aggregate receipt') from None
     return report

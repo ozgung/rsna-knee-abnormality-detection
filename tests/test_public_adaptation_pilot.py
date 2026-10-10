@@ -210,8 +210,9 @@ class NumericalDiagnosticTests(unittest.TestCase):
         self.assertEqual(error.exception.check,'RESUME_NOT_QUALIFIED')
         self.assertNotIn('tail_gradient_comparison',report)
         report={'exact_resume_status':'PASS','save_reload_status':'PASS'}
-        with self.assertRaises(PilotCheckError) as error:evaluate_tail_reference(report,actual,reference)
-        self.assertEqual(error.exception.check,'TAIL_GRADIENT_MISMATCH')
+        evaluate_tail_reference(report,actual,reference)  # Old elementwise discrepancies are informational.
+        from knee.public_adaptation_pilot import require_exact_gradients
+        with self.assertRaises(PilotCheckError):require_exact_gradients(actual,reference)
         self.assertEqual(report['exact_resume_status'],'PASS')
         self.assertEqual(report['tail_gradient_comparison']['parameters_compared'],3)
         wrong={k:v*(3/16) for k,v in reference.items()}
@@ -276,3 +277,80 @@ class NumericalDiagnosticTests(unittest.TestCase):
         self.assertEqual(result['logits_max_abs_error'],0.)
         self.assertNotIn('logits',result);self.assertNotIn('loss',result)
         b[1]['rng_sha256']='different';self.assertFalse(forward_comparison(a,b)['rng_exact'])
+
+
+@unittest.skipUnless(importlib.util.find_spec('torch') and importlib.util.find_spec('numpy'),'optional torch/numpy absent')
+class StudyMeanOracleTests(unittest.TestCase):
+    def test_fp64_analytic_linear_gradients_unequal_masks_and_negative_controls(self):
+        import torch
+        from knee.public_adaptation_pilot import masked_loss,study_mean_backward,require_group_counts
+        for count in (3,14,15,16):
+            with self.subTest(count=count):
+                weight=torch.tensor([[.2,-.3,.1,.4],[-.1,.5,-.2,.3]],dtype=torch.float64,requires_grad=True)
+                bias=torch.tensor([.1,-.2,.3,-.1],dtype=torch.float64,requires_grad=True)
+                expected_w=torch.zeros_like(weight);expected_b=torch.zeros_like(bias)
+                losses=[];masks=[]
+                for i in range(count):
+                    x=torch.tensor([[.2+i/17,-.7+i/23]],dtype=torch.float64)
+                    y=torch.tensor([[.15,.35,.6,.85]],dtype=torch.float64)
+                    mask=torch.tensor([[1. if j<=i%4 else 0. for j in range(4)]],dtype=torch.float64)
+                    z=x@weight+bias
+                    derivative=(torch.sigmoid(z.detach())-y)*mask/(mask.sum()*count)
+                    expected_w+=x.T@derivative;expected_b+=derivative[0]
+                    loss=masked_loss(z,y,mask);self.assertEqual(loss.dtype,torch.float64)
+                    study_mean_backward(loss,count);losses.append((x,y,mask));masks.append(mask.sum())
+                require_group_counts(count,count,len(losses))
+                self.assertTrue(torch.allclose(weight.grad,expected_w,atol=1e-12,rtol=1e-12))
+                self.assertTrue(torch.allclose(bias.grad,expected_b,atol=1e-12,rtol=1e-12))
+                # Wrong /16 cannot qualify tails; pooled-observed-cell weighting
+                # also differs from equal study means under unequal masks.
+                if count!=16:
+                    weight.grad=None;bias.grad=None
+                    for x,y,mask in losses:
+                        study_mean_backward(masked_loss(x@weight+bias,y,mask),16)
+                    self.assertFalse(torch.allclose(expected_w,weight.grad,atol=1e-12,rtol=1e-12))
+                pooled=torch.zeros_like(weight)
+                for x,y,mask in losses:
+                    z=x@weight.detach()+bias.detach()
+                    pooled+=x.T@((torch.sigmoid(z)-y)*mask/sum(masks))
+                self.assertFalse(torch.allclose(pooled,expected_w,atol=1e-12,rtol=1e-12))
+                # Unknown-cell labels must not affect losses or gradients.
+                x,y,mask=losses[0];z=(x@weight.detach()+bias.detach()).requires_grad_()
+                changed=torch.where(mask.bool(),y,1-y)
+                self.assertTrue(torch.equal(masked_loss(z,y,mask),masked_loss(z,changed,mask)))
+                masked_loss(z,y,mask).backward();original_grad=z.grad.clone()
+                self.assertTrue(torch.equal(original_grad[mask==0],torch.zeros_like(original_grad[mask==0])))
+                other=z.detach().clone().requires_grad_();masked_loss(other,changed,mask).backward()
+                self.assertTrue(torch.equal(original_grad,other.grad))
+        with self.assertRaises(ValueError):masked_loss(z,y,torch.zeros_like(mask))
+        for count in (0,17,3.0,True):
+            with self.assertRaises(ValueError):study_mean_backward(torch.tensor(1.,requires_grad=True),count)
+        with self.assertRaises(ValueError):require_group_counts(3,16,3)
+        with self.assertRaises(ValueError):require_group_counts(14,14,13)
+
+    def test_independent_inline_exact_gate_rejects_wrong_helper(self):
+        import torch
+        from knee.public_adaptation_pilot import masked_loss,study_mean_backward,require_exact_gradients
+        def gradients(wrong=False,inline=False):
+            z=torch.tensor([[.2,-.4]],requires_grad=True)
+            for i in range(3):
+                loss=masked_loss(z,torch.tensor([[.2+i/10,.7]]),torch.tensor([[1.,float(i%2)]]))
+                if inline:(loss/3).backward()
+                else:study_mean_backward(loss,16 if wrong else 3)
+            return {'backbone.weight':z.grad}
+        require_exact_gradients(gradients(),gradients(inline=True))
+        with self.assertRaises(ValueError):require_exact_gradients(gradients(wrong=True),gradients(inline=True))
+
+    def test_integer_optimizer_keys_fingerprint_and_family_gross_gate(self):
+        import torch
+        from knee.public_adaptation_pilot import state_fingerprint,evaluate_tail_reference
+        a={'state':{0:{'step':torch.tensor(2.),'exp_avg':torch.tensor([.2])}},'param_groups':[{'params':[0]}]}
+        self.assertEqual(state_fingerprint(a),state_fingerprint(a))
+        b={'state':{'0':a['state'][0]},'param_groups':a['param_groups']}
+        self.assertNotEqual(state_fingerprint(a),state_fingerprint(b))
+        ref={'backbone.weight':torch.tensor([1e6]),'att.weight':torch.tensor([1.])}
+        wrong={'backbone.weight':ref['backbone.weight'].clone(),'att.weight':torch.tensor([1.01])}
+        # Global tiny error cannot hide a head-only scaling bug.
+        report={'exact_resume_status':'PASS','save_reload_status':'PASS'}
+        with self.assertRaises(ValueError):evaluate_tail_reference(report,wrong,ref)
+        self.assertLess(report['tail_gradient_comparison']['relative_l2_error'],1e-5)
