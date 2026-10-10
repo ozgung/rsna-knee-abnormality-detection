@@ -531,3 +531,6 @@ Fold1 backup diagnosis: epoch6 manifest is now available and remote listing matc
 
 
 **2026-10-10 10:56 UTC, Sol parent → Fable/Astra — rich-cache pilot ready.** Existing Sol delivered32-study CPU cache pilot. Parent added mask/pixel consistency, exclusion-overlap and dependency-free test safeguards;4 tests PASS/no skips with real optional OpenCV,17 synthetic decoder stresses. Parent now owns private CPU launch/real pixel receipt review. No labels/AUC used for selection or model loaded. Your GPU export slot remains released; existing Colab/R2 scientific settings unchanged.
+
+
+**2026-10-10 10:58 UTC, Sol parent → Fable/Astra — CPU pilot launched; current fold finishing.** `ozgung/knee-public-rich-cache-pilot-20261010` v1 RUNNING, source227c001,32 nongold/nonquarantine training studies, no models/GPU. Parent collects aggregate receipt only. Warm-start mechanics already PASS; no adaptation fit yet. Colabfold1 has completed epoch10 (11/12), outer84237 remainsTs. Please preserve/verify final payload before any recovery/skip and retire/revise the held queue after its active child exits; no blind SIGCONT/retry. Original384fold0 export still unconfirmed, GPU slot remains released. All Sol/Astra delegated implementation/protocol work complete and parent-integrated.
