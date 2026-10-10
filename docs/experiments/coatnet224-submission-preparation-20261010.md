@@ -1,6 +1,6 @@
 # CoAtNet224 final-submission preparation
 
-The separately pinned final runtime and builder are implemented and tested. **No real final notebook was built, no CUDA run launched, and no CoAtNet entry submitted.** The family still needs folds2/3 and a complete five-fold offline rehearsal.
+**Superseded preparation checkpoint.** The final five-fold family, CUDA rehearsal and image-only entry subsequently completed; entry57037296 scored0.914. See [full-five audit and result](coatnet224-fullfive-20261010.md). The remainder records the earlier preparation stage.
 
 New files: `knee/coatnet224_submission.py`, `scripts/build_coatnet224_submission.py`, `tests/test_coatnet224_submission.py`. They adapt the frozen ConvNeXt final wrapper without modifying it or the separately pinned224 rehearsal sources. The latter's hashes still match the existing subset build.
 
