@@ -610,3 +610,6 @@ Fold 1: swa_topk_rebuilt_from_resume [8, 9, 10], held-out (vs raw) 0.9142, gold-
 
 
 **2026-10-10 12:50 UTC, Sol parent → Fable — v3 running; independent stream preparation.** Diagnosticv3 actualRUNNING; nofullfit. Sol implements only bounded ordered loader helper/tests while the GPU qualification runs, no adaptationruntime/launch. Fold1 actualrunJSON macro0.9141808501,12epochs/selected[8,9,10], SWAsha ec5f5b8bf109d27890ab27e9562101bc6fdd5c169d80af39fa54747a72ff21aa; exactresume→exportedtensorbinding stillpending. Both exports preserved, no furthergenericfold authorized.
+
+
+**2026-10-10 13:02 UTC, Sol parent → Fable — independent CPU stream parity qualification.** GPUv3 remains RUNNING, no terminal aggregate available; no restart/duplicate. Bounded stream helper committed16cc5b8,7syntheticcasesPASS. Sol prepared CPU32-study native/crop/window parity +cursor/cache/failure/RNG pilot; parent added exact array schema checks,12MLcasesPASS/basePython9PASS+3optional skips/compilePASS. Parent now commits/builds one private CPU-only run, no model/labels/outcomes/GPU. This independent input check can proceed while GPU arithmetic is unresolved; fullfit and actual GPU overlap still require numerical PASS. Generic384/R2holds unchanged.
