@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-10 02:46 UTC**. Read this snapshot and queue, then the latest entries in [the Fable/Astra handoff](docs/claude-astra-handoff.md). Durable rules are in [AGENTS.md](AGENTS.md); setup is in [README.md](README.md). Earlier detailed history is preserved in [the status archive](docs/status-archive/status-before-20261009-1830-reconciliation.md).
+Updated **2026-10-10 03:44 UTC**. Read this snapshot and queue, then the latest entries in [the Fable/Astra handoff](docs/claude-astra-handoff.md). Durable rules are in [AGENTS.md](AGENTS.md); setup is in [README.md](README.md). Earlier detailed history is preserved in [the status archive](docs/status-archive/status-before-20261009-1830-reconciliation.md).
 
 ## Current snapshot
 
@@ -16,24 +16,25 @@ Updated **2026-10-10 02:46 UTC**. Read this snapshot and queue, then the latest 
 | --- | --- | --- |
 | Parent — fixed round1 fit | Allfive COMPLETE; full artifact/metric audit and weight hashes PASS | Retain exact fixed comparison; no recursive bootstrap expansion based on biased validation. |
 | Parent — round1 inference | Rehearsal/final PASS; entry57028725 PENDING | Inspect hidden score/failure when complete; do not resubmit. Best0.950 preserved. |
-| Fable — CoAtNet224 | Fold01v3 COMPLETE and audited; fold4v2 RUNNING; parent released fold23v2 | Finish fixed family; verify checkpoint bytes and build separately pinned224 inference. [Partial audit](docs/experiments/coatnet224-partial-audit-20261010.md). |
-| Fable — Colab CoAtNet384 | New run `knee-c384-f0-a1` RUNNING after attempt2 loss | First full resume dataset ready (1.464GB); downloaded-byte/restore verification still pending. Active loop32148; Fable owns persistence identity/retention fixes. [Review](docs/experiments/colab-resume-review-20261010.md). |
+| Fable/parent — CoAtNet224 | Folds0/1/4 COMPLETE, audited and checkpoint bytes verified; fold23v2 RUNNING | Finish fixed family; separately pinned224 rehearsal implemented and subsetbuild complete; fullfiveCUDA pending. [Partial audit](docs/experiments/coatnet224-partial-audit-20261010.md). |
+| Fable — Colab CoAtNet384 | `knee-c384-f0-a1` finished14epochs; SWA saved, export/recovery collection ongoing | Latest private dataset reports ready; actual restore still unverified. Active loop32148; Fable must apply accepted persistence corrections before nextfold. [Review](docs/experiments/colab-resume-review-20261010.md). |
 | Parent/Fable — next scientific hypothesis | Static compatibility review complete; training smoke pending | Public384-named CoAtNet already qualified with explicit `img_size=320`; current training omits this argument. Its loader transfers only the backbone, discarding the trained head. Require explicit geometry and strict full-model loading for a full warm start. See [review](docs/experiments/coatnet-warmstart-review-20261009.md). No new fit launched. |
 | Parent/Fable — B1 archival integration | Deferred reporting/cache corrections | Benchmark remains descriptive. “Not flagged” does not prove gold-independent provenance; nongold equality cannot establish gold equality. Bind or regenerate cached parquet-to-CSV conversions. Current pinned training artifacts are unaffected. |
 
 ## Active jobs and recovery
 
-Latest receipt: `outputs/analysis/reconcile-20261010-0245/receipt.json`. Fullfive round1 rehearsal/final v1 COMPLETE and PASS; competition entry57028725 PENDING. CoAtNet01v3 COMPLETE; fold4v2 RUNNING; correctedfold23v2 newly accepted. Colab currentrun loggingepoch7 with fullstate uploadversion8; processing/readiness and restore of the latest version not independently verified.
+Latest receipt: `outputs/analysis/reconcile-20261010-0335/receipt.json`; reconciliation at03:36–03:44UTC. Entry57028725 remainsPENDING. CoAtNet01v3 and4v2 COMPLETE;23v2 and Fable’s new bootstrap-label01v1 RUNNING. Colab finished14epochs and savedSWA[13,12,11]; finalexports/collection pending. Private recovery dataset reportsready afterepoch13/version14 upload; no actual restore verified.
 
 | Job | State / evidence |
 | --- | --- |
 | `ozgung/knee-tracka-convnext-r1-fold01-20261009` v1 | COMPLETE. Small artifacts under `outputs/kaggle/trackA-convnext-r1-fold01-20261009-result/trackA/`; exact metadata and61-check independent audit PASS. Selected SWA epochs0:[9,8,7],1:[8,9,7]. |
 | `ozgung/knee-tracka-convnext-r1-fold23-20261009` v1 | COMPLETE. Artifact/metrics65-check audit PASS; both selected checkpoints SHA-verified. Result `outputs/kaggle/trackA-convnext-r1-fold23-20261009-result/trackA/`. |
 | `ozgung/knee-tracka-convnext-r1-fold4-20261009` v1 | COMPLETE.45-check artifact/metrics audit PASS; selectedSWA[9,8,7] bytes verified. Fullfive staged in `outputs/kaggle/own-convnext-r1-fivefold-inputs-20261009/`. |
-| `ozgung/knee-tracka-coatnet224-fold01-20261009` v3 / `…-fold23-20261009` v2 | Fold01 COMPLETE,56 independent checks PASS; selected weights not yet byte-verified. Correctedfold23 v2 pushed02:45UTC; do not push again. Prior geometry/OOM failures preserved separately, including `outputs/kaggle/trackA-coatnet224-fold01-20261009-failed-v2/`. |
-| `ozgung/knee-tracka-coatnet224-fold4-20261009` v2 | RUNNING memory-revised replacement; queue log confirms successful version2 push. Actual selected-checkpoint result pending. Prior failed settings remain distinct. |
+| `ozgung/knee-tracka-coatnet224-fold01-20261009` v3 / `…-fold23-20261009` v2 | Fold01 COMPLETE; parent threefold57-check audit PASS, selectedweights0/1/4 SHA and metadata verified. Correctedfold23 v2 pushed02:45UTC; do not push again. Prior geometry/OOM failures preserved separately, including `outputs/kaggle/trackA-coatnet224-fold01-20261009-failed-v2/`. |
+| `ozgung/knee-tracka-coatnet224-fold4-20261009` v2 | COMPLETE. ReportAUC0.906643, all12defined, selectedSWA[8,9,7]; byte-verified292826563byte checkpoint,486finite tensors. |
+| `ozgung/knee-tracka-coatnet224-r1-fold01-20261010` v1 | RUNNING; Fable pushed03:08UTC. Paired bootstrap-label arm against original CoAtNet01. No recursivev2 approved from validation alone. |
 
-Parent stopped queuePID**6782** after verifying its identity, to prioritize the now-ready qualification over the remaining long fit. Both active training kernels are untouched. **Do not restart `queue_push2.sh`: its original list would duplicate jobs.** CorrectedCoAtNetfold23 is now released asv2; the old queue remains stopped and must not restart. Fable's watchPID**75269** remains alive; original queue/watch logs remain in the previously recorded `/private/tmp/claude-501/-Users-ozgun-Dev-rsna-knee-abnormality-detection/5710ec33-d376-4baa-809b-95617f931beb/scratchpad/`.
+Parent stopped queuePID**6782** after verifying its identity, to prioritize the now-ready qualification over the remaining long fit. Both active training kernels are untouched. **Do not restart `queue_push2.sh`: its original list would duplicate jobs.** CorrectedCoAtNetfold23 is now released asv2; the old queue remains stopped and must not restart. Process check03:38UTC found oldwatchPID**75269** and launcher20983 gone; do not restart them. Original original queue/watch logs remain in the previously recorded `/private/tmp/claude-501/-Users-ozgun-Dev-rsna-knee-abnormality-detection/5710ec33-d376-4baa-809b-95617f931beb/scratchpad/`.
 
 One-shot launcherPID**20983** accepted rehearsalv1 at02:37:40UTC (`launch-state.json`: PUSH_ACCEPTED). Its work is complete; do not restart. Files `launch-state.json`, `launch.log`, `launch.pid`, `queued-push-responses.txt` remain under `outputs/analysis/reconcile-20261009-2330/`. Initial startup/capacity failures are preserved; no duplicate rehearsal or controller was launched. Parent subsequently built and pushed finalv1 once, qualified it, and submitted entry57028725 once.
 
@@ -70,7 +71,7 @@ ML interpreter `.venv/bin/python`; Kaggle CLI `/Users/ozgun/miniconda3/bin/kaggl
 
 ## Latest checkpoint
 
-This turn: qualified and submitted fixed round1 entry57028725; four entries remain today. Released correctedCoAtNet23v2 after short checks. IndependentSol audit confirms CoAtNet01 reportAUC0.901842/0.902008 and56 checks PASS; do not call selected-fold predictions unbiased teachers. Future recipes should record skippedAMP steps and flush partial gradient accumulation; preserve this ongoing comparison. Colab currentfit remains active and unchanged, latestepoch7 reportAUC0.9115; Fable owns accepted persistence fixes between folds. Next: collect round1 hidden result, finish/audit CoAtNet family, then qualify separately pinned224 image-only inference. Best0.950 unchanged.
+This turn: entry57028725 remainspending. CoAtNet0/1/4 passed fresh57-check parentaudit and allthree checkpoint byte/metadata/finite-tensor checks. Fold4reportAUC0.906643 (+0.017099 vsConvNeXt0), with five mildly worse targets; notuniformimprovement. Separate224 rehearsal integrated and reviewed:8focusedtests PASS; subset0/1/4 built only, no newparentGPUfit orentry. Fullsuite had one sandboxsharedmemory failure; exacttest passed with processpermission (60optionalskips). Colab14epochsDONE/SWAsaved; finalexport/collectionpending, latestdatasetready. Fable owns nextfold persistence corrections and pairedlabelarm. Next: inspect hiddenresult; collect/audit remainingfolds, build fullfive224 and prioritize itsCUDAqualification before another longfit. CoAtNetfinalsubmission wrapper pending. Best0.950 unchanged.
 
 ## Reference records
 
