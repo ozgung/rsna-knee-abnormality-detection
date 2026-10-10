@@ -20,6 +20,34 @@ STATE_ATOL = 1e-6
 STATE_RTOL = 1e-5
 
 
+SAFE_CHECKS = frozenset({'LABEL_BYTES', 'LABEL_TARGET_SCHEMA', 'MASK_TARGET_SCHEMA',
+    'LABEL_DUPLICATE_IDS', 'LABEL_SELECTED_COVERAGE', 'MASK_INVALID_VALUES',
+    'LABEL_OBSERVED_TARGET_INVALID', 'LABEL_NONCONTRIBUTING_STUDIES', 'LABEL_CONTRIBUTOR_COUNT'})
+SAFE_STAGES = frozenset({'storage', 'cache_contract', 'cache_binding', 'source_lineage',
+    'reader_policy', 'cache_index', 'public_definitions', 'label_preflight',
+    'official_metadata', 'model_load', 'frozen_parity', 'optimizer_setup',
+    'full_updates', 'tail_reference', 'resume_continuation', 'reload_predictions'})
+
+
+class PilotCheckError(ValueError):
+    """Only reviewed enum checks and aggregate numeric counts can leave runtime."""
+    def __init__(self, check, counts=None):
+        if check not in SAFE_CHECKS: raise ValueError('Unreviewed diagnostic enum')
+        self.check = check
+        self.counts = counts or {}
+        if (not set(self.counts) <= {'selected_studies', 'noncontributing_studies', 'observed_cells', 'unknown_cells'} or
+                any(type(v) is not int or v < 0 for v in self.counts.values())):
+            raise ValueError('Unsafe diagnostic aggregate')
+        super().__init__(check)
+
+
+def failure_diagnostic(stage, error):
+    result = {'failure_stage': stage if stage in SAFE_STAGES else 'unclassified',
+              'failure_check': error.check if isinstance(error, PilotCheckError) else 'UNCLASSIFIED_EXCEPTION'}
+    if isinstance(error, PilotCheckError): result['failure_counts'] = error.counts
+    return result
+
+
 def file_sha(path):
     with Path(path).open('rb') as handle: return hashlib.file_digest(handle, 'sha256').hexdigest()
 
@@ -207,30 +235,35 @@ def load_labels(label_path, mask_path, ids, targets):
     import pyarrow.parquet as pq
     import re
     if file_sha(label_path)!=LABEL_SHA or file_sha(mask_path)!=MASK_SHA:
-        raise ValueError('Original label/mask bytes differ')
+        raise PilotCheckError('LABEL_BYTES')
     normalize=lambda s: re.sub('[^a-z0-9]','',s.lower())
     label_names=pq.read_schema(label_path).names
-    if not set(['StudyInstanceUID',*targets])<=set(label_names): raise ValueError('Original target order unavailable')
+    if not set(['StudyInstanceUID',*targets])<=set(label_names): raise PilotCheckError('LABEL_TARGET_SCHEMA')
     names=pq.read_schema(mask_path).names
     mapping={normalize(c[2:]):c for c in names if c.startswith('m_')}
     mask_columns=[mapping.get(normalize(t)) for t in targets]
-    if None in mask_columns or len(set(mask_columns))!=12: raise ValueError('Original mask target mapping differs')
+    if None in mask_columns or len(set(mask_columns))!=12: raise PilotCheckError('MASK_TARGET_SCHEMA')
     # Only ID/target/mask columns, never reports or raw y_ outcomes.
     labels=pq.read_table(label_path,columns=['StudyInstanceUID',*targets]).to_pydict()
     masks=pq.read_table(mask_path,columns=['StudyInstanceUID',*mask_columns]).to_pydict()
     def rows(table,columns):
         keys=table['StudyInstanceUID']
-        if len(set(keys))!=len(keys): raise ValueError('Duplicate label studies')
+        if len(set(keys))!=len(keys): raise PilotCheckError('LABEL_DUPLICATE_IDS')
         positions={str(key):i for i,key in enumerate(keys)}
-        if not set(ids)<=positions.keys(): raise ValueError('Selected label coverage missing')
+        if not set(ids)<=positions.keys(): raise PilotCheckError('LABEL_SELECTED_COVERAGE')
         return {sid: np.asarray([table[c][positions[sid]] for c in columns],dtype=np.float32) for sid in ids}
     ys=rows(labels,targets); ms=rows(masks,mask_columns)
     for sid in ids:
         y,m=ys[sid],ms[sid]
-        if not np.isfinite(m).all() or not np.isin(m,[0,1]).all() or not m.any(): raise ValueError('Noncontributing/invalid original mask')
-        if not np.isfinite(y[m>0]).all() or not ((y[m>0]>=0)&(y[m>0]<=1)).all(): raise ValueError('Invalid observed soft target')
+        if not np.isfinite(m).all() or not np.isin(m,[0,1]).all(): raise PilotCheckError('MASK_INVALID_VALUES')
+        if not np.isfinite(y[m>0]).all() or not ((y[m>0]>=0)&(y[m>0]<=1)).all(): raise PilotCheckError('LABEL_OBSERVED_TARGET_INVALID')
         ys[sid]=np.where(m>0,y,0).astype(np.float32)
     return ys,ms
+
+
+def contributor_ordinals(ids, masks):
+    """Valid all-unknown studies contribute no loss and are skipped before shuffle."""
+    return [i for i, sid in enumerate(ids) if any(masks[sid])]
 
 
 def run(public_source, decoder_source, manifest, checkpoint, cache, labels, masks, root, out, contract):
@@ -267,19 +300,26 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
                       peak_rss_bytes=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss*1024)
         (out/'qualification.json').write_text(json.dumps(report,indent=2,allow_nan=False)+'\n')
     save()
+    stage='storage'
     try:
         if shutil.disk_usage(out).free < 4*1024**3: raise OSError('Insufficient disposable state storage')
+        stage='cache_contract'
         observed=cache_contract(json.loads((cache/'receipt.json').read_text()))
+        stage='cache_binding'
         if observed!=contract or file_sha(cache/'private-index.json')!=INDEX_SHA: raise ValueError('Cache binding changed')
+        stage='source_lineage'
         if manifest['source_sha256']!=contract['source_sha256'] or sha256(canonical_bytes(manifest))!=contract['manifest_sha256']:
             raise ValueError('Public source/cache lineage differs')
+        stage='reader_policy'
         if policy_contract()!=json.loads((cache/'receipt.json').read_text())['input_policy']:
             raise ValueError('Protected reader policy changed')
+        stage='cache_index'
         index=json.loads((cache/'private-index.json').read_text())
         ids=[r['StudyInstanceUID'] for r in index]
         bounded_ids(ids,count=32)
         if len(ids)!=32 or sha256(canonical_bytes(ids))!=IDS_SHA or [r['ordinal'] for r in index]!=list(range(32)):
             raise ValueError('Cache index membership/order differs')
+        stage='public_definitions'
         public,decoder=load_definitions(public_source,decoder_source,manifest)
         def cached(i):
             row=index[i]
@@ -291,9 +331,17 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
                     not np.array_equal(mask.astype(bool),volume.reshape(96,-1).any(axis=1))):
                 raise ValueError('Cache array integrity failed')
             return volume,mask
+        stage='label_preflight'
         ys,ms=load_labels(labels,masks,ids,public.LAB)
         report['observed_cells']=int(sum(ms[s].sum() for s in ids))
+        contributors=contributor_ordinals(ids,ms)
+        skipped=[i for i in range(32) if i not in contributors]
+        if len(contributors)!=30 or len(skipped)!=2: raise PilotCheckError('LABEL_CONTRIBUTOR_COUNT')
+        report.update(requested_studies=32,contributing_unique_studies=30,skipped_unknown_studies=2,
+                      group_sizes=[16,14],contributor_ids_sha256=sha256(canonical_bytes([ids[i] for i in contributors])),
+                      skipped_ids_sha256=sha256(canonical_bytes([ids[i] for i in skipped])))
         report['targets']=public.LAB
+        stage='official_metadata'
         if file_sha(root/'train_series.csv')!=contract['series_metadata_sha256']: raise ValueError('Official metadata changed')
         records={}
         with (root/'train_series.csv').open(newline='') as handle:
@@ -302,11 +350,13 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
         torch.set_num_threads(4); torch.backends.cudnn.benchmark=False
         torch.backends.cudnn.deterministic=True; torch.backends.cudnn.allow_tf32=False; torch.backends.cuda.matmul.allow_tf32=False
         torch.use_deterministic_algorithms(True)
+        stage='model_load'
         model=load_model(public,checkpoint,'cuda',manifest)
         if any(p.dtype != torch.float32 for p in model.parameters()) or torch.is_autocast_enabled():
             raise ValueError('Protocol requires actual FP32 parameters/computation')
         torch.cuda.reset_peak_memory_stats()
         parity_start=time.monotonic(); frozen_errors=[]; window_errors=[]
+        stage='frozen_parity'
         for i in (0,1):
             raw,rawmask,counts=prepare_study(public,decoder,ids[i],records,root/'train_series')
             volume,mask=cached(i)
@@ -322,14 +372,16 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
             del raw,rawmask,volume,mask,raw_windows,cached_windows
         report.update(frozen_parity_studies=2,frozen_prediction_max_error=max(frozen_errors),
                       gpu_window_max_error=max(window_errors),raw_frozen_parity_seconds=time.monotonic()-parity_start)
+        stage='optimizer_setup'
         optimizer=torch.optim.AdamW(optimizer_groups(model),betas=(.9,.999),eps=1e-8,foreach=False,fused=False)
         report['optimizer_groups']=[{k:v for k,v in g.items() if k!='params'} for g in optimizer.param_groups]
         original_bn=bn_state(model)
         if not original_bn: raise ValueError('Expected public BN buffers absent')
         probes={family:next((name,p.detach().cpu().clone()) for name,p in model.named_parameters()
                      if (name.startswith('backbone.'))==(family=='encoder')) for family in ('encoder','head')}
-        def order(epoch): return np.random.default_rng(42+epoch).permutation(32).tolist()
+        def order(epoch): return np.random.default_rng(42+epoch).permutation(contributors).tolist()
         sampler={'epoch':0,'position':0,'order':order(0)}
+        report['sampler_order_sha256']=sha256(canonical_bytes(sampler['order']))
         def accumulate(chosen,epoch,denominator):
             training_mode(model); optimizer.zero_grad(set_to_none=True)
             for i in chosen:
@@ -349,14 +401,17 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
                 del windows,volume,mask,logits
             require_bn(model,original_bn)
         train_start=time.monotonic()
+        stage='full_updates'
         for update in range(2):
             chosen=sampler['order'][sampler['position']:sampler['position']+16]
-            if len(chosen)!=16: raise ValueError('Full accumulation membership differs')
-            accumulate(chosen,0,16)
+            if len(chosen)!=[16,14][update]: raise ValueError('Accumulation membership differs')
+            accumulate(chosen,0,len(chosen))
             counts,norm=apply_update(model,optimizer,update)
-            sampler['position']+=16; report['updates']+=1; report['contributing_studies']+=16
+            sampler['position']+=len(chosen); report['updates']+=1; report['contributing_studies']+=len(chosen)
             report['last_gradient_counts']=counts; report['last_unclipped_grad_norm']=norm; save()
+        if sampler['position']!=30: raise ValueError('Contributor epoch coverage differs')
         sampler={'epoch':1,'position':0,'order':order(1)}
+        report['next_epoch_sampler_order_sha256']=sha256(canonical_bytes(sampler['order']))
         save_state(temporary[0],model,optimizer,sampler,2,contract)
         chosen=sampler['order'][:3]
         accumulate(chosen,1,3)
@@ -365,6 +420,7 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
         save_state(temporary[1],model,optimizer,sampler,3,contract)
         # Reopen saved full state; reference accumulates unscaled study losses,
         # then divides by actual3. This would detect an accidental /16 tail.
+        stage='tail_reference'
         restored,updates=restore_state(temporary[0],model,optimizer,contract)
         if restored!={'epoch':1,'position':0,'order':order(1)} or updates!=2: raise ValueError('Sampler/counter resume differs')
         accumulate(restored['order'][:3],restored['epoch'],1)
@@ -375,6 +431,7 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
             if not torch.allclose(actual,reference,atol=STATE_ATOL,rtol=STATE_RTOL): raise ValueError('Tail denominator reference failed')
             tail_error=max(tail_error,float((actual-reference).abs().max()))
         del actual_grad
+        stage='resume_continuation'
         # Resume proof uses IDENTICAL /3 arithmetic, separately from reordered
         # tail reference. Deterministic model/optimizer/RNG/sampler must be exact.
         restored,updates=restore_state(temporary[0],model,optimizer,contract)
@@ -392,6 +449,7 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
         assert_state_close(a['sampler'],b['sampler'],atol=0,rtol=0)
         if a['updates']!=b['updates'] or b['updates']!=3: raise ValueError('Resume update count differs')
         del a,b
+        stage='reload_predictions'
         volume,mask=cached(0)
         probe_windows=sampled_windows(public,volume,mask,ids[0],1)
         model.eval()
@@ -407,7 +465,7 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
         changes={family:float((dict(model.named_parameters())[name].detach().cpu()-before).abs().max())
                  for family,(name,before) in probes.items()}
         if any(v<=0 or not np.isfinite(v) for v in changes.values()): raise ValueError('Group parameter update absent')
-        report.update(updates=3,contributing_studies=35,tail_gradient_max_error=tail_error,
+        report.update(updates=3,contributing_studies=33,tail_gradient_max_error=tail_error,
                       resume_model_max_error=model_error,resume_optimizer_max_error=optimizer_error,
                       resume_rng_exact=True,resume_sampler_exact=True,bn_buffers_unchanged=True,
                       save_reload_logit_max_error=prediction_error,
@@ -415,7 +473,7 @@ def run(public_source, decoder_source, manifest, checkpoint, cache, labels, mask
                       final_lrs={g['name']:g['lr'] for g in optimizer.param_groups},status='PASS')
         save()
     except Exception as error:
-        report.update(status='FAIL',failure_type=type(error).__name__)
+        report.update(status='FAIL',failure_type=type(error).__name__,**failure_diagnostic(stage,error))
         save()
         raise RuntimeError('AdamW qualification failed; inspect sanitized aggregate receipt') from None
     finally:

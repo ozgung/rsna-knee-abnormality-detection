@@ -76,6 +76,8 @@ class MechanicsTests(unittest.TestCase):
             return p.grad
         self.assertTrue(torch.allclose(gradient(3),gradient(1)/3,atol=1e-7))
         self.assertFalse(torch.allclose(gradient(3),gradient(16)))
+        self.assertTrue(torch.allclose(gradient(14),gradient(1)/14,atol=1e-7))
+        self.assertFalse(torch.allclose(gradient(14),gradient(16)))
         self.assertEqual(float(gradient(3)[0,1]),0.)
 
     def test_bn_affine_groups_and_group_omission(self):
@@ -147,6 +149,39 @@ class LabelSchemaTests(unittest.TestCase):
                 self.assertAlmostEqual(float(ys['a'][1]),.2); self.assertAlmostEqual(float(ys['b'][1]),.7)
                 self.assertEqual(float(ys['b'][0]),0.); self.assertEqual(float(ms['b'][0]),0.)
                 with self.assertRaises(ValueError): pilot.load_labels(labels,masks,['missing'],targets)
+            for column in list(md):
+                if column.startswith('m_'): md[column][1]=0.
+            pq.write_table(pa.table(md),masks)
+            with patch.object(pilot,'LABEL_SHA',pilot.file_sha(labels)),patch.object(pilot,'MASK_SHA',pilot.file_sha(masks)):
+                ys,ms=pilot.load_labels(labels,masks,['a','b'],targets)
+                self.assertEqual(pilot.contributor_ordinals(['a','b'],ms),[0])
+                self.assertEqual(float(ms['b'].sum()),0.)
+                self.assertTrue(np.array_equal(ys['b'],np.zeros(12,np.float32)))
             md['m_T1']=[1.,.5]; pq.write_table(pa.table(md),masks)
             with patch.object(pilot,'LABEL_SHA',pilot.file_sha(labels)),patch.object(pilot,'MASK_SHA',pilot.file_sha(masks)):
                 with self.assertRaises(ValueError): pilot.load_labels(labels,masks,['a','b'],targets)
+
+
+class SafeFailureTests(unittest.TestCase):
+    def test_diagnostics_never_export_unknown_exception_text_or_ids(self):
+        from knee.public_adaptation_pilot import failure_diagnostic,PilotCheckError
+        result=failure_diagnostic('label_preflight',ValueError('private-id/report-text'))
+        self.assertEqual(result,{'failure_stage':'label_preflight','failure_check':'UNCLASSIFIED_EXCEPTION'})
+        error=PilotCheckError('LABEL_NONCONTRIBUTING_STUDIES',{'selected_studies':32,'noncontributing_studies':2,'observed_cells':303,'unknown_cells':81})
+        result=failure_diagnostic('label_preflight',error)
+        self.assertEqual(result['failure_check'],'LABEL_NONCONTRIBUTING_STUDIES')
+        self.assertEqual(result['failure_counts']['noncontributing_studies'],2)
+        with self.assertRaises(ValueError): PilotCheckError('private-id')
+        with self.assertRaises(ValueError): PilotCheckError('MASK_INVALID_VALUES',{'private-id':1})
+
+
+class ContributorSamplingTests(unittest.TestCase):
+    def test_filter_before_shuffle_and_flush_actual_fourteen(self):
+        from knee.public_adaptation_pilot import contributor_ordinals
+        ids=[str(i) for i in range(32)]
+        masks={sid:[0,0] if i in (3,20) else [1,0] for i,sid in enumerate(ids)}
+        actual=contributor_ordinals(ids,masks)
+        self.assertEqual(len(actual),30); self.assertNotIn(3,actual); self.assertNotIn(20,actual)
+        groups=[actual[i:i+16] for i in range(0,len(actual),16)]
+        self.assertEqual([len(g) for g in groups],[16,14])
+        self.assertEqual([i for g in groups for i in g],actual)

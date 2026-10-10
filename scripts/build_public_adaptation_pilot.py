@@ -61,7 +61,7 @@ print(json.dumps({'event':'adaptation_pilot_done','status':report['status'],'ela
         {'cell_type':'markdown','id':'protocol','metadata':{},'source':[
             '# Disposable exact-AdamW adaptation qualification\n',
             f"{manifest['attribution']}. [Public source]({manifest['source_url']}).\n",
-            'Exact completed32-study cache. Two16-study updates, actual3-study tail reference, full saved-state continuation. Explicit original observation masks correct the finite-only TrackA loader prospectively; no outcomes informed this choice. No validation/AUC/gold, fit or retained weights. Public checkpoint has training-population exposure.\n']},
+            'Exact completed32-study cache. Two optimizer updates (16+14 contributing studies), actual3-study tail reference, full saved-state continuation. Explicit original observation masks correct the finite-only TrackA loader prospectively; no outcomes informed this choice. No validation/AUC/gold, fit or retained weights. Public checkpoint has training-population exposure.\n']},
         {'cell_type':'code','id':'run','metadata':{},'execution_count':None,'outputs':[],'source':code.splitlines(True)}]}
     meta={'id':f'ozgung/{slug}','title':slug.replace('-',' ').title(),'code_file':'notebook.ipynb',
           'language':'python','kernel_type':'notebook','is_private':True,'enable_gpu':True,'enable_tpu':False,

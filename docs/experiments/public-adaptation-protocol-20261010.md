@@ -6,11 +6,11 @@ Hypothesis: two low-learning-rate passes over the original masked weak labels ma
 
 | Component | Fixed choice |
 | --- | --- |
-| Population | Existing4345 eligible studies, original fixed fold0/quarantine. Expected3475 training/870 development; verify exact membership and observed-label support before launch. No gold or bootstrap targets. |
+| Population | Existing4345 eligible studies, original fixed fold0/quarantine. Expected3475 training/870 development membership; verify exact membership and observed-label support before launch. Only studies with at least one valid observed training cell contribute. No gold or bootstrap targets. |
 | Inputs | Public96-slice layout,2–98% span,140mm crop directly to384, central320 crop and public normalization. Preserve partial masks and boundary policy. No corpus44 substitution. |
 | Initial state | Strict full encoder/head state SHA7e5315dad125b99fc65b340b3de41de628e9be51ff5835355dd61c86472244ef, explicit320 geometry. |
 | Optimizer | AdamW, betas(0.9,0.999), eps1e-8, encoderLR1e-6, complete headLR1e-5. Matrix/kernel decay0.01; biases and normalization affine parameters decay0. All intended parameters included. |
-| Duration | Two complete epochs, seed42, batch1, accumulate16 contributing studies. Flush the partial group with its actual denominator; expected218 updates/epoch,436 total,3-study tail. Counts are checked, not forced. |
+| Duration | Two complete epochs, seed42, batch1, accumulate16 contributing studies. Flush the partial group with its actual denominator; actual contributing count N determines ceil(N/16) updates/epoch and2*ceil(N/16) total. The3475-membership example gives218/436 and3-study tail only if every member contributes. Counts are checked, not forced. |
 | Schedule/precision |20 successful-update warmup then constant LR. FP32, norm clip1.0 after accumulation. Pilot fixes checkpointing/windowchunk4 settings; no silent precision fallback. |
 | Views |12 uniformly sampled admissible centers per study; no replacement when sufficient, otherwise replacement. Deterministic epoch/study RNG. No spatial/intensity augmentation; original head dropout0.2 during training. |
 | Normalization | Freeze BN running statistics/counters, train affine parameters; reapply BN-eval after model.train(). LayerNorm remains trainable. |
@@ -28,3 +28,5 @@ The first mechanical CPU pilot will establish exact96×384 bytes, masks and cent
 Evidence: Astra addendum `outputs/analysis/astra-method-decision-20261010/recommendation.md`; parent [warm-start qualification](public-warmstart-qualification-20261010.md). No adaptation fit or full cache rebuild launched at this checkpoint.
 
 October10 prospective clarification before pilot outcomes: apply the original explicit `m_` observation masks from pinned `train_labels_v1.parquet` (SHA `a134cfce2f751f90f4219d791a563ee677b6223ac28f32e456bb3759c1d3fba9`) to finite pinned `labels_v1_blend.parquet` targets (SHA `d2cdb8a37e0c4c491758d17c96e3bd4081f06b257c7849608df88590368e94e2`). Require exact study alignment and document mask semantics. TrackA inherited loader used finite blend cells without explicit masks; this corrected observation policy is part of the new prospective recipe, not an unchanged TrackA comparison.
+
+October10 pre-update eligibility correction, accepted by AstraHigh before any model outcome: exact32cachecontains30 contributors and2 validallzero observationmaskstudies (303 observed/81 unknown cells). Pilotv1 failed1.16s/0updates/0CUDAallocation. Preserve32membership/data hashes; filter validnoncontributors before deterministic sampling, skipwithoutreplacement, record contributor/skipped/orderfingerprints. Invalid/missing masks stillfail. Pilotv2 executes16+14 actualcontributor updates, then independent3-contributor tail/reference/exactresume proof. Fullfit validates actualtrainingN and unchangedvalidationmembership; no new targets, metricselection or weakenedparity/provenance.
