@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-10 09:36 UTC**. Read this snapshot, then [Fable/Astra handoff](docs/claude-astra-handoff.md). Prior recovery details and receipts: [archived status](docs/status-archive/status-before-20261010-fullfive.md). Durable rules: AGENTS.md; setup: README.md.
+Updated **2026-10-10 09:53 UTC**. Read this snapshot, then [Fable/Astra handoff](docs/claude-astra-handoff.md). Prior recovery details and receipts: [archived status](docs/status-archive/status-before-20261010-fullfive.md). Durable rules: AGENTS.md; setup: README.md.
 
 ## Current snapshot
 
@@ -15,6 +15,7 @@ Updated **2026-10-10 09:36 UTC**. Read this snapshot, then [Fable/Astra handoff]
 
 | Owner / task | State / next action |
 | --- | --- |
+| Parent — native DICOM inventory / ROI prerequisites | Private CPU header kernel v1 RUNNING, no GPU or pixel decoding. Inspect aggregate results, then qualify native crop/localization prototype before fitting. |
 | Parent — original224 entry | Entry57037296 PENDING. Inspect score/runtime when complete; do not resubmit v1. |
 | Fable — Colab384 original-label family | Fold0 trained; finalbackup ready, payload/export pending. Fable relaunched fold1 after reported reliability fixes; A100 session and epoch0 backup confirmed09:24UTC. Qualification slot released08:53UTC for prepared export; respect actual capacity. |
 | Fable — persistence fixes | Re-review:14 focused tests PASS; state separation/final wait/locking/strict resumes improved. Exact remote payload binding and recovery/skip evidence still need correction; preserve healthy training. |
@@ -27,6 +28,7 @@ Updated **2026-10-10 09:36 UTC**. Read this snapshot, then [Fable/Astra handoff]
 | `ozgung/knee-own-coatnet224-rehearsal-fivefold-20261010` v1 | COMPLETE/PASS. Build `outputs/kaggle/own-coatnet224-rehearsal-fivefold-20261010/`. Command `/Users/ozgun/miniconda3/bin/kaggle kernels push -p outputs/kaggle/own-coatnet224-rehearsal-fivefold-20261010`. Outputs `coatnet224_rehearsal/rehearsal-report.json` and `visible.csv`; no local controller. |
 | `ozgung/knee-own-coatnet224-submission-20261010` v1 | COMPLETE/PASS, entry57037296 PENDING. Build `outputs/kaggle/own-coatnet224-submission-20261010/`; push with same KaggleCLI. Collect `coatnet224_submission/operational-receipt.json` and root `submission.csv`; no local controller. |
 | `ozgung/knee-tracka-coatnet224-r2-fold01-20261010` v1 | Fable launched08:22UTC, occupies second GPU slot. `labels_bootstrap_v2`; do not duplicate or promote automatically. |
+| `ozgung/knee-dicom-native-resolution-20261010` v1 | CPU-only/offline, RUNNING09:53UTC. Build `outputs/kaggle/dicom-native-resolution-20261010/`; no controller. Retrieve only `dicom_resolution/{train,test}-headers.json`, aggregate coverage/maxima/spacing. No GPU, labels, decoded pixels or identifier output. |
 | Colab | Fable-owned `knee-c384r-f1-a1`, A100 endpoint `gpu-a100-s-kkb-ass1c2-20ivyft9r6y5b`, active09:24UTC. Fold1 epoch0 completed; serverversion1 backup logged READY09:22UTC. Log `outputs/colab/c384raw-loop.log`; maintained controller `scripts/colab_tracka_folds.sh` queues folds1–4. Fable owns stop/resume; do not launch a competing controller. |
 
 Colab launch ownership is now **Fable only**, with stops coordinated in sharedhandoff except clear runaway/duplicate work. Parent/Sol must not launch another loop. Completed original384fold0 backup `ozgung/knee-colab-resume-c384r-fold0` is serverREADY; smallmetadata confirms12epochs,partialfalse,selected[10,11,9], resume size2,049,835,743bytes. Payload remains remote/restore-unverified. Recovery receipt `outputs/analysis/colab-raw384-reconcile-20261010/receipt.json`. Failed download/cleanup logs preserved as `outputs/colab/c384raw-loop-fold0.log`; stoppedfold1 log `outputs/colab/c384raw-loop.log`, frozen localsources/receipt `outputs/analysis/colab-raw384-fold1-launch-20261010/`. Do not restart oldloops63024/79276. Fable prepared `outputs/kaggle/trackA-export-c384r-fold0-20261010/`; may now push: parent released qualification/entry slot08:53UTC. Fable reports implementing classified retries, strict identity, staged-payload manifests and final-backup verification before this fresh fold1. Parent confirmed active session/first READY log and reviewed the critical paths after Sol re-review. Fourteen focused tests pass; exact durable payload/recovery provenance is still unqualified. No fixed compute reserve or training-time cap is imposed.
@@ -40,7 +42,7 @@ Accidental seed42 repeat `ozgung/knee-tracka-coatnet224-s43-fold01-20261010` v1 
 ## Scientific decisions and verification
 
 - User switched parent to **Sol High** on October10. Parent handles execution/integration; explicitly delegate consequential experiment design, method improvement and scientific decisions to **Astra High**, routine work to Sol low/medium or Luna. Avoid Astra for recurring monitoring.
-- Scientific advisor `/root/next_method_astra` (Astra High) is reviewing the next two controlled experiments and causes of the gap: corpus336→model384 upsampling, coverage, initialization, labels and validation. Read-only, no live actions. Expected memo `outputs/analysis/astra-method-decision-20261010/recommendation.md`; parent must integrate it before new experimental launches.
+- Astra High method review completed: prioritize inherited MRI representation/supervision and coverage; spatial upsampling alone cannot establish native-detail gain. Parent adopted full-view plus direct-DICOM joint ROI as a controlled hypothesis before larger variants, retaining coverage/public warm-start comparisons. [Native-detail/ROI plan](docs/experiments/native-detail-roi-plan-20261010.md); aggregate memo `outputs/analysis/astra-method-decision-20261010/recommendation.md`.
 
 - Original224 fixed recipe: native `coatnet_rmlp_2_rw_224.sw_in12k_ft_in1k`,224px,k8train/k16eval,10epochs,bs4/accum2,gradcheckpoint,windowchunk8,seed42,generic timm initialization,original `labels_v1_blend`. Keep fixed family; scheduler/AMP update ambiguity and dropped final accumulation microbatch are documented, not silently changed.
 - Eligibility4345 =4407 minus58gold and4related quarantined studies; known patient/report components do not cross fixed folds. Historical600 release applies only to newCV, old comparisons remain frozen. Fullfold report AUC selects SWA, so OOF is not untouched outerfold evidence. Globalteacher bootstrap adds indirect exposure. Reports may supervise training; inference remains image-only.
