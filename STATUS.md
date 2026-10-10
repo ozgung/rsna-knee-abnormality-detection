@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-10 09:31 UTC**. Read this snapshot, then [Fable/Astra handoff](docs/claude-astra-handoff.md). Prior recovery details and receipts: [archived status](docs/status-archive/status-before-20261010-fullfive.md). Durable rules: AGENTS.md; setup: README.md.
+Updated **2026-10-10 09:36 UTC**. Read this snapshot, then [Fable/Astra handoff](docs/claude-astra-handoff.md). Prior recovery details and receipts: [archived status](docs/status-archive/status-before-20261010-fullfive.md). Durable rules: AGENTS.md; setup: README.md.
 
 ## Current snapshot
 
@@ -38,6 +38,9 @@ Completed original224 sources: `ozgung/knee-tracka-coatnet224-fold01-20261009` v
 Accidental seed42 repeat `ozgung/knee-tracka-coatnet224-s43-fold01-20261010` v1 was canceled after555.4s; preserve its notebook/logs and do not restart. Any future seed43 run must prove resolved command seed first. Old queue6782 and lost bootstrapColab loop32148/32151 must not restart. Recovery backup and exact selected tensor fingerprint remain in linked archive/recovery docs.
 
 ## Scientific decisions and verification
+
+- User switched parent to **Sol High** on October10. Parent handles execution/integration; explicitly delegate consequential experiment design, method improvement and scientific decisions to **Astra High**, routine work to Sol low/medium or Luna. Avoid Astra for recurring monitoring.
+- Scientific advisor `/root/next_method_astra` (Astra High) is reviewing the next two controlled experiments and causes of the gap: corpus336→model384 upsampling, coverage, initialization, labels and validation. Read-only, no live actions. Expected memo `outputs/analysis/astra-method-decision-20261010/recommendation.md`; parent must integrate it before new experimental launches.
 
 - Original224 fixed recipe: native `coatnet_rmlp_2_rw_224.sw_in12k_ft_in1k`,224px,k8train/k16eval,10epochs,bs4/accum2,gradcheckpoint,windowchunk8,seed42,generic timm initialization,original `labels_v1_blend`. Keep fixed family; scheduler/AMP update ambiguity and dropped final accumulation microbatch are documented, not silently changed.
 - Eligibility4345 =4407 minus58gold and4related quarantined studies; known patient/report components do not cross fixed folds. Historical600 release applies only to newCV, old comparisons remain frozen. Fullfold report AUC selects SWA, so OOF is not untouched outerfold evidence. Globalteacher bootstrap adds indirect exposure. Reports may supervise training; inference remains image-only.
