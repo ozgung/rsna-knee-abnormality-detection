@@ -10,7 +10,7 @@ import re
 import subprocess
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from knee.public_s6_entry import VERSION,METHOD,SENTINELS,require_rehearsal
+from knee.public_s6_entry import VERSION,METHOD,INPUT_POLICY,SENTINELS,require_rehearsal
 from knee.public_s6_qualification import canonical,digest,file_sha,require,save,LABELS
 from knee.public_fullfield_entry import test_contract
 from knee.reference_blend import DOCKER_IMAGE,CONVNEXT_DATASET
@@ -30,11 +30,11 @@ ROOTS={
  'knee/reference.py':{'load_definitions','load_model'},
  'knee/public_fullfield.py':{'GRID_NAMES','snapshot','require_immutable','fullfield_windows'},
  'knee/public_fullfield_entry.py':{'safe_id','read_series','test_contract','write_csv'},
- 'knee/public_s6_qualification.py':{'LABELS','RECIPE','UID','SERIES_COLUMNS','canonical','digest','file_sha','require','save','verify_sources','verify_assets','verify_staged','synthetic_source_checks'},
+ 'knee/public_s6_qualification.py':{'LABELS','RECIPE','UID','SERIES_COLUMNS','canonical','digest','file_sha','require','save','verify_sources','verify_assets','synthetic_source_checks'},
  'knee/public_s6_evaluation.py':{'array_sha','model_digest','environment','save_predictions'},
  'knee/public_adaptation_fit.py':{'PlatformInterruption','atomic_save'},
  'knee/public_adaptation_pilot.py':{'state_fingerprint'},
- 'knee/mirror_input.py':{'prepare_study'},
+ 'knee/mirror_input.py':{'prepare_study','stress_inputs','STRESS_CASES'},
 }
 
 
@@ -113,7 +113,7 @@ def build(evaluation_build,evaluation_result,audit_path,pilot_build,pilot_result
         probes[sid]={'old':{'input':{k:record[k] for k in ('volume_sha256','mask_sha256')},'probabilities':historical[ordinal].tolist()}}
     cfg0=payload['cfg'];sr=json.loads((Path(evaluation_result)/'s6/receipt.json').read_bytes());environment={'torch':result['environment']['torch'],'packages':result['environment']['packages']}
     columns,visible,_=test_contract(data_root,LABELS,visible=True);sentinels=[ids[i] for i in SENTINELS]
-    binding={'version':VERSION,'method':METHOD,'source_bundle_sha256':digest(sources),'primitive_segments_sha256':digest(pins),
+    binding={'version':VERSION,'method':METHOD,'input_policy':INPUT_POLICY,'source_bundle_sha256':digest(sources),'primitive_segments_sha256':digest(pins),
         'evaluation_notebook_sha256':EVALUATION_NOTEBOOK_SHA,'evaluation_receipt_sha256':EVALUATION_RECEIPT_SHA,'independent_audit_sha256':AUDIT_SHA,
         'pilot_receipt_sha256':PILOT_RECEIPT_SHA,'pilot_wrapper_sha256':PILOT_WRAPPER_SHA,'pilot_arrays_sha256':file_sha(Path(pilot_result)/'wrapper/predictions-private.npz'),
         'old_notebook_sha256':CONTROL_NOTEBOOK_SHA,'old_receipt_sha256':CONTROL_RECEIPT_SHA,'old32_historical_probability_reference':'not saved; original-source/repeat/reload parity', 'old_historical_array_sha256':hashlib.sha256(historical.tobytes()).hexdigest(), 'old_historical_control_receipt_sha256':file_sha(Path(evaluation_result)/'control/receipt.json'),'evaluation_build_receipt_sha256':file_sha(Path(evaluation_build)/'build-receipt.json'),'pilot_build_receipt_sha256':file_sha(Path(pilot_build)/'build-receipt.json'),'old_build_receipt_sha256':file_sha(Path(control_build)/'build-receipt.json'),

@@ -81,6 +81,74 @@ class EntryTests(unittest.TestCase):
         with (stage/'train.csv').open() as h:self.assertEqual(next(csv.reader(h)),[E.UID])
         self.assertEqual(set(p.name for p in stage.iterdir()),{'train.csv','train_series.csv','train_series'})
 
+    def availability_stage(self):
+        self.fixture(['a','b'])
+        records=E.read_series(self.root/'test_series.csv')
+        for name in ('empty','absent'):
+            records['a'].append(dict(zip(E.SERIES_COLUMNS,['a',name,'1','0','Coronal'])))
+        (self.root/'test_series'/'a'/'empty').mkdir()
+        staged=self.root/'availability-stage';binding=E.stage(staged,['a','b'],records,{s:self.root/'test_series' for s in ('a','b')})
+        return staged,binding
+
+    def test_stage_preserves_absent_empty_metadata_and_source_paths(self):
+        staged,binding=self.availability_stage();E.verify_staged(staged,['a','b'],binding)
+        self.assertEqual([x[3] for x in binding['availability_inventory']],['present','empty','absent','present'])
+        self.assertEqual(binding['series'],4)
+        alias=staged/'train_series'/'a'/'absent'
+        self.assertTrue(alias.is_symlink());self.assertFalse(alias.exists())
+        self.assertEqual(alias.readlink(),(self.root/'test_series'/'a'/'absent').resolve())
+        self.assertFalse((self.root/'test_series'/'a'/'absent').exists())
+        with (staged/'train_series.csv').open() as h:self.assertEqual([r['SeriesInstanceUID'] for r in csv.DictReader(h)],['seriesa','empty','absent','seriesb'])
+
+    def test_stage_rejects_tampered_missing_alias_and_inventory(self):
+        staged,binding=self.availability_stage();alias=staged/'train_series'/'a'/'absent'
+        alias.unlink();alias.symlink_to(self.root/'test_series'/'a'/'another-absent',target_is_directory=True)
+        with self.assertRaises(ValueError):E.verify_staged(staged,['a','b'],binding)
+        alias.unlink();alias.symlink_to(self.root/'test_series'/'a'/'absent',target_is_directory=True)
+        bad=copy.deepcopy(binding);bad['availability_inventory'][2][3]='empty'
+        with self.assertRaises(ValueError):E.verify_staged(staged,['a','b'],bad)
+        extra=staged/'train_series'/'a'/'extra';extra.symlink_to(self.root/'missing')
+        with self.assertRaises(ValueError):E.verify_staged(staged,['a','b'],binding)
+
+    def test_availability_changes_and_non_directory_are_rejected(self):
+        staged,binding=self.availability_stage();(self.root/'test_series'/'a'/'absent').mkdir()
+        with self.assertRaises(ValueError):E.verify_staged(staged,['a','b'],binding)
+        (self.root/'test_series'/'a'/'absent').rmdir();(self.root/'test_series'/'a'/'empty'/'new.dcm').write_bytes(b'fixture')
+        with self.assertRaises(ValueError):E.verify_staged(staged,['a','b'],binding)
+        with self.assertRaises(ValueError):E.source_availability(self.root/'test_series'/'a'/'seriesa'/'one.dcm',self.root/'test_series')
+
+    def test_source_and_stage_alias_escapes_are_rejected(self):
+        staged,binding=self.availability_stage();root=self.root/'test_series';escape=root/'a'/'escape';escape.symlink_to(self.root,target_is_directory=True)
+        with self.assertRaises(ValueError):E.source_availability(escape,root)
+        sibling=root/'a'/'sibling';sibling.symlink_to(root/'b'/'seriesb',target_is_directory=True)
+        with self.assertRaises(ValueError):E.source_availability(sibling,root)
+        (root/'a'/'seriesa'/'outside.dcm').symlink_to(self.root/'test.csv')
+        with self.assertRaises(ValueError):E.verify_staged(staged,['a','b'],binding)
+        (root/'a'/'seriesa'/'outside.dcm').unlink()
+        study=staged/'train_series'/'b';(study/'seriesb').unlink();study.rmdir();study.symlink_to(root/'b',target_is_directory=True)
+        with self.assertRaises(ValueError):E.verify_staged(staged,['a','b'],binding)
+
+    def test_recovered_old_diagnostics_remain_informational_fatal_counters_stop(self):
+        counters={'pixel_failures':2,'fast_bad_headers':1,'header_parse_failures':3,'resource_errors':0,'invalid_pixels':0}
+        before=counters.copy();E.old_decode_gate(counters);self.assertEqual(before,counters)
+        for key in ('resource_errors','invalid_pixels'):
+            with self.subTest(key=key),self.assertRaises(ValueError):E.old_decode_gate({**counters,key:1})
+        source=Path(E.__file__).read_text();self.assertEqual(source.count('old_decode_gate(counters)'),2);self.assertIn('old_decode_gate(rc)',source)
+        self.assertNotIn("'pixel_failures','fast_bad_headers','header_parse_failures'))",source)
+
+    def test_mirror_stress_records_recovered_diagnostics_and_requires_all17(self):
+        from knee import mirror_input as MI
+        def stress(public,decoder):
+            MI.prepare_study(None,None,None,None,None)
+            return {'status':'PASS','cases':dict.fromkeys(MI.STRESS_CASES,'PASS'),'uses_raw_data':False,'uses_labels':False}
+        counters={'resource_errors':0,'invalid_pixels':0,'pixel_failures':1,'fast_bad_headers':1,'header_parse_failures':1}
+        with patch.object(MI,'prepare_study',return_value=('volume','mask',counters)),patch.object(MI,'stress_inputs',side_effect=stress):
+            result=E.mirror_stress(None,None)
+        self.assertEqual(result['case_count'],17);self.assertEqual(result['successful_decode_count'],1)
+        self.assertEqual(result['decode_diagnostics'][0]['counters'],counters)
+        with patch.object(MI,'stress_inputs',return_value={'status':'PASS','cases':{},'uses_raw_data':False,'uses_labels':False}):
+            with self.assertRaises(ValueError):E.mirror_stress(None,None)
+
     def test_strict_metadata_and_target_order(self):
         self.fixture(['a','b','c'])
         text=(self.root/'test_series.csv').read_text();(self.root/'test_series.csv').write_text(text.replace('Sagittal','Unknown',1))
@@ -103,6 +171,17 @@ class EntryTests(unittest.TestCase):
         with patch('numpy.savez',side_effect=OSError('Interrupted write')):
             with self.assertRaises(OSError):E.old_ledger(path,['id'],np.ones((1,12))*.2)
         self.assertEqual(before,path.read_bytes());self.assertFalse(path.with_name(path.name+'.tmp').exists())
+
+    @unittest.skipUnless(np is not None and pd is not None, 'NumPy/pandas required for numerical contracts')
+    def test_fresh_policy_and_actual_stresses_required(self):
+        r,b,path=self.passing_rehearsal();E.require_rehearsal(r,b,path)
+        for kind in ('old-version','missing-policy','mirror-case','native-case'):
+            q=copy.deepcopy(r);binding=copy.deepcopy(b)
+            if kind=='old-version':q['version']=binding['version']='s6-dual-image-only-v1';q['binding']=binding
+            elif kind=='missing-policy':binding.pop('input_policy');q['binding']=binding
+            elif kind=='mirror-case':q['workers']['old'][0]['partial_input_stress']['cases'].pop('bad_pixel')
+            else:q['workers']['s6'][0]['native_availability_stress']['cases']['empty']['status']='FAIL'
+            with self.subTest(kind=kind),self.assertRaises(ValueError):E.require_rehearsal(q,binding,path)
 
     def test_failed_rehearsal_cannot_gate_entry(self):
         for r in [{'status':'FAIL'},{'status':'PASS','version':E.VERSION,'mode':'rehearsal','binding':{},'completed':38}, {'status':'INTERRUPTED'}]:
@@ -138,7 +217,7 @@ class EntryTests(unittest.TestCase):
     def passing_rehearsal(self):
         pids=['p'+str(i) for i in range(32)];oids=['o'+str(i) for i in range(4)];vids=['v'+str(i) for i in range(3)];ids=pids+oids+vids
         sent={'old':oids,'s6':[pids[i] for i in E.SENTINELS]};environment={'torch':'frozen','packages':{'numpy':'frozen'}}
-        binding={'version':E.VERSION,'method':E.METHOD,'s6_probe_ids':pids,'old_historical_ids':oids,'environment':environment,
+        binding={'version':E.VERSION,'method':E.METHOD,'input_policy':E.INPUT_POLICY,'s6_probe_ids':pids,'old_historical_ids':oids,'environment':environment,
                  'qualified_state':{'old_state':'old','old_grid':'grid','s6_state':'s6'},
                  'sentinel_inputs':{a:{sid:{'input':'same'} for sid in sent[a]} for a in sent},
                  'sentinel_probabilities':{a:{sid:[.5]*12 for sid in sent[a]} for a in sent}}
@@ -157,6 +236,9 @@ class EntryTests(unittest.TestCase):
            'completed_old_historical':4,'all_input_state_probability_gates':True,'zero_failed':True,'zero_imputed':True,'boards':boards,'elapsed_seconds':300,
            'projection':{'conservative_seconds':20000},'csv_sha256':E.file_sha(csvpath),'visible_ids':vids,'sentinel_ids':sent,'workers':workers,
            'phases':{a:{'wall_seconds':100,'peaks':{'host_rss_bytes':1,'output_disk_bytes':1},'minimum_disk_free_bytes':1} for a in sent}}
+        from knee.mirror_input import STRESS_CASES
+        workers['old'][0]['partial_input_stress']={'status':'PASS','cases':dict.fromkeys(STRESS_CASES,'PASS'),'case_count':17,'uses_raw_data':False,'uses_labels':False}
+        workers['s6'][0]['native_availability_stress']={'status':'PASS','case_count':2,'cases':{case:{'status':'PASS','usable_series':1,'slices':4} for case in ('absent','empty')},'uses_raw_data':False,'uses_labels':False}
         return r,binding,csvpath
 
     def test_pristine_native_renderer_restored_before_repeated_one_time_patch(self):

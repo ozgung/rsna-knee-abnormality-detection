@@ -13,13 +13,14 @@ import shutil
 import subprocess
 import sys
 import time
-from knee.public_s6_qualification import (LABELS,RECIPE,UID,SERIES_COLUMNS,canonical,digest,file_sha,require,save,verify_sources,verify_assets,verify_staged,synthetic_source_checks)
+from knee.public_s6_qualification import (LABELS,RECIPE,UID,SERIES_COLUMNS,canonical,digest,file_sha,require,save,verify_sources,verify_assets,synthetic_source_checks)
 from knee.public_s6_evaluation import array_sha,model_digest,environment,save_predictions
 from knee.public_adaptation_fit import PlatformInterruption,atomic_save
 from knee.public_adaptation_pilot import state_fingerprint
 from knee.public_fullfield_entry import safe_id,read_series,test_contract,write_csv
 
-VERSION='s6-dual-image-only-v1'
+VERSION='s6-dual-image-only-v2'
+INPUT_POLICY={'version':'source-partial-input-v1','staging':'all metadata, exact confined source aliases, bound present/empty/absent inventory','recovered_diagnostics':['pixel_failures','fast_bad_headers','header_parse_failures'],'fatal_counters':['resource_errors','invalid_pixels'],'prediction_recovery':'none; complete both arms required'}
 METHOD={'old':'central320 K94 equal original/mirror probabilities','s6':RECIPE,'blend':[.7,.3],
         'rank':'pandas average pct over all actual test rows','s6_quantization':'source Python %.6f float64','assignment':'canonical ordinal modulo2'}
 MAX_SECONDS=9*3600
@@ -47,27 +48,85 @@ def assignments(ids):
     return [[s for i,s in enumerate(ids) if i%2==board] for board in range(2)]
 
 
+def source_availability(source,root):
+    root=Path(root).resolve();source=Path(source)
+    require(source.parent.resolve().is_relative_to(root) and source.resolve().is_relative_to(source.parent.resolve()),'IMAGE_PATH_ESCAPE')
+    require(not source.parent.exists() or source.parent.is_dir(),'IMAGE_STUDY_NOT_DIRECTORY')
+    require(not source.is_symlink() or source.exists(),'DANGLING_SOURCE_ALIAS')
+    if source.exists():
+        require(source.is_dir(),'IMAGE_PATH_NOT_DIRECTORY')
+        for image in source.glob('*.dcm'):
+            require(image.is_file() and image.resolve().is_relative_to(source.resolve()),'DICOM_PATH_ESCAPE')
+        return 'present' if any(source.glob('*.dcm')) else 'empty'
+    return 'absent'
+
+
+def verify_staged(staged,ids,receipt):
+    """Entry-local verifier preserves source-supported missing/empty series."""
+    staged=Path(staged)
+    require(set(p.name for p in staged.iterdir())=={'train.csv','train_series.csv','train_series'},'UNEXPECTED_STAGE_TABLE')
+    require(not (staged/'train_series').is_symlink(),'STAGE_ROOT_ALIAS')
+    for name in ('train.csv','train_series.csv'):
+        require(not (staged/name).is_symlink() and file_sha(staged/name)==receipt['train_sha256' if name=='train.csv' else 'series_sha256'],'STAGED_BYTES_CHANGED')
+    with (staged/'train.csv').open(newline='') as h:
+        r=csv.DictReader(h);require(r.fieldnames==[UID] and [x[UID] for x in r]==ids,'STAGED_ID_ONLY_ORDER')
+    with (staged/'train_series.csv').open(newline='') as h:
+        r=csv.DictReader(h);require(r.fieldnames==SERIES_COLUMNS,'STAGED_SERIES_SCHEMA');rows=list(r)
+    pairs=[(x[UID],x['SeriesInstanceUID']) for x in rows]
+    require({u for u,_ in pairs}==set(ids) and len(pairs)==len(set(pairs)) and all(safe_id(u) and safe_id(s) for u,s in pairs),'STAGED_SERIES_MEMBERSHIP')
+    require(digest(ids)==receipt['membership_sha256'] and digest(pairs)==receipt['series_membership_sha256'],'STAGED_MEMBERSHIP_BINDING')
+    images=staged/'train_series';require({p.name for p in images.iterdir()}==set(ids),'STAGED_STUDY_MEMBERSHIP')
+    for p in images.iterdir():require(p.is_dir() and not p.is_symlink(),'STAGED_STUDY_ALIAS')
+    require({(p.parent.name,p.name) for p in images.glob('*/*')}==set(pairs),'EXPOSED_IMAGE_MEMBERSHIP')
+    inventory=receipt['availability_inventory'];require(digest(inventory)==receipt['availability_sha256'] and len(inventory)==len(pairs),'AVAILABILITY_BINDING')
+    paths=[]
+    for (u,s),entry in zip(pairs,inventory):
+        require(entry[:2]==[u,s] and len(entry)==5,'AVAILABILITY_ORDER')
+        source,state,root=entry[2:];target=Path(root)/u/s;alias=images/u/s
+        require(str(target.resolve())==source and alias.is_symlink() and str(alias.readlink())==source and str(alias.resolve())==source,'EXACT_SOURCE_ALIAS')
+        require(source_availability(target,root)==state,'SOURCE_AVAILABILITY_CHANGED');paths.append([u,s,source])
+    require(digest(paths)==receipt['image_paths_sha256'] and receipt['studies']==len(ids) and receipt['series']==len(pairs),'SOURCE_INVENTORY_BINDING')
+
+
 def stage(staged,ids,records,image_paths):
-    """CStudies gets an ID-only train alias; original train.csv is never read."""
+    """ID-only alias, every metadata row, no images fabricated or removed."""
     staged=Path(staged);require(not staged.exists() and set(ids)==set(records)==set(image_paths),'FRESH_EXACT_STAGE')
     staged.mkdir(parents=True);(staged/'train_series').mkdir()
     with (staged/'train.csv').open('w',newline='') as h:
         w=csv.writer(h);w.writerow([UID]);w.writerows([[s] for s in ids])
-    pairs=[];inventory=[]
+    pairs=[];inventory=[];availability=[]
     with (staged/'train_series.csv').open('w',newline='') as h:
         w=csv.DictWriter(h,fieldnames=SERIES_COLUMNS);w.writeheader()
         for sid in ids:
             require(safe_id(sid),'UNSAFE_ID')
             for row in records[sid]:
                 series=row['SeriesInstanceUID'];require(safe_id(series) and row[UID]==sid,'STAGE_METADATA')
-                source=Path(image_paths[sid])/sid/series
-                require(source.is_dir() and source.resolve().is_relative_to((Path(image_paths[sid])/sid).resolve()) and any(source.glob('*.dcm')),'IMAGE_PATH')
+                root=Path(image_paths[sid]).resolve();source=root/sid/series;state=source_availability(source,root)
                 p=staged/'train_series'/sid/series;p.parent.mkdir(exist_ok=True);p.symlink_to(source.resolve(),target_is_directory=True)
-                w.writerow({k:row[k] for k in SERIES_COLUMNS});pairs.append((sid,series));inventory.append([sid,series,str(source.resolve())])
+                w.writerow({k:row[k] for k in SERIES_COLUMNS});pairs.append((sid,series));inventory.append([sid,series,str(source.resolve())]);availability.append([sid,series,str(source.resolve()),state,str(root)])
     require(len(pairs)==len(set(pairs)),'DUPLICATE_STAGE_SERIES')
     r={'train_sha256':file_sha(staged/'train.csv'),'series_sha256':file_sha(staged/'train_series.csv'),'image_paths_sha256':digest(inventory),
-       'membership_sha256':digest(ids),'series_membership_sha256':digest(pairs),'studies':len(ids),'series':len(pairs)}
+       'membership_sha256':digest(ids),'series_membership_sha256':digest(pairs),'studies':len(ids),'series':len(pairs),
+       'availability_inventory':availability,'availability_sha256':digest(availability)}
     verify_staged(staged,ids,r);return r
+
+
+def old_decode_gate(counters):
+    # prepare_study already runs the unchanged source volume/mask/empty gate.
+    require(all(counters.get(k,0)==0 for k in INPUT_POLICY['fatal_counters']),'OLD_DECODE_FAILURE')
+
+
+def mirror_stress(public,decoder):
+    from unittest.mock import patch
+    from knee import mirror_input as MI
+    diagnostics=[];prepare=MI.prepare_study
+    def observe(*a,**kw):
+        value=prepare(*a,**kw);old_decode_gate(value[2])
+        diagnostics.append({'reference':kw.get('reference',False),'counters':dict(value[2])})
+        return value
+    with patch.object(MI,'prepare_study',side_effect=observe):result=MI.stress_inputs(public,decoder)
+    require(result.get('status')=='PASS' and result.get('cases')==dict.fromkeys(MI.STRESS_CASES,'PASS') and result.get('uses_raw_data') is False and result.get('uses_labels') is False,'ACTUAL_MIRROR_STRESS_REQUIRED')
+    return {**result,'case_count':len(result['cases']),'successful_decode_count':len(diagnostics),'decode_diagnostics':diagnostics}
 
 
 def old_ledger(path,ids,p):
@@ -150,6 +209,7 @@ def old_worker(config_path):
     try:
         r['environment']=board_environment(torch,cfg);verify_staged(cfg['staged'],cfg['staged_ids'],cfg['stage_binding'])
         public,decoder=load_definitions(cfg['public_source'],cfg['decoder_source'],cfg['public_manifest'])
+        if cfg['mode']=='rehearsal' and cfg['board']==0:r['partial_input_stress']=mirror_stress(public,decoder);save(out/'receipt.json',r)
         model=load_model(public,cfg['control_checkpoint'],'cuda',cfg['public_manifest']);before=snapshot(model);r['state_before']=before
         require(before['state']==cfg['control_state_sha256'],'QUALIFIED_OLD_STATE')
         grid={k:v.detach().cpu().clone() for k,v in model.named_buffers() if k in GRID_NAMES};r['constructor_grid_sha256']=state_fingerprint(grid);require(r['constructor_grid_sha256']==cfg['control_grid_sha256'],'OLD_CONSTRUCTOR_GRID')
@@ -158,13 +218,13 @@ def old_worker(config_path):
         records=read_series(Path(cfg['staged'])/'train_series.csv');frozen=out/'frozen-state.pt';atomic_save(frozen,{k:v.detach().cpu() for k,v in model.state_dict().items()})
         def infer(sid):
             t=time.monotonic();v,m,counters=prepare_study(public,decoder,sid,records,Path(cfg['staged'])/'train_series')
-            require(all(counters.get(k,0)==0 for k in ('resource_errors','invalid_pixels','pixel_failures','fast_bad_headers','header_parse_failures')),'OLD_DECODE_FAILURE')
+            old_decode_gate(counters)
             reference_seconds=0.
             if sid in cfg.get('probes',{}):
                 reference_start=time.monotonic()
                 rv,rm,rc=prepare_study(public,decoder,sid,records,Path(cfg['staged'])/'train_series',reference=True)
                 require(np.array_equal(v,rv) and np.array_equal(m,rm),'OLD_ORIGINAL_SOURCE_REFERENCE_INPUT')
-                require(all(rc.get(k,0)==0 for k in ('resource_errors','invalid_pixels','pixel_failures','fast_bad_headers','header_parse_failures')),'OLD_REFERENCE_DECODE_FAILURE')
+                old_decode_gate(rc)
                 refinputs=[public.eval_windows(rv,rm,94,320,mirror=b) for b in (False,True)]
                 refp=np.asarray(public.infer_pair_probs(model,*refinputs,'cuda'),dtype=np.float32);torch.cuda.synchronize();reference_seconds=time.monotonic()-reference_start
             inputs=[public.eval_windows(v,m,94,320,mirror=b) for b in (False,True)];p=np.asarray(public.infer_pair_probs(model,*inputs,'cuda'),dtype=np.float32);probabilities([p],1)
@@ -174,7 +234,7 @@ def old_worker(config_path):
             if 'qualified_full384_windows' in expected_old.get('input',{}):
                 audit_start=time.monotonic();full=[fullfield_windows(public,v,m,mirror=b) for b in (False,True)]
                 fp.update(window_audit(inputs,full=full,reference=refinputs));del full;reference_seconds+=time.monotonic()-audit_start
-            torch.cuda.synchronize();return p,fp,{'seconds':time.monotonic()-t,'production_seconds':time.monotonic()-t-reference_seconds,'reference_seconds':reference_seconds,'decode_counters':counters}
+            torch.cuda.synchronize();return p,fp,{'seconds':time.monotonic()-t,'production_seconds':time.monotonic()-t-reference_seconds,'reference_seconds':reference_seconds,'decode_counters':counters,'reference_decode_counters':rc if sid in cfg.get('probes',{}) else None}
         ps=[]
         with PlatformInterruption() as stop:
             for sid in cfg.get('old_sentinels',[]):
@@ -215,6 +275,50 @@ def reset_native_renderer(cfg):
     return importlib.reload(native)
 
 
+def native_availability_stress(cfg):
+    """Actual pinned lean prepare and OneStudySource; synthetic images only."""
+    import contextlib
+    import io
+    import tempfile
+    import numpy as np
+    import pydicom
+    import probe_infer as PI
+    native=reset_native_renderer(cfg);previous=PI.OneStudySource.current;checks={}
+    try:
+        native=PI.install_native(lean=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/'direct';root.mkdir();uid='synthetic';series='usable'
+            rows=[dict(zip(SERIES_COLUMNS,[uid,series,'1','0','Sagittal'])),dict(zip(SERIES_COLUMNS,[uid,'unavailable','1','0','Coronal']))]
+            with (root/'train.csv').open('w',newline='') as h:w=csv.writer(h);w.writerow([UID]);w.writerow([uid])
+            with (root/'train_series.csv').open('w',newline='') as h:w=csv.DictWriter(h,fieldnames=SERIES_COLUMNS);w.writeheader();w.writerows(rows)
+            images=root/'train_series'/uid/series;images.mkdir(parents=True)
+            for i in range(4):
+                meta=pydicom.Dataset();meta.TransferSyntaxUID=pydicom.uid.ExplicitVRLittleEndian
+                meta.MediaStorageSOPClassUID=pydicom.uid.MRImageStorage;meta.MediaStorageSOPInstanceUID='1.2.826.0.1.3680043.8.498.'+str(i+1)
+                ds=pydicom.FileDataset(None,{},file_meta=meta,preamble=bytes(128));ds.SOPClassUID=meta.MediaStorageSOPClassUID;ds.SOPInstanceUID=meta.MediaStorageSOPInstanceUID
+                ds.Rows=32;ds.Columns=40;ds.SamplesPerPixel=1;ds.BitsAllocated=16;ds.BitsStored=12;ds.HighBit=11;ds.PixelRepresentation=0
+                ds.PhotometricInterpretation='MONOCHROME2';ds.ImageOrientationPatient=[0,1,0,0,0,1];ds.ImagePositionPatient=[i,0,0]
+                ds.PixelSpacing=[.5,.5];ds.InstanceNumber=i;ds.ImageLaterality='L'
+                ds.PixelData=((np.arange(1280,dtype=np.uint16).reshape(32,40)+i*11)%2000).tobytes()
+                pydicom.dcmwrite(images/f'{i}.dcm',ds,enforce_file_format=True)
+            PI.OneStudySource.current=uid
+            for case in ('absent','empty'):
+                if case=='empty':(root/'train_series'/uid/'unavailable').mkdir()
+                alias=Path(tmp)/('stage-'+case);binding=stage(alias,[uid],{uid:rows},{uid:root/'train_series'});verify_staged(alias,[uid],binding)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    direct=native.prepare(root,Path(tmp)/('direct-out-'+case),split='train',study_ids=[uid],source_directory=True)
+                    staged=native.prepare(alias,Path(tmp)/('stage-out-'+case),split='train',study_ids=[uid],source_directory=True)
+                require(direct['failed_studies']==staged['failed_studies']==[],'NATIVE_USABLE_COMPANION')
+                a=direct['studies'][0];b=staged['studies'][0]
+                require(len(a['series'])==len(b['series'])==1 and a['errors']==b['errors'],'NATIVE_AVAILABILITY_SOURCE_EQUAL')
+                x=a['series'][0];y=b['series'][0];v=np.load(x['path'],allow_pickle=False);w=np.load(y['path'],allow_pickle=False)
+                require(np.array_equal(v,w) and {k:z for k,z in x.items() if k!='path'}=={k:z for k,z in y.items() if k!='path'},'NATIVE_ARRAY_METADATA_EQUAL')
+                checks[case]={'status':'PASS','usable_series':1,'slices':len(v),'array_sha256':array_sha(v),'metadata_sha256':digest({k:z for k,z in x.items() if k!='path'})}
+    finally:
+        PI.OneStudySource.current=previous;reset_native_renderer(cfg)
+    return {'status':'PASS','case_count':2,'cases':checks,'uses_raw_data':False,'uses_labels':False,'reader':'pinned probe_infer.OneStudySource and install_native(lean=True)'}
+
+
 def s6_worker(config_path):
     import numpy as np
     import torch
@@ -231,6 +335,7 @@ def s6_worker(config_path):
         require('monai' not in sys.modules,'FRESH_MONAI_NAMESPACE');sys.path.insert(0,cfg['code']);os.environ['RSNA_CODE_ROOT']=cfg['code']
         import compact_infer as CI
         import compact_train as CT
+        if cfg['mode']=='rehearsal' and cfg['board']==0:r['native_availability_stress']=native_availability_stress(cfg);save(out/'receipt.json',r)
         require(CT.LABELS==LABELS,'S6_TARGET_ORDER');r['synthetic_source_checks']=synthetic_source_checks()
         torch.manual_seed(42);np.random.seed(42);torch.backends.cudnn.benchmark=False
         spec=json.loads((Path(cfg['compact'])/'state_spec.json').read_bytes());models=[]
@@ -393,7 +498,7 @@ def projection(cfg,phases,reports,setup,merge_seconds):
 
 
 def require_rehearsal(r,binding,csv_path):
-    require(binding.get('version')==VERSION and binding.get('method')==METHOD,'EXACT_FROZEN_METHOD')
+    require(binding.get('version')==VERSION and binding.get('method')==METHOD and binding.get('input_policy')==INPUT_POLICY,'EXACT_FROZEN_METHOD')
     require(r.get('status')=='PASS' and r.get('version')==VERSION and r.get('mode')=='rehearsal' and r.get('binding')==binding,'PASS_EXACT_REHEARSAL_REQUIRED')
     require(r.get('completed')==39 and r.get('completed_visible')==3 and r.get('completed_probes')==36 and r.get('completed_s6_probes')==32 and r.get('completed_old_historical')==4 and r.get('all_input_state_probability_gates') is True and r.get('zero_failed') is True and r.get('zero_imputed') is True,'REHEARSAL_COMPLETE_GATES')
     require(len(r.get('boards',[]))==2 and len({x['uuid'] for x in r['boards']})==2 and all(x['name']=='Tesla T4' for x in r['boards']),'TWO_PHYSICAL_T4_GATES')
@@ -402,6 +507,11 @@ def require_rehearsal(r,binding,csv_path):
     with Path(csv_path).open(newline='') as h:rows=list(csv.reader(h))
     require(rows[0]==[UID]+LABELS and len(rows)==4 and [x[0] for x in rows[1:]]==r['visible_ids'],'VISIBLE_CSV_COVERAGE')
     probabilities([[float(x) for x in row[1:]] for row in rows[1:]],3)
+    from knee.mirror_input import STRESS_CASES
+    stress=r.get('workers',{}).get('old',[{}])[0].get('partial_input_stress',{})
+    require(stress.get('status')=='PASS' and stress.get('cases')==dict.fromkeys(STRESS_CASES,'PASS') and stress.get('case_count')==17 and stress.get('uses_raw_data') is False and stress.get('uses_labels') is False,'REHEARSAL_PARTIAL_INPUT_STRESS')
+    native=r.get('workers',{}).get('s6',[{}])[0].get('native_availability_stress',{})
+    require(native.get('status')=='PASS' and native.get('case_count')==2 and native.get('uses_raw_data') is False and native.get('uses_labels') is False and set(native.get('cases',{}))=={'absent','empty'} and all(x.get('status')=='PASS' and x.get('usable_series')==1 and x.get('slices',0)>0 for x in native['cases'].values()),'REHEARSAL_NATIVE_AVAILABILITY_STRESS')
     for arm in ('old','s6'):
         require(arm in r.get('phases',{}) and r['phases'][arm]['wall_seconds']>0 and r['phases'][arm]['peaks']['host_rss_bytes']>0 and r['phases'][arm]['peaks']['output_disk_bytes']>0 and r['phases'][arm]['minimum_disk_free_bytes']>0,'CONCURRENT_RESOURCE_MEASUREMENT')
         rr=r.get('workers',{}).get(arm,[]);require(len(rr)==2,'REHEARSAL_WORKERS')
@@ -446,7 +556,7 @@ def run(root,cfg,out,*,started):
             for sid in probes:require(sid in training,'PROBE_METADATA');records[sid]=training[sid];paths[sid]=str(Path(root)/'train_series')
             require(len(cfg['probe_order'])==36 and set(cfg['probe_order'])==set(probes),'FROZEN36_CANONICAL_ORDER');ids=cfg['probe_order']+ids
         cfg={**cfg,'staged_ids':ids,'assignment':assignments(ids)};save(out/'assignment.json',{'ids':ids,'assignment':cfg['assignment'],'policy':METHOD['assignment']})
-        staged=out/'images-only';cfg.update(staged=str(staged),stage_binding=stage(staged,ids,records,paths))
+        staged=out/'images-only';cfg.update(staged=str(staged),stage_binding=stage(staged,ids,records,paths));r['stage_binding']=cfg['stage_binding'];save(out/'receipt.json',r)
         inventory=subprocess.check_output(['nvidia-smi','--query-gpu=index,uuid,name','--format=csv,noheader'],text=True);boards=[]
         for line in inventory.splitlines():
             index,uuid,name=[x.strip() for x in line.split(',')];boards.append({'index':int(index),'uuid':uuid,'name':name})
