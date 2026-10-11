@@ -15,17 +15,22 @@ from scripts.build_public_adaptation_fit import reviewed_json
 
 def build_evaluation(original_notebook, original_metadata, failed_receipt, terminal_receipt,
                      destination, slug, *, expected_notebook_sha256, expected_metadata_sha256,
-                     expected_failed_sha256, expected_terminal_sha256, expected_endpoint_sha256):
+                     expected_failed_sha256, expected_terminal_sha256, expected_endpoint_sha256,
+                     recovery_dataset, recovery_manifest, expected_recovery_manifest_sha256,
+                     expected_dataset_version):
     """No downloads, launch, checkpoint selection or training continuation."""
     root=Path(__file__).resolve().parents[1]; dest=Path(destination)
     if dest.exists() or (dest.resolve().is_relative_to(root) and not dest.resolve().is_relative_to(root/'outputs')):
         raise ValueError('Fresh private ignored build required')
     if not re.fullmatch('[a-z0-9]+(?:-[a-z0-9]+)*',slug): raise ValueError('Invalid slug')
-    if expected_endpoint_sha256 is not None and not re.fullmatch('[0-9a-f]{64}',expected_endpoint_sha256): raise ValueError('Pinned endpoint bytes required')
+    if not re.fullmatch('[0-9a-f]{64}',expected_endpoint_sha256 or ''): raise ValueError('Pinned endpoint bytes required')
+    if not re.fullmatch('ozgung/[a-z0-9]+(?:-[a-z0-9]+)*',recovery_dataset): raise ValueError('Owned recovery dataset required')
+    if type(expected_dataset_version) is not int or expected_dataset_version <= 0: raise ValueError('Positive recovery dataset version required')
     notebook=reviewed_json(original_notebook,expected_notebook_sha256)
     metadata=reviewed_json(original_metadata,expected_metadata_sha256)
     prior=reviewed_json(failed_receipt,expected_failed_sha256)
     terminal=reviewed_json(terminal_receipt,expected_terminal_sha256)
+    recovery_manifest=reviewed_json(recovery_manifest,expected_recovery_manifest_sha256)
     if not (prior.get('status')=='FAIL' and prior.get('failure_stage')=='evaluation' and
             prior.get('updates')==432 and prior.get('epoch')==2 and prior.get('consumed_cursor')==0 and
             prior.get('config')==fit_config() and prior.get('binding',{}).get('config')==fit_config() and
@@ -36,6 +41,16 @@ def build_evaluation(original_notebook, original_metadata, failed_receipt, termi
             type(terminal.get('version')) is int and terminal['version']>0 and
             terminal.get('checkpoint_sha256')==prior['checkpoint_sha256']):
         raise ValueError('Exact terminal kernel/version/checkpoint required')
+    files=recovery_manifest.get('files',{})
+    if not (recovery_manifest.get('schema')==1 and recovery_manifest.get('source_kernel')==source and
+            recovery_manifest.get('source_version')==terminal['version'] and
+            recovery_manifest.get('original_training_binding')==prior['binding'] and
+            set(files)=={'receipt.json','resume.pt','endpoint.pt'} and
+            files['resume.pt']=={'sha256':prior['checkpoint_sha256'],'bytes':prior['checkpoint_bytes']} and
+            files['receipt.json']=={'sha256':expected_failed_sha256,'bytes':Path(failed_receipt).stat().st_size} and
+            files['endpoint.pt'].get('sha256')==expected_endpoint_sha256 and
+            type(files['endpoint.pt'].get('bytes')) is int and files['endpoint.pt']['bytes']>0):
+        raise ValueError('Exact recovery dataset manifest required')
     cells=[c for c in notebook['cells'] if c['cell_type']=='code']
     if len(cells)!=1: raise ValueError('Expected immutable fit notebook')
     code=''.join(cells[0]['source'])
@@ -53,6 +68,9 @@ def build_evaluation(original_notebook, original_metadata, failed_receipt, termi
     digest=fingerprint(sources)
     revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()
     recovery={'prior':prior,'terminal':terminal,'endpoint_sha256':expected_endpoint_sha256,
+              'recovery_dataset':recovery_dataset,'expected_dataset_version':expected_dataset_version,
+              'recovery_manifest':recovery_manifest,'recovery_manifest_sha256':expected_recovery_manifest_sha256,
+              'dataset_version_binding':'mounted files match externally verified version manifest hashes',
               'truth_policy':TRUTH_POLICY,'endpoint_qualification':'all-tensor fixed average oracle from SHA-pinned resume',
               'operational_bundle_sha256':digest,'operational_code_revision':revision,
               'original_notebook_sha256':expected_notebook_sha256,
@@ -69,10 +87,18 @@ def build_evaluation(original_notebook, original_metadata, failed_receipt, termi
     for old,new in replacements:
         if code.count(old)!=1: raise ValueError('Original immutable entry differs')
         code=code.replace(old,new,1)
+    old="previous=notebook_root('/kaggle/input',RESUME_SOURCE,'public-adaptation-fit',['receipt.json','resume.pt','endpoint.pt'])"
+    new=("previous=dataset_root('/kaggle/input',EVALUATION_RECOVERY['recovery_dataset'],['receipt.json','resume.pt','endpoint.pt','recovery-manifest.json'])\n"
+         "        if file_sha(previous/'recovery-manifest.json')!=EVALUATION_RECOVERY['recovery_manifest_sha256'] or json.loads((previous/'recovery-manifest.json').read_text())!=EVALUATION_RECOVERY['recovery_manifest']: raise ValueError('Recovery manifest differs')\n"
+         "        for name,record in EVALUATION_RECOVERY['recovery_manifest']['files'].items():\n"
+         "            if file_sha(previous/name)!=record['sha256'] or (previous/name).stat().st_size!=record['bytes']: raise ValueError('Recovery dataset file bytes differ')")
+    if code.count(old)!=1: raise ValueError('Original recovery mount differs')
+    code=code.replace(old,new,1)
     compile(code,'<evaluation-only-recovery>','exec')
     cells[0]['source']=code.splitlines(True)
     notebook['cells'][0]['source']=['# Fixed endpoint evaluation recovery\n','Finished two-epoch training is preserved. Zero optimizer updates; strict original endpoint average, unchanged fixed population and original truth gate. Observed original y_ is converted to float32 and thresholded at >=0.5 with masks unchanged, matching the historical evaluator. The protocol amendment is recorded before metrics.\n']
-    metadata.update(id='ozgung/'+slug,title=slug.replace('-',' ').title(),kernel_sources=[source])
+    metadata.update(id='ozgung/'+slug,title=slug.replace('-',' ').title(),kernel_sources=[],
+                    dataset_sources=list(dict.fromkeys([*metadata.get('dataset_sources',[]),recovery_dataset])))
     if metadata.get('enable_internet') or not metadata.get('is_private'): raise ValueError('Private offline metadata required')
     encoded=json.dumps(notebook,indent=2)+'\n'
     if len(encoded.encode())>900000: raise ValueError('Notebook exceeds source limit')
@@ -95,5 +121,9 @@ if __name__=='__main__':
     parser.add_argument('slug')
     for name in ('notebook','metadata','failed','terminal'):
         parser.add_argument('--expected-'+name+'-sha256',required=True)
-    parser.add_argument('--expected-endpoint-sha256')
+    parser.add_argument('--expected-endpoint-sha256',required=True)
+    parser.add_argument('--recovery-dataset',required=True)
+    parser.add_argument('--recovery-manifest',type=Path,required=True)
+    parser.add_argument('--expected-recovery-manifest-sha256',required=True)
+    parser.add_argument('--expected-dataset-version',type=int,required=True)
     print(json.dumps(build_evaluation(**vars(parser.parse_args())),indent=2))
