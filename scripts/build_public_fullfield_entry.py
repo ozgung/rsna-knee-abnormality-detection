@@ -95,6 +95,15 @@ def verify_build(destination):
     return receipt
 
 
+def executable_notebook(code):
+    """Declare the Python kernel required by Kaggle's Papermill runner."""
+    compile(code, '<full384-image-only>', 'exec')
+    return {'nbformat':4, 'nbformat_minor':5,
+            'metadata':{'kernelspec':{'display_name':'Python3', 'language':'python', 'name':'python3'}},
+            'cells':[{'id':'full384-inference', 'cell_type':'code', 'metadata':{},
+                      'execution_count':None, 'outputs':[], 'source':code.splitlines(True)}]}
+
+
 def build(fold1_build, fold1_result, data_root, destination, slug, *, entry=False, rehearsal_build=None, rehearsal_receipt=None, rehearsal_csv=None):
     import numpy as np
     project=Path(__file__).resolve().parents[1];dest=Path(destination)
@@ -191,7 +200,7 @@ except BaseException as error:
 finally:signal.alarm(0)
 """
     compile(code,'<full384-image-only>','exec')
-    notebook={'nbformat':4,'nbformat_minor':5,'metadata':{},'cells':[{'cell_type':'code','metadata':{},'execution_count':None,'outputs':[],'source':code.splitlines(True)}]}
+    notebook=executable_notebook(code)
     metadata={'id':'ozgung/'+slug,'title':slug.replace('-',' ').title(),'code_file':'notebook.ipynb','language':'python','kernel_type':'notebook','is_private':True,'enable_gpu':True,'enable_tpu':False,'enable_internet':False,'competition_sources':['rsna-knee-abnormality-detection'],'dataset_sources':[WEIGHT_DATASET,CONVNEXT_DATASET],'kernel_sources':[],'model_sources':[],'docker_image':DOCKER_IMAGE}
     raw=(json.dumps(notebook,indent=2)+'\n').encode();require(len(raw)<900000,'Notebook payload <900000 bytes')
     dest.mkdir(parents=True);(dest/'notebook.ipynb').write_bytes(raw)

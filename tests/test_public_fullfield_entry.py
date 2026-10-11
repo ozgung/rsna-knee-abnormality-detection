@@ -9,10 +9,24 @@ import unittest
 from unittest.mock import patch
 from knee.public_fullfield_entry import (VERSION, METHOD, atomic_json, require_rehearsal, safe_id, test_contract, write_csv)
 from knee.reference import sha256
-from scripts.build_public_fullfield_entry import exact_closure, verify_build
+from scripts.build_public_fullfield_entry import exact_closure, executable_notebook, verify_build
 
 
 class EntryTests(unittest.TestCase):
+    def test_notebook_declares_executable_python_kernel(self):
+        code='value = 1\n'
+        notebook=executable_notebook(code)
+        self.assertEqual(notebook['metadata']['kernelspec']['name'], 'python3')
+        self.assertEqual(notebook['metadata']['kernelspec']['language'], 'python')
+        self.assertEqual(''.join(notebook['cells'][0]['source']), code)
+        self.assertEqual(notebook['cells'][0]['id'], 'full384-inference')
+        # nbformat's actual schema checks the notebook used by Papermill.
+        try:
+            import nbformat
+        except ImportError:
+            return
+        nbformat.validate(nbformat.from_dict(notebook))
+
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.root=Path(self.temp.name)
         self.columns=['StudyInstanceUID', *['t'+str(i) for i in range(12)]]
