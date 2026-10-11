@@ -4,6 +4,7 @@ import ast
 import base64
 import csv
 import json
+import inspect
 from pathlib import Path
 import re
 import subprocess
@@ -19,8 +20,42 @@ MANIFEST_SHA='1c1211e64b73f1f6433ade804816572db1a2aa5422ed9c57365184bc6a9517e6'
 CODECS={
  'pylibjpeg-2.1.0-py3-none-any.whl':'25df9496a69e64e98c887fddee12a1271e275b5f74ba804f9bf98a08bb80993e',
  'pylibjpeg_libjpeg-2.4.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl':'01d950ef496476a9223e4966376cb88098fcf5c55a12a21f722d7b5f84daae43',
- 'pylibjpeg_openjpeg-2.6.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl':'aa6b08327be6f6daf0814a61fd7410f53a08e8e0b35774c634d9907402ff4f1c'}
+ 'pylibjpeg_openjpeg-2.6.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl':'aa6b08327be6f6daf0814a61fd7410f53a08e8e0b35774c634d9907402ff4f1c'}
 DATASETS=['heliosli/rsna-knee-compact-v1','heliosli/rsna-orthofoundation-fold0-epoch7-20261004','goodpjw2008/rsna-knee-2-5d-convnext-reader']
+
+
+def mounted_root(inputs, reference, required, discovery, *, competition=False):
+    """Probe only two exact attachment roots; never enumerate their children."""
+    parts=reference.split('/')
+    require(len(parts)==(1 if competition else 2) and all(re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*',p) for p in parts),'Invalid attachment reference')
+    require(required and all(isinstance(n,str) and n and Path(n).name==n and n not in ('.','..') for n in required),'Invalid asset names')
+    inputs=Path(inputs)
+    candidates=([inputs/'competitions'/parts[0],inputs/parts[0]] if competition else
+                [inputs/'datasets'/parts[0]/parts[1],inputs/parts[1]])
+    probes=[{'root':str(root),'present':[n for n in required if (root/n).is_file()]} for root in candidates]
+    discovery.append({'reference':reference,'required':list(required),'probes':probes})
+    matches=[root for root,probe in zip(candidates,probes) if probe['present']]
+    # Partial duplicate mounts also fail closed, rather than silently picking a complete one.
+    require(len(matches)==1,'Expected exactly one explicit attachment mount: '+reference)
+    root=matches[0]
+    require(all((root/n).is_file() for n in required),'Required attachment files missing: '+reference)
+    return root
+
+
+def record_setup_failure(out, error, phase, discovery, binding):
+    """Keep original detail privately; stdout exposes only fixed phase/type/counts."""
+    import traceback
+    detail=out/'setup-error-private.json'
+    save(detail,dict(failure_type=type(error).__name__,message=str(error),traceback=traceback.format_exc(),phase=phase,discovery=discovery))
+    if not (out/'receipt.json').exists():
+        save(out/'receipt.json',dict(status='FAIL',failure_stage='offline_setup',failure_type=type(error).__name__,setup_phase=phase,
+             diagnostic_file=detail.name,discovery_attempts=len(discovery),binding=binding,advancement_allowed=False))
+    print(json.dumps(dict(status='FAIL',failure_stage='offline_setup',setup_phase=phase,failure_type=type(error).__name__,
+                         discovery_attempts=len(discovery),diagnostic_file=detail.name,advancement_allowed=False)),flush=True)
+
+
+def setup_handler_source():
+    return inspect.getsource(mounted_root)+chr(10)+inspect.getsource(record_setup_failure)
 
 
 def published_pins(embedded,contract):
@@ -100,7 +135,7 @@ def build(embedded,closure,closure_receipt,contract_path,manifest_path,sample_pa
              'frozen_order_sha256':SAMPLE_SHA,'train_sha256':TRAIN_SHA,'fold_sha256':FOLD_SHA,'exclusion_sha256':EXCLUDED_SHA,
              'source_bundle_sha256':digest(sources),'source_collection_receipt_sha256':file_sha(closure_receipt),'code_revision':revision,'working_sources':'exact bundled implementation; may be uncommitted',
              'target_mapping':{name:name for name in LABELS},'recipe':RECIPE}
-    bootstrap=f'''import base64,hashlib,json,os,sys,zlib,subprocess,socket
+    bootstrap=f'''import base64,hashlib,json,os,sys,zlib,subprocess,socket,re
 from pathlib import Path
 os.environ.update(HF_HUB_OFFLINE='1',TRANSFORMERS_OFFLINE='1',HF_HUB_DISABLE_TELEMETRY='1',CUBLAS_WORKSPACE_CONFIG=':4096:8',BUILD_MONAI='0')
 encoded={encoded!r}
@@ -119,24 +154,41 @@ binding={binding!r}
 ids={ids!r}
 codecs={CODECS!r}
 out=Path('/kaggle/working/s6-qualification')
-def root_for(filename):
-    candidates=[p.parent for p in Path('/kaggle/input').rglob(filename)]
-    require(len(candidates)==1,'Unique mounted asset path required')
-    return candidates[0]
+{setup_handler_source()}
+discovery=[]
+phase='python_abi'
+def setup_phase(value):
+    global phase
+    phase=value
+    save(out/'setup-discovery-private.json',dict(phase=phase,discovery=discovery))
+    print(json.dumps(dict(event='s6_setup_phase',phase=phase,discovery_attempts=len(discovery))),flush=True)
 try:
+    setup_phase('python_abi')
     require(sys.version_info[:2]==(3,12),'Python codec ABI differs')
-    raw=root_for('sample_submission.csv');require(file_sha(raw/'sample_submission.csv')==binding['schema_sha256'],'Official schema bytes differ');schema_header(raw/'sample_submission.csv')
+    setup_phase('competition_discovery')
+    raw=mounted_root('/kaggle/input','rsna-knee-abnormality-detection',['sample_submission.csv','train.csv','train_series.csv'],discovery,competition=True)
+    setup_phase('schema_hash')
+    require(file_sha(raw/'sample_submission.csv')==binding['schema_sha256'],'Official schema bytes differ');schema_header(raw/'sample_submission.csv')
+    setup_phase('codec_discovery')
+    codec_root=mounted_root('/kaggle/input',{DATASETS[2]!r},list(codecs),discovery)
+    setup_phase('codec_hash')
     wheels=[]
     for name,pin in codecs.items():
-        p=root_for(name)/name;require(file_sha(p)==pin,'Offline codec bytes differ');wheels.append(str(p))
+        p=codec_root/name;require(file_sha(p)==pin,'Offline codec bytes differ');wheels.append(str(p))
+    setup_phase('codec_install')
     subprocess.run([sys.executable,'-m','pip','install','--no-index','--no-deps',*wheels],check=True)
-    compact=root_for('E_lrprior_s0_f0.pt');anatomy=root_for('anatomy.pt')/'anatomy.pt'
+    setup_phase('compact_discovery')
+    compact=mounted_root('/kaggle/input',{DATASETS[0]!r},['manifest.json',*manifest['sha256']],discovery)
+    setup_phase('anatomy_discovery')
+    anatomy=mounted_root('/kaggle/input',{DATASETS[1]!r},['anatomy.pt'],discovery)/'anatomy.pt'
+    setup_phase('configuration')
     config=project/'config-private.json'
     save(config,dict(code=str(code),source_pins=pins,manifest=manifest,binding=binding,ids=ids,raw=str(raw),staged=str(project/'images-only'),compact=str(compact),anatomy=str(anatomy),out=str(out)))
+    setup_phase('qualification_run')
     report=run(config)
     print(json.dumps(dict(status=report['status'],completed_studies=report['completed_studies'],anatomy=report['anatomy'],advancement_allowed=False)))
 except BaseException as e:
-    if not (out/'receipt.json').exists():save(out/'receipt.json',dict(status='FAIL',failure_stage='offline_setup',failure_type=type(e).__name__,binding=binding,advancement_allowed=False))
+    record_setup_failure(out,e,phase,discovery,binding)
     raise RuntimeError('S6 qualification failed; preserve receipt and outputs') from None
 '''
     compile(bootstrap,'<s6-bootstrap>','exec')

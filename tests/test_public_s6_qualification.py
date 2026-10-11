@@ -1,5 +1,8 @@
 """Synthetic integrity contracts; real CUDA/anatomy remains a separate pilot."""
 import csv
+import ast
+import contextlib
+import io
 import importlib.util
 import json
 from pathlib import Path
@@ -9,6 +12,83 @@ import unittest
 from unittest.mock import patch
 
 from knee import public_s6_qualification as S
+
+
+class S6SetupContracts(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.root=Path(__file__).resolve().parents[1]
+        spec=importlib.util.spec_from_file_location('s6_setup_contract_test',cls.root/'scripts/build_public_s6_qualification.py')
+        cls.builder=importlib.util.module_from_spec(spec);spec.loader.exec_module(cls.builder)
+
+    def test_codec_filenames_match_successfully_rehearsed_pins(self):
+        tree=ast.parse((self.root/'knee/reference_blend.py').read_text())
+        published=next(ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='CODEC_WHEELS' for t in n.targets))
+        self.assertEqual(tuple(self.builder.CODECS),published)
+        tree=ast.parse((self.root/'knee/coverage_inference.py').read_text())
+        hash_table=next(ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='CODECS' for t in n.targets))
+        self.assertEqual(self.builder.CODECS,hash_table)
+
+    def test_large_competition_tree_never_enumerated_modern_and_legacy(self):
+        with TemporaryDirectory() as temp:
+            p=Path(temp);raw=p/'competitions/rsna-knee-abnormality-detection';raw.mkdir(parents=True)
+            (raw/'sample_submission.csv').write_text('synthetic')
+            # A large unrelated image corpus containing decoy matching filenames.
+            for i in range(256):
+                images=raw/'train_series'/str(i)/'series';images.mkdir(parents=True)
+                (images/'sample_submission.csv').write_text('decoy')
+                (images/'anatomy.pt').write_bytes(b'decoy')
+            for modern in (True,False):
+                mount=(p/'datasets/heliosli/rsna-knee-compact-v1' if modern else p/'rsna-knee-compact-v1')
+                mount.mkdir(parents=True);(mount/'manifest.json').write_text('{}')
+                discovery=[]
+                with patch.object(Path,'rglob',side_effect=AssertionError('recursive scan forbidden')),patch.object(Path,'glob',side_effect=AssertionError('enumeration forbidden')),patch.object(Path,'iterdir',side_effect=AssertionError('enumeration forbidden')):
+                    self.assertEqual(self.builder.mounted_root(p,'rsna-knee-abnormality-detection',['sample_submission.csv'],discovery,competition=True),raw)
+                    self.assertEqual(self.builder.mounted_root(p,'heliosli/rsna-knee-compact-v1',['manifest.json'],discovery),mount)
+                self.assertEqual(len(discovery),2)
+                (mount/'manifest.json').unlink()
+
+    def test_duplicate_partial_missing_or_unscoped_assets_fail_closed(self):
+        with TemporaryDirectory() as temp:
+            p=Path(temp);a=p/'datasets/heliosli/rsna-knee-compact-v1';b=p/'rsna-knee-compact-v1'
+            for root in (a,b):root.mkdir(parents=True);(root/'manifest.json').write_text('{}')
+            (a/'model.pt').write_bytes(b'synthetic')
+            discovery=[]
+            with self.assertRaises(ValueError):self.builder.mounted_root(p,'heliosli/rsna-knee-compact-v1',['manifest.json','model.pt'],discovery)
+            self.assertEqual(len(discovery[0]['probes']),2)
+            (b/'manifest.json').unlink();(a/'model.pt').unlink()
+            with self.assertRaises(ValueError):self.builder.mounted_root(p,'heliosli/rsna-knee-compact-v1',['manifest.json','model.pt'],[])
+            with self.assertRaises(ValueError):self.builder.mounted_root(p,'heliosli/rsna-knee-compact-v1',['../outside'],[])
+            with self.assertRaises(ValueError):self.builder.mounted_root(p,'../rsna-knee-compact-v1',['manifest.json'],[])
+
+    def test_generated_setup_handler_keeps_private_detail_and_preserves_receipt(self):
+        namespace={'Path':Path,'require':S.require,'save':S.save,'json':json,'re':__import__('re')}
+        exec(compile(self.builder.setup_handler_source(),'<generated-setup>','exec'),namespace)
+        builder_tree=ast.parse((self.root/'scripts/build_public_s6_qualification.py').read_text())
+        build=next(n for n in builder_tree.body if isinstance(n,ast.FunctionDef) and n.name=='build')
+        template=next(n.value for n in build.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='bootstrap' for t in n.targets))
+        rendered=eval(compile(ast.Expression(template),'<bootstrap-template>','eval'),dict(vars(self.builder),encoded='',binding={'source_bundle_sha256':'synthetic'},hashes={},manifest={},ids=[]))
+        handler=next(n for n in ast.parse(rendered).body if isinstance(n,ast.Try))
+        # Execute the exact generated except block; replace only the setup body.
+        handler.body=ast.parse("raise ValueError('sensitive path /private/study-example and original cause')").body
+        handler_code=compile(ast.fix_missing_locations(ast.Module(body=[handler],type_ignores=[])),'<generated-failure>','exec')
+        with TemporaryDirectory() as temp:
+            out=Path(temp);discovery=[{'reference':'synthetic','probes':[]}]
+            for preserve in (False,True):
+                if preserve:S.save(out/'receipt.json',{'failure_stage':'actual_model_gate','original':True})
+                stdout=io.StringIO()
+                with contextlib.redirect_stdout(stdout):
+                    namespace.update(out=out,phase='codec_discovery',discovery=discovery,binding={'pin':'unchanged'})
+                    with self.assertRaisesRegex(RuntimeError,'preserve receipt'):
+                        exec(handler_code,namespace)
+                detail=json.loads((out/'setup-error-private.json').read_bytes())
+                self.assertIn('original cause',detail['message']);self.assertIn('ValueError',detail['traceback'])
+                self.assertEqual(detail['discovery'],discovery)
+                summary=json.loads(stdout.getvalue());self.assertEqual(summary['setup_phase'],'codec_discovery')
+                self.assertNotIn('sensitive',stdout.getvalue());self.assertNotIn('/private/',stdout.getvalue())
+                receipt=json.loads((out/'receipt.json').read_bytes())
+                if preserve:self.assertEqual(receipt,{'failure_stage':'actual_model_gate','original':True})
+                else:self.assertEqual(receipt['diagnostic_file'],'setup-error-private.json')
 
 
 class S6QualificationContracts(unittest.TestCase):
