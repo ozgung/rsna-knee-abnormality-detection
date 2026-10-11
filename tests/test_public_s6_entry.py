@@ -149,6 +149,23 @@ class EntryTests(unittest.TestCase):
            'phases':{a:{'wall_seconds':100,'peaks':{'host_rss_bytes':1,'output_disk_bytes':1},'minimum_disk_free_bytes':1} for a in sent}}
         return r,binding,csvpath
 
+    def test_physical_uuid_exact_bytes_allow_only_display_prefix_difference(self):
+        import uuid
+        from types import SimpleNamespace
+        identifier=uuid.UUID('00112233-4455-6677-8899-aabbccddeeff')
+        class CUuuid:
+            bytes=list(identifier.bytes)
+            def __str__(self):return str(identifier)
+        props=SimpleNamespace(uuid=CUuuid());expected='GPU-'+str(identifier)
+        result=E.physical_uuid(props,expected)
+        self.assertEqual(result['physical_uuid'],expected)
+        self.assertEqual(result['uuid_bytes_hex'],identifier.bytes.hex())
+        self.assertEqual(result['torch_uuid_raw'],str(identifier))
+        for bad in ['GPU-00112233-4455-6677-8899-aabbccddee00','MIG-'+str(identifier),'GPU-wrong',str(identifier)]:
+            with self.subTest(value=bad),self.assertRaises(ValueError):E.physical_uuid(props,bad)
+        props.uuid=SimpleNamespace(bytes=list(identifier.bytes)[:-1])
+        with self.assertRaises(ValueError):E.physical_uuid(props,expected)
+
     def test_fresh_worker_pythonpath_from_unrelated_directory(self):
         import os
         import subprocess

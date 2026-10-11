@@ -90,13 +90,26 @@ def merge(ids,shards,arm):
     require(set(by_id)==set(ids),'COMPLETE_ARMS_REQUIRED');return np.array([by_id[s] for s in ids])
 
 
+def physical_uuid(properties,expected):
+    """Compare the exact16 CUDA UUID bytes with the NVIDIA inventory UUID.
+
+    PyTorch2.10 exposes CUuuid.bytes; nvidia-smi includes GPU-. Compare
+    bytes so display formatting cannot replace the physical-board check.
+    """
+    import uuid
+    require(isinstance(expected,str) and expected.startswith('GPU-'),'NVIDIA_UUID_SCHEMA')
+    raw=bytes(properties.uuid.bytes);require(len(raw)==16,'CUDA_UUID16_BYTES')
+    require(uuid.UUID(bytes=raw)==uuid.UUID(expected[4:]),'PHYSICAL_UUID_BINDING')
+    return {'physical_uuid':expected,'torch_uuid_raw':str(properties.uuid),'uuid_bytes_hex':raw.hex()}
+
+
 def board_environment(torch,cfg):
     import importlib.metadata
     r=environment(torch);r['physical_board']=cfg['board'];r['cuda_visible_devices']=os.environ.get('CUDA_VISIBLE_DEVICES')
     require(r['cuda_visible_devices']==str(cfg['board']) and torch.cuda.device_count()==1 and torch.cuda.get_device_name(0)=='Tesla T4','ISOLATED_T4_REQUIRED')
     require(list(sys.version_info[:2])==[3,12] and torch.__version__==cfg['environment']['torch'],'PINNED_PYTHON_TORCH')
     for name,pin in cfg['environment']['packages'].items():require(importlib.metadata.version(name)==pin,'PINNED_PACKAGE_'+name)
-    r['physical_uuid']=str(torch.cuda.get_device_properties(0).uuid);require(r['physical_uuid']==cfg['physical']['uuid'],'PHYSICAL_UUID_BINDING')
+    r.update(physical_uuid(torch.cuda.get_device_properties(0),cfg['physical']['uuid']))
     r['torch_threads']=torch.get_num_threads();r['torch_interop_threads']=torch.get_num_interop_threads();return r
 
 
