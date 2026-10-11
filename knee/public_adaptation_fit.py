@@ -236,6 +236,38 @@ def train_epochs(model, optimizer, contributors, loss_for, binding, checkpoint, 
             'endpoint':average_endpoint(epoch_states, dict(model.named_parameters()), original_bn)}
 
 
+def recover_completed_endpoint(model, contributors, binding, checkpoint, endpoint_path):
+    """Verify a finished training artifact and its fixed endpoint without optimization."""
+    import torch
+    state = torch.load(checkpoint, map_location='cpu', weights_only=True)
+    require(set(state) == {'schema','binding','orders','epoch','cursor','updates','model','optimizer',
+                          'rng','epoch_states','original_bn','fingerprints'}, 'RESUME_SCHEMA')
+    orders = [epoch_order(contributors, e) for e in (0, 1)]
+    require(state['schema'] == 1 and state['binding'] == binding and state['orders'] == orders,
+            'RESUME_BINDING')
+    for key in ('model','optimizer','rng','epoch_states','original_bn'):
+        require(state_fingerprint(state[key]) == state['fingerprints'][key], 'RESUME_PAYLOAD')
+    validate_cursor(state['epoch'],state['cursor'],state['updates'],orders,len(state['epoch_states']))
+    require(state['epoch'] == 2 and state['cursor'] == 0, 'RECOVERY_NOT_COMPLETED')
+    require(state_fingerprint(bn_state(model)) == state_fingerprint(state['original_bn']), 'RESUME_INITIAL_BN')
+    require(len(state['optimizer']['state']) == len(list(model.parameters())) and
+            all(int(value['step']) == state['updates'] for value in state['optimizer']['state'].values()),
+            'RESUME_OPTIMIZER_COUNTER')
+    model.load_state_dict(state['model'],strict=True)
+    require_bn(model,state['original_bn'])
+    require(state_fingerprint(state['model']) == state_fingerprint(state['epoch_states'][-1]),
+            'RECOVERY_FINAL_MODEL')
+    expected = average_endpoint(state['epoch_states'],dict(model.named_parameters()),state['original_bn'])
+    attached = torch.load(endpoint_path,map_location='cpu',weights_only=True)
+    require(state_fingerprint(expected) == state_fingerprint(attached), 'RECOVERY_ENDPOINT')
+    require(all(not value.is_floating_point() or torch.isfinite(value).all() for value in attached.values()),
+            'RECOVERY_ENDPOINT_FINITE')
+    model.load_state_dict(attached,strict=True)
+    return {'status':'COMPLETE','updates':state['updates'],'endpoint':attached}
+
+
+TRUTH_POLICY = 'original-observed-y-float32-ge-0.5-mask-unchanged-v1'
+
 def load_binary_truth(path, ids, targets):
     import numpy as np
     import pyarrow.parquet as pq
@@ -254,8 +286,11 @@ def load_binary_truth(path, ids, targets):
     values = np.asarray([[table[c][pos[s]] for c in columns] for s in ids], dtype=np.float64)
     y, m = np.split(values, 2, axis=1)
     require(np.isfinite(m).all() and np.isin(m,[0,1]).all() and
-            np.isfinite(y[m>0]).all() and np.isin(y[m>0],[0,1]).all(), 'TRUTH_BINARY')
-    return np.where(m>0,y,0), m
+            np.isfinite(y[m>0]).all() and ((y[m>0]>=0)&(y[m>0]<=1)).all(), 'TRUTH_BINARY')
+    # Historical original-label evaluator: float32 conversion followed by >=0.5.
+    # Unknown cells are masked before conversion; they cannot become negatives in support.
+    binary=(np.where(m>0,y,0).astype(np.float32)>=np.float32(.5)).astype(np.float64)
+    return np.where(m>0,binary,0), m
 
 
 def metric_report(y, masks, probabilities, targets):
@@ -368,7 +403,7 @@ def preflight_inputs(root, label_path, mask_path, folds, excluded, preflight, ta
 
 
 def run(public_source, decoder_source, manifest, checkpoint, labels, masks, root, out,
-        folds, excluded, preflight, gate, binding, *, resume=None):
+        folds, excluded, preflight, gate, binding, *, resume=None, evaluation_recovery=None):
     """Remote CUDA entry point; failed receipts never include exception text/IDs."""
     out=Path(out); out.mkdir(parents=True,exist_ok=resume is not None)
     started=time.monotonic(); stage='environment'; decode_records=[]; gpu_intervals=[]
@@ -403,7 +438,7 @@ def run(public_source, decoder_source, manifest, checkpoint, labels, masks, root
         stage='qualification'
         require(qualification_gate(gate['stage1'],gate['stage2'],gate['manifest'],gate['contract'],gate['stream'])==binding['qualification'],'QUALIFICATION_GATE')
         require(binding['config']==fit_config() and binding['preflight']==fingerprint(preflight) and
-                binding['source_bundle_sha256']==os.environ.get('KNEE_SOURCE_SHA256') and
+                (evaluation_recovery['operational_bundle_sha256'] if evaluation_recovery else binding['source_bundle_sha256'])==os.environ.get('KNEE_SOURCE_SHA256') and
                 binding['public_manifest']==fingerprint(manifest) and manifest['checkpoint_sha256']==INITIAL_SHA and
                 binding['input_policy']==policy_contract() and binding['excluded_content_sha256']==fingerprint(excluded),'FIT_BINDING')
         require(resume is None or Path(resume)==out/'resume.pt','RESUME_LOCATION')
@@ -424,7 +459,7 @@ def run(public_source, decoder_source, manifest, checkpoint, labels, masks, root
         torch.use_deterministic_algorithms(True)
         model=load_model(public,checkpoint,'cuda',manifest)
         require(all(p.dtype==torch.float32 for p in model.parameters()) and not torch.is_autocast_enabled(),'FP32_REQUIRED')
-        optimizer=torch.optim.AdamW(optimizer_groups(model),betas=(.9,.999),eps=1e-8,foreach=False,fused=False)
+        optimizer=None if evaluation_recovery else torch.optim.AdamW(optimizer_groups(model),betas=(.9,.999),eps=1e-8,foreach=False,fused=False)
         torch.cuda.reset_peak_memory_stats()
         def read(sid):
             tick=time.monotonic()
@@ -454,21 +489,42 @@ def run(public_source, decoder_source, manifest, checkpoint, labels, masks, root
             receipt()
         stage='training'
         train_started=time.monotonic()
-        with PlatformInterruption() as stop:
-            result=train_epochs(model,optimizer,contributors,loss_for,binding,out/'resume.pt',
-                stream_factory=stream_factory,interruption=stop,resume=resume is not None,on_boundary=boundary,
-                timings=report['timings'],gpu_intervals=gpu_intervals)
-        report['updates']=result['updates']; report['training_seconds']=time.monotonic()-train_started
+        if evaluation_recovery:
+            stage='evaluation_recovery'
+            prior=evaluation_recovery['prior']
+            require(resume is not None and prior['binding']==binding and prior['status']=='FAIL' and
+                    prior['failure_stage']=='evaluation' and prior['updates']==432 and
+                    prior['epoch']==2 and prior['consumed_cursor']==0, 'RECOVERY_RECEIPT')
+            require(file_sha(resume)==prior['checkpoint_sha256'] and
+                    Path(resume).stat().st_size==prior['checkpoint_bytes'] and
+                    (evaluation_recovery['endpoint_sha256'] is None or
+                     file_sha(out/'endpoint.pt')==evaluation_recovery['endpoint_sha256']), 'RECOVERY_BYTES')
+            result=recover_completed_endpoint(model,contributors,binding,resume,out/'endpoint.pt')
+            report.update(evaluation_recovery=evaluation_recovery,epoch=2,consumed_cursor=0,
+                          optimizer_updates_this_run=0,training_seconds=prior['training_seconds'],
+                          endpoint_sha256=file_sha(out/'endpoint.pt'),endpoint_provenance='exact all-tensor fixed average oracle from SHA-pinned final resume')
+        else:
+            with PlatformInterruption() as stop:
+                result=train_epochs(model,optimizer,contributors,loss_for,binding,out/'resume.pt',
+                    stream_factory=stream_factory,interruption=stop,resume=resume is not None,on_boundary=boundary,
+                    timings=report['timings'],gpu_intervals=gpu_intervals)
+            report['training_seconds']=time.monotonic()-train_started
+        report['updates']=result['updates']
         if result['status']=='INTERRUPTED':
             report.update(status='INTERRUPTED',checkpoint_sha256=file_sha(out/'resume.pt'),
                           checkpoint_bytes=(out/'resume.pt').stat().st_size); receipt(); return report
         require(result['updates']==432,'UPDATE_TOTAL')
-        endpoint=result['endpoint']; atomic_save(out/'endpoint.pt',endpoint)
+        endpoint=result['endpoint']
+        if not evaluation_recovery: atomic_save(out/'endpoint.pt',endpoint)
         # Strict reload and exact equality before any endpoint/control metric.
         loaded=torch.load(out/'endpoint.pt',map_location='cpu',weights_only=True)
         require(state_fingerprint(loaded)==state_fingerprint(endpoint),'ENDPOINT_RELOAD')
         model.load_state_dict(loaded,strict=True); model.eval(); del optimizer,result,loaded
         stage='evaluation'; evaluation_started=time.monotonic()
+        # Fail closed before decoding/inference when the original truth contract is invalid.
+        report['truth_policy']=TRUTH_POLICY
+        y,m=load_binary_truth(masks,dev,public.LAB)
+        train_y,train_m=load_binary_truth(masks,train,public.LAB)
         endpoint_predictions=[]; probe=None; endpoint_probe=None
         with StudyStream(dev,read,contract=fingerprint(binding),prefetch=4,close_timeout=30) as stream:
             for sid in dev:
@@ -489,11 +545,10 @@ def run(public_source, decoder_source, manifest, checkpoint, labels, masks, root
                 volume,mask=next(stream)
                 windows=[public.gpu_windows(volume,mask,94,320,'cuda',mirror=m) for m in (False,True)]
                 control_predictions.append(public.infer_pair_probs(control,*windows,'cuda')); stream.acknowledge()
-        y,m=load_binary_truth(masks,dev,public.LAB)
-        train_y,train_m=load_binary_truth(masks,train,public.LAB)
         prevalence=np.divide((train_y*train_m).sum(0),train_m.sum(0),out=np.full(12,np.nan),where=train_m.sum(0)>0)
         require(np.isfinite(prevalence).all(),'PREVALENCE_UNDEFINED')
         c,e=np.asarray(control_predictions),np.asarray(endpoint_predictions)
+        atomic_save(out/'predictions-private.npz',None,lambda _,h:np.savez(h,control=c,endpoint=e))  # Private order bound by folds/preflight.
         prevalence_fit={t:{'probability':float(prevalence[j]),'positive':int((train_y[:,j]*train_m[:,j]).sum()),
             'negative':int(((1-train_y[:,j])*train_m[:,j]).sum()),'observed':int(train_m[:,j].sum()),
             'missing':int(len(train)-train_m[:,j].sum())} for j,t in enumerate(public.LAB)}
@@ -506,7 +561,6 @@ def run(public_source, decoder_source, manifest, checkpoint, labels, masks, root
                 metrics['endpoint']['targets'][t]['positive']>=20 and metrics['endpoint']['targets'][t]['negative']>=20 and
                 metrics['endpoint']['targets'][t]['auc']-metrics['control']['targets'][t]['auc']<=-.01]
         triage='reject' if (bootstrap['ci95'] is not None and bootstrap['ci95'][1]<0) or len(damage)>=3 else 'unpromising; do not expand' if delta<=0 else 'inconclusive; no expansion' if bootstrap['ci95'] is None else 'eligible for separately rehearsed candidate consideration'
-        np.savez(out/'predictions-private.npz',control=c,endpoint=e)  # UID order bound by private folds/preflight.
         report.update(status='PASS',evaluation_seconds=time.monotonic()-evaluation_started,metrics=metrics,train_prevalence_fit=prevalence_fit,paired_bootstrap=bootstrap,macro_delta=delta,
                       peak_cuda_bytes=torch.cuda.max_memory_allocated(),peak_rss_bytes=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss*1024,
                       target_damage=damage,triage=triage,endpoint_sha256=file_sha(out/'endpoint.pt'),

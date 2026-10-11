@@ -9,7 +9,7 @@ from unittest.mock import patch
 from knee.public_adaptation_fit import (atomic_save, average_endpoint, fit_config,
     fingerprint, qualification_gate, validate_cursor, PlatformInterruption,
     SCIENTIFIC_REVISION, SCIENTIFIC_BUNDLE, INITIAL_SHA, metric_report,
-    paired_bootstrap, report_components, train_epochs, load_binary_truth)
+    paired_bootstrap, report_components, train_epochs, load_binary_truth, recover_completed_endpoint)
 from knee.public_adaptation_pilot import (scientific_config, LABEL_SHA, MASK_SHA,
     masked_loss, study_mean_backward, optimizer_groups, state_fingerprint)
 
@@ -154,6 +154,27 @@ class FitMechanicsTests(unittest.TestCase):
         mask=torch.tensor([[1.,float(index%3!=0)]])
         return masked_loss(model(x),y,mask)
 
+    def test_evaluation_recovery_verifies_fixed_completed_state_without_optimizer_steps(self):
+        with tempfile.TemporaryDirectory() as directory:
+            p=Path(directory); model=self.model(); contributors=['0','1','2']; binding={'synthetic':True}
+            result=train_epochs(model,self.optimizer(model),contributors,self.loss,binding,p/'resume.pt')
+            atomic_save(p/'endpoint.pt',result['endpoint'])
+            before=(p/'resume.pt').read_bytes()
+            with patch.object(torch.optim.AdamW,'step',side_effect=AssertionError('Recovery must never step')):
+                recovered=recover_completed_endpoint(self.model(),contributors,binding,p/'resume.pt',p/'endpoint.pt')
+            self.assertEqual(recovered['updates'],2)
+            self.assertEqual(state_fingerprint(recovered['endpoint']),state_fingerprint(result['endpoint']))
+            self.assertEqual((p/'resume.pt').read_bytes(),before)
+            wrong=copy.deepcopy(result['endpoint']);next(iter(wrong.values())).add_(.01)
+            atomic_save(p/'endpoint.pt',wrong)
+            with self.assertRaisesRegex(ValueError,'RECOVERY_ENDPOINT'):
+                recover_completed_endpoint(self.model(),contributors,binding,p/'resume.pt',p/'endpoint.pt')
+            atomic_save(p/'endpoint.pt',result['endpoint'])
+            state=torch.load(p/'resume.pt',weights_only=True);state['epoch']=1
+            atomic_save(p/'resume.pt',state)
+            with self.assertRaisesRegex(ValueError,'RESUME_CURSOR'):
+                recover_completed_endpoint(self.model(),contributors,binding,p/'resume.pt',p/'endpoint.pt')
+
     def test_analytic_unequal_masks_and_15_tail_reject_fixed16_and_pooled_cells(self):
         observed=[1,2,3]*5
         parameter=torch.tensor(.3,dtype=torch.float64,requires_grad=True)
@@ -256,6 +277,22 @@ class FitMechanicsTests(unittest.TestCase):
 
 @unittest.skipIf(np is None,'Optional numpy unavailable')
 class BinaryTruthTests(unittest.TestCase):
+    def test_historical_observed_soft_truth_threshold_and_unknown_mask(self):
+        try: import pyarrow as pa; import pyarrow.parquet as pq
+        except ImportError: self.skipTest('Optional pyarrow unavailable')
+        with tempfile.TemporaryDirectory() as directory:
+            p=Path(directory)/'truth.parquet'
+            with patch('knee.public_adaptation_fit.file_sha',return_value=MASK_SHA):
+                pq.write_table(pa.table({'StudyInstanceUID':['a','b','c','d','e'],
+                    'y_acl':[.3,.5,.99,float('nan'),2.],'m_acl':[1.,1.,1.,0.,0.]}),p)
+                y,m=load_binary_truth(p,['a','b','c','d','e'],['ACL'])
+                self.assertEqual(y.tolist(),[[0.],[1.],[1.],[0.],[0.]])
+                self.assertEqual(m.tolist(),[[1.],[1.],[1.],[0.],[0.]])
+                for value,mask in [(float('nan'),1.),(float('inf'),1.),(-.1,1.),(1.1,1.),(.3,.5)]:
+                    pq.write_table(pa.table({'StudyInstanceUID':['a'],'y_acl':[value],'m_acl':[mask]}),p)
+                    with self.assertRaisesRegex(ValueError,'TRUTH_BINARY'):
+                        load_binary_truth(p,['a'],['ACL'])
+
     def test_original_truth_alignment_uses_binary_y_and_masks(self):
         try: import pyarrow as pa; import pyarrow.parquet as pq
         except ImportError: self.skipTest('Optional pyarrow unavailable')
@@ -267,7 +304,7 @@ class BinaryTruthTests(unittest.TestCase):
                 y,m=load_binary_truth(p,['a','b'],['ACL'])
                 self.assertEqual(y.tolist(),[[0.],[1.]])
                 self.assertEqual(m.tolist(),[[0.],[1.]])
-                pq.write_table(pa.table({'StudyInstanceUID':['a'],'y_acl':[.3],'m_acl':[1.]}),p)
+                pq.write_table(pa.table({'StudyInstanceUID':['a'],'y_acl':[1.3],'m_acl':[1.]}),p)
                 with self.assertRaisesRegex(ValueError,'TRUTH_BINARY'): load_binary_truth(p,['a'],['ACL'])
             with self.assertRaisesRegex(ValueError,'TRUTH_BYTES'): load_binary_truth(p,['a'],['ACL'])
 
