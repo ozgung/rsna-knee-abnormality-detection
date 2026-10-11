@@ -2,12 +2,16 @@ import ast
 import copy
 import csv
 import json
+import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-import numpy as np
-import pandas as pd
+try:
+    import numpy as np
+    import pandas as pd
+except ImportError:
+    np=pd=None
 from knee import public_s6_entry as E
 from scripts import build_public_s6_entry as B
 
@@ -35,6 +39,7 @@ class EntryTests(unittest.TestCase):
             result.append((r,path))
         return result
 
+    @unittest.skipUnless(np is not None and pd is not None, 'NumPy/pandas required for numerical contracts')
     def test_ties_uneven_shards_shuffled_completion_match_single_population(self):
         ids=['z','a','x','b','m'];c=np.tile([.3,.1,.3,.7,.1],(12,1)).T;s=np.tile([.2000001,.2000002,.8,.1,.8],(12,1)).T
         cs=self.shards(ids,c);ss=self.shards(ids,s,'s6')
@@ -45,11 +50,13 @@ class EntryTests(unittest.TestCase):
         np.testing.assert_array_equal(E.blend(cm,sm),expected)
         self.assertEqual(E.assignments(ids),[['z','x','m'],['a','b']])
 
+    @unittest.skipUnless(np is not None and pd is not None, 'NumPy/pandas required for numerical contracts')
     def test_visible_ranks_exclude_probes(self):
         p=np.tile([.2,.7,.4],(12,1)).T;q=np.tile([.8,.2,.2],(12,1)).T
         np.testing.assert_array_equal(E.blend(p,q),.7*pd.DataFrame(p).rank(pct=True).to_numpy()+.3*pd.DataFrame(E.quantize(q)).rank(pct=True).to_numpy())
         self.assertFalse(np.array_equal(E.blend(p,q),E.blend(np.vstack([np.zeros((32,12)),p]),np.vstack([np.ones((32,12)),q]))[-3:]))
 
+    @unittest.skipUnless(np is not None and pd is not None, 'NumPy/pandas required for numerical contracts')
     def test_bad_ledgers_and_worker_failure_rejected(self):
         ids=['one','two','three'];p=np.ones((3,12))*.5
         for field,value in [('status','FAIL'),('status','INTERRUPTED'),('completed',1),('state_after','mutated'),('zero_imputed',False),('fp32_recoveries',1),('ledger_sha256','wrong')]:
@@ -61,6 +68,7 @@ class EntryTests(unittest.TestCase):
             shards[0][0]['ledger_sha256']=E.file_sha(path)
             with self.subTest(ids=got),self.assertRaises(ValueError):E.merge(ids,shards,'old')
 
+    @unittest.skipUnless(np is not None and pd is not None, 'NumPy/pandas required for numerical contracts')
     def test_nonfinite_probability_bounds_and_shape(self):
         for p in [np.full((2,12),np.nan),np.full((2,12),np.inf),np.full((2,12),1.01),np.full((2,12),-.01),np.ones((2,11))]:
             with self.assertRaises(ValueError):E.blend(p,np.ones((2,12))*.5)
@@ -80,6 +88,7 @@ class EntryTests(unittest.TestCase):
         (self.root/'test_series.csv').write_text(text)
         with self.assertRaises(ValueError):E.test_contract(self.root,list(reversed(E.LABELS)))
 
+    @unittest.skipUnless(np is not None and pd is not None, 'NumPy/pandas required for numerical contracts')
     def test_source_six_decimal_boundary_is_gate(self):
         p=np.ones(12)*.12345649;fp={'input':'same'};cfg={'probes':{'sid':{'s6':{'input':fp,'probabilities':p.tolist()}}}}
         self.assertEqual(E.probe_gate('sid','s6',p,fp,cfg),0)
@@ -88,6 +97,7 @@ class EntryTests(unittest.TestCase):
         self.assertIsNone(E.probe_gate('sid','old',p,fp,cfg))
         with self.assertRaises(ValueError):E.probe_gate('sid','old',p,{'input':'changed'},cfg)
 
+    @unittest.skipUnless(np is not None and pd is not None, 'NumPy/pandas required for numerical contracts')
     def test_interrupted_atomic_write_retains_previous(self):
         path=self.root/'ledger.npz';E.old_ledger(path,['id'],np.ones((1,12))*.5);before=path.read_bytes()
         with patch('numpy.savez',side_effect=OSError('Interrupted write')):
@@ -179,6 +189,7 @@ class EntryTests(unittest.TestCase):
         r=subprocess.run([sys.executable,'-m','knee.public_s6_entry','--help'],cwd=self.root,env=env,capture_output=True,text=True)
         self.assertEqual(r.returncode,0,r.stderr)
 
+    @unittest.skipUnless(importlib.util.find_spec('torch') is not None, 'Torch required for window parity')
     def test_qualified384_hash_namespace_and_exact_central320_relation(self):
         import torch
         full=[torch.arange(384*384,dtype=torch.float32).reshape(1,1,384,384) for _ in range(2)]
@@ -190,6 +201,7 @@ class EntryTests(unittest.TestCase):
         with self.assertRaises(ValueError):E.window_audit(plain,full=full)
         source=Path(B.__file__).read_text();self.assertIn("'qualified_full384_windows':cr['qualification'][i]['windows']",source)
 
+    @unittest.skipUnless(np is not None and pd is not None, 'NumPy/pandas required for numerical contracts')
     def test_complete_receipt_passes_and_material_mutations_fail(self):
         r,b,path=self.passing_rehearsal();E.require_rehearsal(r,b,path)
         mutations=[lambda q:q.update(completed=38),lambda q:q['projection'].update(conservative_seconds=E.MAX_SECONDS),
