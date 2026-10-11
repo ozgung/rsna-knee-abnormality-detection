@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-11 21:40 UTC (October 12 00:40 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Earlier exact recovery/history](docs/status-archive/status-before-20261011-s6-v4-terminal.md).
+Updated **2026-10-11 22:38 UTC (October 12 01:38 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Earlier exact recovery/history](docs/status-archive/status-before-20261011-s6-v4-terminal.md).
 
 ## Current snapshot
 
@@ -10,7 +10,7 @@ Updated **2026-10-11 21:40 UTC (October 12 00:40 TRT)**. Read this snapshot, the
 - Pure entry v2 completed in **152.48 seconds**, with all three visible studies, zero imputation and **21 independent checks PASS**. Visible CSV and raw arm probabilities match v4 exactly. Build and accepted-source checks: 15 and 16 PASS respectively.
 - Fixed 870-study development comparison: original 0.951330909 → fixed 70:30 rank blend **0.962963989**, delta +0.011633080, paired 2,000-bootstrap CI [+0.009787471, +0.013714779]; all 12 targets improved. Independent audit: 73 PASS / 0 FAIL / 3 UNKNOWN. Public training/report/gold exposure and unavailable patient identities prevent an independent-generalization claim or public score forecast. [Comparison](docs/experiments/s6-fixed-evaluation-result-20261011.md).
 - Full384 submission **57083497 failed** with Notebook Threw Exception; API COMPLETE with empty score. No traceback or established hidden cause. Preserve it; no blind retry.
-- Latest actual GPU allowance, 21:35 UTC: **42.6509 / 45 h used, 2.3491 h remaining, zero reserved**. Hidden-evaluation quota accounting is unknown. No ordinary training jobs, local controllers or Colab runtimes remained; agents are done. Submission acceptance reports **three slots remaining today**. Respect actual limits; no invented reserve or purchases.
+- Latest actual GPU allowance, 22:37 UTC: **42.6980 / 45 h used, 2.3020 h remaining, zero reserved**. Hidden-evaluation quota accounting is unknown. No ordinary training jobs, local controllers or Colab runtimes remained; agents are done. Submission acceptance reported **three slots remaining today**; S6 is still PENDING at 22:35 UTC. Respect actual limits; no invented reserve or purchases.
 
 ## Ready queue and ownership
 
@@ -18,6 +18,7 @@ Updated **2026-10-11 21:40 UTC (October 12 00:40 TRT)**. Read this snapshot, the
 | --- | --- |
 | Parent — S6 hidden evaluation | Reconcile submission 57086107 at the next meaningful checkpoint. Preserve exact version 2; inspect score or official error before selecting another predictor. |
 | Parent — next experiment | Await S6 public result. Standalone S6, full384 blend, weight sweeps and larger batches remain unselected and need prospective comparisons. |
+| Parent — domain checkpoint preparation | Metadata audit completed without GPU use: OrthoFoundation lacks a verified license; KneePreM code supplies no weights. [Evidence](docs/research/mri-domain-checkpoint-audit-20261011.md). Keep both as research leads until artifact permission/provenance is verified. |
 | Fable — independent review | May inspect counterexamples and planning risks; no compute claimed. Coordinate in the shared log. |
 | Parent — failed/closed paths | Preserve full384 exception and two-fold evidence. Input-policy regression is established, but its role in the hidden failure is unknown. Own224/384/R2 and public-adaptation negative recipes remain closed. |
 
@@ -49,4 +50,6 @@ Reconcile using `kaggle competitions submissions rsna-knee-abnormality-detection
 
 ## Latest checkpoint
 
-**2026-10-11 21:40 UTC:** repaired pure entry v2 completed; parent independently verified all three studies, strict state/device/logit/probability gates, exact v4 visible CSV and raw probabilities (21 PASS). Fresh allowance was four remaining; one authorized submission accepted as **57086107**, PENDING, with three remaining. No new training or duplicate job launched. Rehearsal/input repair evidence remains unchanged; hidden runtime and score await evaluation. Parent owns the next result/error audit. Local Git branch `codex/token-efficient-instructions`, no remote; preserve user AGENTS edits and Fable untracked files. Integrated worktrees are protected by pinned/workspace guards; do not force archive.
+**2026-10-11 22:38 UTC:** S6 submission 57086107 remains PENDING with no score; its ordinary version 2 notebook and prior rehearsal/full384 jobs are COMPLETE. Colab reports no active sessions; local process inspection finds no project trainer/controller; agents remain done. GPU allowance 2.3020 h remaining, zero reserved. Evidence `outputs/analysis/public-s6-entry-20261011/pure-entry/submissions-2235.json` and `capacity-2237.json`. No duplicate job or submission.
+
+Independent preparation: [domain checkpoint audit](docs/research/mri-domain-checkpoint-audit-20261011.md), ten metadata/content checks PASS. OrthoFoundation binds a 1.31 GB LFS object but has no verified repository/weight license; KneePreM has Apache-2.0 code with explicit user-supplied checkpoints, no distributed model. No weights downloaded, external code executed or GPU used. Next inspect the S6 hidden score/error before selecting a new predictor. Local branch `codex/token-efficient-instructions`, no remote; preserve user AGENTS edits and Fable untracked files. Protected worktrees remain recoverable; do not force archive.
