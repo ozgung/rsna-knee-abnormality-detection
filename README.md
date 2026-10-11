@@ -141,3 +141,8 @@ The builder rejects incomplete or failed cache receipts. Inspect the private not
 
 
 For a selected ensemble, `scripts/build_ensemble_kaggle.py` builds the notebook and a separate **weights-only** asset directory. Supply `--assets-dir` and the private `--dataset-source`; use `--rehearsal` for cached-feature versus raw-image parity. Kaggle notebook source must be below1MB, so do not embed checkpoint bytes. Inspect the exact upload directory before creating its private dataset; the builder rejects unexpected files. Rehearsal computes reference predictions from the existing training notebook cache on Kaggle. The pure entry reads only its small heads and test images/metadata. Never upload gold prediction fixtures, reports or identifiers as part of the weights package.
+
+
+### Selected-checkpoint export provenance
+
+For resumed TrackA exports, `scripts/build_tracka_export_kaggle.py` requires an expected dataset version, source checkpoint SHA and training config JSON. Its runtime verifies source identity and every selected weight tensor before image inference, then records training and export settings separately. [Method, required CLI arguments and evidence](docs/experiments/selected-export-provenance-20261011.md). This qualification does not change existing training recipes or establish a competition score.
