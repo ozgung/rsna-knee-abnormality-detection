@@ -201,6 +201,20 @@ def old_worker(config_path):
     finally:r['elapsed_seconds']=time.monotonic()-start;save(out/'receipt.json',r)
 
 
+def reset_native_renderer(cfg):
+    """Restore the pinned original module before its one-time lean patch.
+
+    Fresh sentinel datasets must not patch a previously patched prepare.
+    The exact scientific source remains unchanged and its guard runs again.
+    """
+    import importlib
+    native=importlib.import_module('training.native_cache')
+    path=(Path(cfg['code'])/'training/native_cache.py').resolve()
+    require(Path(native.__file__).resolve()==path,'EXACT_NATIVE_SOURCE_PATH')
+    require(file_sha(path)==cfg['source_pins']['training/native_cache.py'],'EXACT_NATIVE_SOURCE_BYTES')
+    return importlib.reload(native)
+
+
 def s6_worker(config_path):
     import numpy as np
     import torch
@@ -252,6 +266,7 @@ def s6_worker(config_path):
                     for m,name in zip(models,cfg['manifest']['models']):
                         m.load_state_dict(torch.load(Path(cfg['compact'])/name,map_location='cpu',weights_only=True),strict=True);m.eval()
                     CI.FORCED_SIDE.clear()
+                    reset_native_renderer(cfg)
                     ds=CI.CStudies(cfg['staged'],'train',all_ids,out/'scratch',cfg['code'],384,1,'v4',3,cfg['anatomy'],3.5,str(Path(cfg['compact'])/'side_cls.pt'),2.,0.,20.,extent_meta=any(m.extent for m in models));ds._setup()
                     states=models+[ds.bank.model,ds.side_net];require(model_digest(states)==initial,'S6_STRICT_RELOAD_STATE')
                     ds.bank.model.register_forward_hook(finite_aux);ds.side_net.register_forward_hook(finite_aux)

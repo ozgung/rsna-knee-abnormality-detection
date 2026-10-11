@@ -159,6 +159,28 @@ class EntryTests(unittest.TestCase):
            'phases':{a:{'wall_seconds':100,'peaks':{'host_rss_bytes':1,'output_disk_bytes':1},'minimum_disk_free_bytes':1} for a in sent}}
         return r,binding,csvpath
 
+    def test_pristine_native_renderer_restored_before_repeated_one_time_patch(self):
+        import importlib
+        import sys
+        from types import ModuleType
+        code=self.root/'source';package=code/'training';package.mkdir(parents=True)
+        path=package/'native_cache.py';path.write_text('def prepare(): return "original"\ndef quantize_series(): return "original-quantizer"\n')
+        pkg=ModuleType('training');pkg.__path__=[str(package)]
+        cfg={'code':str(code),'source_pins':{'training/native_cache.py':E.file_sha(path)}}
+        with patch.dict(sys.modules):
+            sys.modules['training']=pkg;sys.modules.pop('training.native_cache',None)
+            native=importlib.import_module('training.native_cache')
+            for _ in range(2):
+                native.prepare=lambda:'patched';native.quantize_series=lambda:'lean-quantizer'
+                restored=E.reset_native_renderer(cfg)
+                self.assertIs(restored,native)
+                self.assertEqual(restored.prepare(),'original')
+                self.assertEqual(restored.quantize_series(),'original-quantizer')
+            path.write_text(path.read_text()+'# unreviewed change\n')
+            with self.assertRaisesRegex(ValueError,'EXACT_NATIVE_SOURCE_BYTES'):E.reset_native_renderer(cfg)
+            native.__file__=str(self.root/'elsewhere.py')
+            with self.assertRaisesRegex(ValueError,'EXACT_NATIVE_SOURCE_PATH'):E.reset_native_renderer(cfg)
+
     def test_physical_uuid_exact_bytes_allow_only_display_prefix_difference(self):
         import uuid
         from types import SimpleNamespace
