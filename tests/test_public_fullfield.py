@@ -95,6 +95,19 @@ class DecisionTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):run('','',{},'missing','missing','missing',d,Path(d)/'out',{},[],{},[],{},np.zeros((870,12),np.float32))
             receipt=json.loads(Path(d,'out','receipt.json').read_text())
             self.assertEqual(receipt['status'],'FAIL');self.assertEqual(receipt['failure_stage'],'setup');self.assertEqual(receipt['optimizer_updates'],0)
+    def test_generated_offline_failure_receipt_is_valid_json(self):
+        import ast
+        tree=ast.parse(Path('scripts/build_public_fullfield.py').read_text())
+        entry=next(n.value for n in ast.walk(tree) if isinstance(n,ast.Constant) and
+                   isinstance(n.value,str) and 'except BaseException as error:' in n.value)
+        handler=next(n for n in ast.walk(ast.parse(entry)) if isinstance(n,ast.ExceptHandler))
+        code=compile(ast.Module(body=handler.body,type_ignores=[]),'<offline-failure>','exec')
+        with tempfile.TemporaryDirectory() as d:
+            out=Path(d)/'out'
+            with self.assertRaises(RuntimeError):exec(code,{'out':out,'error':ValueError(),'BINDING':{},'json':json})
+            receipt=json.loads((out/'receipt.json').read_text())
+            self.assertEqual(receipt['status'],'FAIL');self.assertEqual(receipt['failure_stage'],'offline_setup')
+
     def test_build_tamper(self):
         from scripts.build_public_fullfield import verify_build
         from knee.reference import sha256

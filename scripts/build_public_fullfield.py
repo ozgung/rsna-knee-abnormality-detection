@@ -99,7 +99,7 @@ try:
 except BaseException as error:
     if not (out/'receipt.json').exists():
         out.mkdir(parents=True,exist_ok=True)
-        (out/'receipt.json').write_text(json.dumps({'status':'FAIL','failure_stage':'offline_setup','failure_type':type(error).__name__,'binding':BINDING},indent=2)+'\n')
+        (out/'receipt.json').write_text(json.dumps({'status':'FAIL','failure_stage':'offline_setup','failure_type':type(error).__name__,'binding':BINDING},indent=2)+chr(10))
     raise RuntimeError('Fullfield ablation failed; inspect sanitized receipt') from None
 '''
     hashes={n:sha256(v.encode()) for n,v in sources.items()}
