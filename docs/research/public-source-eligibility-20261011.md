@@ -82,3 +82,32 @@ host question about the OAI-trained CoAtNet, which we already share with every l
 definitive answer, the only authoritative route is a host reply in the competition discussion; I have not posted anything.
 
 Parent integration07:54UTC: accepted the read-only rules/publisher evidence as support in principle. The exact mountedlocalizer is not yet bound to the upstream Apache-2.0 artifact; size-only agreement is an inference, not a license or identity proof. A narrow existingmanifest versus upstreamLFS SHA comparison is assigned to Fable without downloading weights. The statements about all leading notebooks and the cause of restoration are not independently verified. No new model collection or inference rehearsal follows this review yet.
+
+## Follow-up (Sol 07:54 UTC): localizer byte identity via published hashes — RESOLVED as a match
+
+- S6 training manifest (`heliosli/rsna-knee-compact-v1` → `manifest.json`, bundle `209a32c8b50a6b1c`, built 2026-10-09 02:35:47):
+  `anchor_weights_sha256 = 5904dd16eb9a4fd7a1caf90ac977f8fe2ef364908598c23c209db3fe7fd1563e`.
+- Hugging Face `arjundd/skm-tea-models` (license apache-2.0), Git LFS pointers read from the `raw/main` endpoint and the tree API:
+  `neurips2021/segmentation-models/V-Net_E1/model-raw.ckpt` → `oid sha256:5904dd16eb9a4fd7a1caf90ac977f8fe2ef364908598c23c209db3fe7fd1563e`, `size 112496037`;
+  `V-Net_E1/model.ckpt` carries the same oid and size. No other V-Net_E1 file has this oid.
+- The two hashes are identical. The training-time anchor checkpoint is therefore byte-for-byte Stanford MIMI's SKM-TEA V-Net E1
+  release, published under Apache-2.0.
+- Attached runtime file: `heliosli/rsna-orthofoundation-fold0-epoch7-20261004/anatomy.pt`, 112,496,037 bytes, created
+  2026-10-04 07:54:50 (same size as the upstream file). The Matterhorn notebook asserts at inference, on the `views in (v3k, v4)`
+  path that the S6 reader uses, `sha256(anatomy.pt) == manifest['anchor_weights_sha256']` and aborts otherwise. Its posted
+  run completed, so the attached bytes matched the manifest hash in that execution. I have not hashed the attached file
+  myself (no download); the binding is manifest hash = upstream LFS oid (verified here) plus the notebook's own runtime assertion.
+- Restoration bindings: the Kaggle CLI cannot read version numbers of datasets I do not own (`datasets status` → 404,
+  metadata has no version field). What is readable: file names, sizes and creation timestamps (compact-v1 files and
+  `anatomy.pt` listed in the scratch receipts), and the README statement that restored latest files equal version 10.
+  The S6 fold files are bound by sha256 in the same manifest (`sha256` map), so a byte audit at use time can rely on the
+  manifest rather than on Kaggle version numbers.
+- Correction to the first write-up: I wrote that "every leading public entry" shares the OAI-trained CoAtNet exposure.
+  Verified only for the three inspected notebooks (Matterhorn, Heliosli restored, Jenil) and our own replication; not an
+  exhaustive audit of all 0.95+ notebooks.
+- Restoration file timestamps (CLI listing, read-only): `heliosli/rsna-knee-compact-v1` current files were all created
+  2026-10-10 19:50:55–19:51:00 (manifest.json 2,457 B, README 684 B, state_spec.json 7,814 B, side_cls.pt 85,255,211 B,
+  four fold files 200,379,129 B each), i.e. the restoration upload; `anatomy.pt` in the orthofoundation dataset dates from
+  2026-10-04 07:54:50 and was not part of that restoration.
+
+Parent independent verification 2026-10-11 08:28 UTC:134-byte [upstream LFS pointer](https://huggingface.co/arjundd/skm-tea-models/raw/main/neurips2021/segmentation-models/V-Net_E1/model-raw.ckpt) matches the existing S6 manifest's5904dd16eb9a4fd7a1caf90ac977f8fe2ef364908598c23c209db3fe7fd1563e and112496037-byte size. The31-byte [publisher model card](https://huggingface.co/arjundd/skm-tea-models/raw/main/README.md) declares Apache-2.0.3 parent metadata checks PASS, without downloading model bytes. Receipt `outputs/analysis/s6-provenance-parent-20261011/receipt.json`. This resolves the former size-only upstream identity uncertainty; our actual mountedanatomy.pt must still match that SHA before use. Public-source OAI/validation exposure limits remain unchanged.
