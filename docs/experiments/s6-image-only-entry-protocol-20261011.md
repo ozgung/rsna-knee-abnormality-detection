@@ -20,3 +20,17 @@ SolMedium `/root/s6_dual_entry_implementation_sol` owns only three new runtime/b
 Actual evaluator elapsed6.04h on one board; 1300-study S6 alone scales near8.95h, ideal two-board scaling4.48h. Shared CPU/storage and original320 workload remain uncertain. Account quota before the separate full384 rehearsal was3.6514 of45h remaining. This reading does not establish hidden-evaluation allowance or per-board billing; verify actual platform evidence, do not infer either free evaluation or a block. No purchases or new terms.
 
 Public all-data/report/gold-guided checkpoint exposure and unavailable patient identities remain the principal scientific limits. Image-only inference does not repair upstream exposure. Detailed accepted decision: ignored `outputs/analysis/public-s6-evaluation-20261011/astra-next-entry-decision.md`; [fixed result](s6-fixed-evaluation-result-20261011.md), [original prospective comparison](s6-qualification-decision-20261011.md).
+
+
+## Shared mechanical review accepted October11
+
+Fable's per-study original320 substitution and deadline-tail substitution proposals were reviewed by Astra and parent and rejected for this fixed entry: missing S6 rows also change ranks of successful rows; runtime-dependent arm selection is a new predictor. A zero-fallback visible rehearsal would not validate that new branch. Qualified source anatomical/missing-plane behavior remains unchanged. Aggregate concurrency/decode/forward timing is accepted.
+
+Today's official data description confirms **about1300** hidden studies; actual test.csv governs runtime. Cached public S6 controller uses two physical GPUs, DICOM-cost-balanced assignment, loaderworkers2 and defaultchunk192, and permits up to3% missing mean-filled rows. Our qualifiedchunk16/workers0, canonicalmod2 and complete genuine predictions differ. Cached visible-run metadata and author score claims do not establish complete hidden runtime. No precision/chunk/fallback shortcut is adopted.
+
+
+## Historical-control evidence gap and accepted sentinel addition
+
+During implementation, the old320 fold0 qualification was found to preserve all32 input/window/mask hashes and parity gates, but not their32 probability arrays. Do not invent that missing historical comparison. Astra and parent accept adding exactly the four already-qualified original320 development sentinels at saved870 ordinals **0,1,868,869**, each on both physical boards. Freeze identity against saved arrays before execution; require historical probability error≤1e-6, fresh repeat/strict reload agreement and unchanged state. The original32 retain exact saved old-input hashes, fresh original-source320 parity and repeat/reload. S6 retains all32 historical probabilities and its original four cross-board sentinels.
+
+Verify actual population disjointness and unique count, expected **39** (32 probes +4old320 sentinels +3visible). Every mechanics row remains outside the three-visible submission rank population. These are additional image-only identity checks, not a new evaluation cohort or candidate. No labels/metric selection or pure-entry predictor change. Agent informed before implementation/execution; no GPU launch yet.
