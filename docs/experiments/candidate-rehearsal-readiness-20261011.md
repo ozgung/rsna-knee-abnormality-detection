@@ -1,6 +1,6 @@
 # Candidate rehearsal readiness — October 11, 2026
 
-The first positive full384 result permits a fixed second-fold replication, now accepted on Kaggle. It does not permit replacing the existing best entry immediately. The S6 gross visible-union screen permits its existing prospective fixed70old320:30S6 development comparison. Neither candidate has passed a new image-only entry rehearsal.
+Both full384 development comparisons now pass: fold0 delta+0.00264620 and fold1 delta+0.00181683, each with positive paired confidence bounds and no damage-rule targets. Independent second-fold audit is51PASS/0FAIL/2UNKNOWN; see the [replication result](public-fullfield-replication-result-20261011.md). This permits one separate image-only rehearsal before an entry. The S6 gross visible-union screen permits its existing prospective fixed70old320:30S6 development comparison, still running. Neither candidate has passed a new image-only entry rehearsal.
 
 ## Full384 candidate, conditional on fixed replication
 
@@ -20,4 +20,4 @@ Record actual CUDA board count/names in the next evaluator. If more than one equ
 
 ## Next evidence
 
-Parent first audits the fixed866 fullfield replication and870 S6 comparison, then implements one concrete qualifying image-only candidate rehearsal. No new entry, GPU run or dataset publication occurred for this planning note. User authorization already covers a promising entry after completed integrity and offline checks; no recurring approval checkpoint is needed.
+Parent has accepted the fixed866 fullfield independent audit and is integrating one concrete full384 image-only rehearsal. S6 terminal evidence will be audited separately. No new entry, rehearsal GPU run or dataset publication has occurred. User authorization already covers a promising entry after completed integrity and offline checks; no recurring approval checkpoint is needed.
