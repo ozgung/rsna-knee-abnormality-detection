@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-12 12:37 UTC (15:37 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
+Updated **2026-10-12 12:40 UTC (15:40 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
 
 ## Current snapshot
 
@@ -18,8 +18,8 @@ Updated **2026-10-12 12:37 UTC (15:37 TRT)**. Read this snapshot, then [shared h
 | --- | --- |
 | Parent — recovery entry | Completed and submitted once as 57096002. Preserve exact accepted v1; visible qualification 26 PASS. |
 | Parent — balanced blend | Deferred after Opus review: exposed870 cannot select generalizing weights. Fresh Heliosli public source already uses50:50 with the same S6 bundle; this is not a new method. Preserve diagnostic receipts, no submission. |
-| Opus — next-direction review | Read12:34 findings; parent replied12:37 accepting validation correction and requesting sourced correlation/rules claims plus one concrete training hypothesis against rejected own384/R2. Shared file remains coordination channel. |
-| Parent — Colab training | Next: freeze a reproducible independent-reader pilot with validation excluded from encoder training as well as head fitting. Public frozen-encoder head is not clean validation. Resolve label/native-view hypothesis and grouping before launch; no job launched. |
+| Opus — next-direction review | Read12:36/12:38 and full strategy review; accepted native-ROI feasibility12:40 with matched controls and second-fold replication before scale. Shared file remains coordination channel. |
+| Parent — Colab training | Next: bounded native-DICOM full-context-plus-ROI feasibility, following October10 design. Check localizer provenance, geometry/coverage/resampling and runtime; then freeze matched ImageNet-initialized control/treatment protocol. No training launched. |
 | Parent — S6 reproduction | Sol source audit finds missing per-study likelihood-ratio/state targets, exact membership/init pin/full flags. Extra exact S6 seeds/folds are not currently reproducible. A new recipe must be named and evaluated as such. |
 | Parent — deferred alternatives | Full384 extra views have positive exposed evidence but add runtime. Own224/384/R2/public-adaptation rejected recipes stay closed. MRI checkpoint leads still need release/license verification. |
 
@@ -70,3 +70,5 @@ Submit command already executed once:
 Reconcile through `api.competition_submissions('rsna-knee-abnormality-detection')`, selecting **ref 57096002** and checking `status`, `public_score`, `error_description` and `total_bytes`. Initial receipt `outputs/analysis/s6-capped-recovery-20261012/pure-entry/submission-v1.json`; command log adjacent. Do not infer success from ordinary notebook COMPLETE or empty-score evaluation COMPLETE. Previous failure versions remain preserved.
 
 **12:37 UTC research checkpoint:** read Opus12:34 review and refreshed public notebook listing/source. Heliosli latest is an existing50:50 same-bundle recipe; goodpjw latest better-ranked stage4 is private, public copy falls back to70:30. Sources/evidence and ownership in shared handoff12:37. No new job or submission.
+
+**12:40 UTC checkpoint:** accepted Fable’s concrete native-ROI hypothesis for feasibility, with matched view/context controls and second-fold replication before scaling. Read [strategy review](docs/research/public-landscape-strategy-20261012.md); parent qualifications in shared handoff12:40. No new compute or submission.
