@@ -1,0 +1,23 @@
+# Own-base gap audit — October 12, 2026
+
+The next diagnostic holds our original224 fold0 checkpoint fixed and compares its existing16 evaluation windows with42 candidate windows in the same44-slice cache. This tests evaluation sampling density before committing to a new96-slice corpus and training. It does not add source slices or establish native-detail improvement.
+
+## Recipe evidence
+
+- Own224 already used `labels_v1_blend`, ten epochs and report-selected top-three SWA. Fold0 selected epochs8,9,7; report AUC0.901842; full-five public0.914. TrainingK8/evaluationK16.
+- Original own384 c384r used the same blended labels,12 epochs and top-three SWA, trainingK12/evaluationK24. Do not confuse it with the older14-epoch bootstrap c384b artifact.
+- Public .945/.949 models also differ in knee-specific initialization, OAI supervision, label recipe, source depth, inference coverage and checkpoint selection. Their score gap does not isolate any factor or establish a competition-only ceiling.
+- A labels-v1-to-blend arm and single-checkpoint-to-SWA arm would repeat features already present. A longer schedule is possible but late own224 epochs plateaued; it is a weaker first diagnostic.
+- A96-slice inference builder exists in cached `outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py`. The exact public training cache/builder is unavailable in inspected artifacts. A controlled input comparison needs explicit series allocation, span, intensity and masks, not just changing an array dimension.
+
+Detailed read-only evidence: `outputs/analysis/base-gap-20261012/recipe-audit.md`. Existing141-check own224 audit remains authoritative for the original family. No new metric or GPU result is claimed.
+
+## Fixed-window diagnostic acceptance
+
+Use the same fold0 SWA bytes,870 IDs, original corpus/labels/truth/masks and model preprocessing. K16 must reproduce saved held-out predictions within a prospectively documented backend tolerance before interpreting K42. Change only evaluation window count. Preserve original candidate-center behavior, including known masked/series-boundary limitations, and report them; do not silently fix those while comparing K. Report per-target AUC/support, explicit macro policy, paired report-component uncertainty and measured runtime/memory. This is repeatedly used development data with checkpoint-selection exposure, not an untouched outer test. No leaderboard submission or training follows automatically.
+
+SolMedium implements a separate evaluator/builder/tests in managed worktree `own224-window-diagnostic`; parent owns review, commit and one qualified run. Production inference is unchanged.
+
+## Native-ROI feasibility findings
+
+The SKM-TEA localizer weights have verified upstream identity, but public anchor-selection heuristics explicitly used gold58 montages. Thus the complete preprocessing is not gold-unexposed. The previously qualified mechanical center90 crop failed anatomical review; do not reuse it as a successful ROI result. Existing S6 full-field-plus-local union passed a limited visible anatomy screen, which does not qualify a new24-view subset. Current native crop helper hardcodes320 resampling;224/384 need an explicit contract. Measure actual resampling, out-of-field and depth-boundary projections, fallback routes, and preserve full context. Hidden-test failure rates remain unknown. Evidence: `outputs/analysis/native-roi-feasibility-20261012/source-review.json`.

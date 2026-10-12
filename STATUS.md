@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-12 12:45 UTC (15:45 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
+Updated **2026-10-12 12:55 UTC (15:55 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
 
 ## Current snapshot
 
@@ -19,7 +19,8 @@ Updated **2026-10-12 12:45 UTC (15:45 TRT)**. Read this snapshot, then [shared h
 | Parent — recovery entry | Completed and submitted once as 57096002. Preserve exact accepted v1; visible qualification 26 PASS. |
 | Parent — balanced blend | Deferred after Opus review: exposed870 cannot select generalizing weights. Fresh Heliosli public source already uses50:50 with the same S6 bundle; this is not a new method. Preserve diagnostic receipts, no submission. |
 | Opus — next-direction review | Read12:36/12:38 and full strategy review; accepted native-ROI feasibility12:40 with matched controls and second-fold replication before scale. Shared file remains coordination channel. |
-| Parent — Colab training | Next: bounded native-DICOM full-context-plus-ROI feasibility, following October10 design. Check localizer provenance, geometry/coverage/resampling and runtime; then freeze matched ImageNet-initialized control/treatment protocol. No training launched. |
+| Sol implementation / parent integration — own-base diagnostic | ACTIVE: `/root/own224_window_diagnostic_sol` builds fixed own224 fold0 K16-vs-K42 evaluation on existing44 cache in managed worktree `own224-window-diagnostic`. Parent reviews/tests/commits then launches once. No training or GPU started. [Acceptance](docs/experiments/own-base-gap-audit-20261012.md). |
+| Parent — native inputs / next training | Source review complete: external localizer weights but gold58-tuned anchor heuristics; center90 previously rejected; current helper hardcodes320. Next bounded full-context-plus-ROI geometry/runtime qualification alongside96-source coverage design. Preserve matched labels/split/initialization; blended labels and top3SWA already used, so do not repeat them as new factors. |
 | Parent — S6 reproduction | Sol source audit finds missing per-study likelihood-ratio/state targets, exact membership/init pin/full flags. Extra exact S6 seeds/folds are not currently reproducible. A new recipe must be named and evaluated as such. |
 | Parent — deferred alternatives | Full384 extra views have positive exposed evidence but add runtime. Own224/384/R2/public-adaptation rejected recipes stay closed. MRI checkpoint leads still need release/license verification. |
 
@@ -51,7 +52,7 @@ Collector pins exact accepted source/version and downloads small outputs only to
 - Full384 improved two exposed development folds, +.002646205/+.001816829, but failed hidden execution. Native-crop/S6 improvement is confounded with readers/sampling; use matched views/coverage ablations for later causal comparisons. [Fold0](docs/experiments/public-fullfield-result-20261011.md), [fold1](docs/experiments/public-fullfield-replication-result-20261011.md), [rehearsal](docs/experiments/fullfield-image-only-rehearsal-20261011.md).
 - [MRI transfer research](docs/research/kaggle-mri-transfer-20261010.md), [public refresh](docs/research/knee-public-refresh-20261011.md), [eligibility](docs/research/public-source-eligibility-20261011.md), [visual review](docs/research/pipeline-review-20261011.md), [29-page PDF](outputs/briefings/knee-pipeline-review-20261011/knee-pipeline-review.pdf), [domain checkpoint audit](docs/research/mri-domain-checkpoint-audit-20261011.md). No new weights fetched; domain leads remain unverified.
 - Official rules/code refreshed October 12: five submissions/day, offline≤9h, public free assets subject rules, no human test labeling. Aggregating solely image predictions has no inspected prohibition (interpretation, not host approval). Dates verified October 11: entry/mergeOctober 15 and finalOctober 22,23:59UTC. Approximately 1,300 hidden studies; actual test.csv authoritative. T4x2 shares4 CPUs / 29 GB RAM; ordinary 12 h does not override competition 9 h.
-- Parent owns commits. Git has no remote. Preserve unrelated user AGENTS.md changes and Fable untracked files. All subagents completed; no agent or controller should restart jobs automatically. Use existing resources/actual account limits, no self-imposed hour caps.
+- Parent owns commits. Git has no remote. Preserve unrelated user AGENTS.md changes and Fable untracked files. Read-only base-gap agent completed; Sol window-diagnostic implementation is active. No agent or controller should restart compute jobs automatically. Use existing resources/actual account limits, no self-imposed hour caps.
 
 ## Latest checkpoint
 
@@ -74,3 +75,5 @@ Reconcile through `api.competition_submissions('rsna-knee-abnormality-detection'
 **12:40 UTC checkpoint:** accepted Fable’s concrete native-ROI hypothesis for feasibility, with matched view/context controls and second-fold replication before scaling. Read [strategy review](docs/research/public-landscape-strategy-20261012.md); parent qualifications in shared handoff12:40. No new compute or submission.
 
 **12:45 UTC coordination checkpoint:** Fable12:41 accepts the ROI refinements. Include measured localizer failure/out-of-volume/routing rates for accessible inputs; hidden rates remain unknown unless returned by Kaggle. Existing `continue-rsna-knee-experiments` heartbeat updated and verified ACTIVE every five minutes, with incremental shared-handoff checks and quiet unchanged runs. Last coworker entry processed:12:41. No new training/submission.
+
+**12:55 UTC checkpoint:** Fable12:49/12:52 processed; base-first priority accepted with corrections. Recipe audit completed; one implementation agent active for K16/K42 diagnostic, exact task/worktree above. No GPU/controller/training/submission launched. Next: inspect agent result, qualify baseline parity/build, reconcile actual resources immediately before one run. Native source review is complete, new real-input ROI execution is not.
