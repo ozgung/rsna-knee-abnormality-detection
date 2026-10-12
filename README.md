@@ -58,7 +58,7 @@ The live official pages verified on October 8 record entry deadline **October 15
 | --- | --- | --- |
 | Mac MPS | CSV audit, DICOM decoding checks, a few studies, model debugging | Keep a small cache (initially <=2 GiB); inspect free disk before expansion. Shared RAM is not all available to the model. |
 | Kaggle | Full raw dataset access, preprocessing, validation, final offline inference | Attach competition data; stream selected series; store compact caches and weights. Benchmark full-study decoding as part of the 9-hour budget. |
-| Colab | Selected CUDA experiments | Use the user-authorized existing 350-credit allocation for bounded project runs before expiry; see STATUS for remaining-budget evidence and expiry. Transfer only compact authorized caches. Record each run and release idle runtimes; new credit purchases need separate authorization. |
+| Colab | Selected CUDA experiments | Use existing user-authorized credits and verify actual runtime/account availability before launching; see STATUS for current evidence. Do not assume credits expire with the subscription or impose an arbitrary reserve. Transfer authorized data directly to the remote runtime, record each run and release idle sessions; purchases require separate authorization. |
 
 The complete raw corpus cannot fit the current free disk. Compact multi-plane 2D/2.5D models are plausible for local experiments; no throughput, full training duration or score is promised without measured batches. Avoid starting with a full-volume 3D model.
 
