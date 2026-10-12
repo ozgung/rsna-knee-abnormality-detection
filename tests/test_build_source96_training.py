@@ -78,7 +78,7 @@ class FoldTests(unittest.TestCase):
                 for p in list(work.iterdir()):
                     if 'fold0' in p.name:p.rename(p.with_name(p.name.replace('fold0','fold1')))
                 record=work/'run_fold1.json';r=json.loads(record.read_text());r.update(fold=1,checkpoint_file='raptor_ft_fold1_swa.pt',source96_experiment_split=guard.SPLITS[1],cache_reference_partition_fold=0,source96_cache_content_sha256=c['content_sha256']);r['export']['n_val']=866;record.write_text(json.dumps(r))
-                payload=Path(c['persistence']['staging'])/'payload_manifest.json';d=json.loads(payload.read_text());d['fold']=1;payload.write_text(json.dumps(d));status['fold']=1
+                fixture.published_payload['fold']=1;status['fold']=1
                 return status
             fixture.artifacts=artifacts
             receipt=fixture.invoke();self.assertEqual(receipt['status'],'PASS');self.assertEqual(receipt['fold'],1)

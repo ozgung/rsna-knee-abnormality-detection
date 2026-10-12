@@ -171,12 +171,26 @@ def primary_complete(work,fold=0,development=870,experiment_split=None,cache_con
     return record
 
 
+def published_manifest(dataset,version):
+    """Read the exact published version; the persister deletes local staging."""
+    with tempfile.TemporaryDirectory() as directory:
+        result=subprocess.run(['kaggle','datasets','download',f'{dataset}/{version}',
+            '-f','payload_manifest.json','-p',directory,'--unzip','-o','-q'],
+            capture_output=True,text=True,timeout=300)
+        path=Path(directory)/'payload_manifest.json'
+        if result.returncode or not path.is_file() or path.is_symlink() or path.stat().st_size>1024*1024:
+            raise ValueError('Exact published backup manifest unavailable')
+        return json.loads(path.read_bytes())
+
+
 def final_verified(c,status):
     fold=c.get('fold',0);p=c['persistence'];resume=Path(c['workdir'])/f'raptor_resume_fold{fold}.pt';st=resume.stat()
     final=status.get('final') or {};version=status.get('verified_version')
     if status.get('dataset')!=p['dataset'] or status.get('fold')!=fold or final.get('state')!='verified' or status.get('verified_epoch')!=9 or final.get('epoch')!=9 or type(version) is not int or version<=0 or final.get('version')!=version or status.get('verified_signature')!=[st.st_size,st.st_mtime_ns]:raise ValueError('Latest final epoch9 backup is not verified')
-    payload=json.loads((Path(p['staging'])/'payload_manifest.json').read_bytes())
+    payload=published_manifest(p['dataset'],version)
     if payload.get('dataset')!=p['dataset'] or payload.get('fold')!=fold or payload.get('epoch')!=9 or payload.get('resume_sha256')!=sha(resume):raise ValueError('Final backup payload differs from latest resume')
+    after=resume.stat()
+    if (after.st_size,after.st_mtime_ns)!=(st.st_size,st.st_mtime_ns):raise ValueError('Resume changed during final backup verification')
     return {'epoch':9,'version':version,'resume_sha256':payload['resume_sha256']}
 
 

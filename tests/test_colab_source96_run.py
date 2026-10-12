@@ -16,6 +16,28 @@ runner=importlib.util.module_from_spec(spec);spec.loader.exec_module(runner)
 PRIMARY=Path(os.environ.get('SOURCE_SPAN_EVIDENCE_ROOT','/nonexistent'))
 PACKAGE=PRIMARY/'outputs/kaggle/source96-training-20261012-draft-v2'
 
+class PublishedManifestTests(unittest.TestCase):
+    def test_download_is_exact_version_and_temporary_staging_is_removed(self):
+        seen=[]
+        def download(command,**kwargs):
+            self.assertEqual(command[:4],['kaggle','datasets','download','fixture/private/7'])
+            self.assertEqual(command[command.index('-f')+1],'payload_manifest.json')
+            path=Path(command[command.index('-p')+1]);seen.append(path)
+            (path/'payload_manifest.json').write_text('{"epoch": 9}')
+            return subprocess.CompletedProcess(command,0)
+        with patch.object(runner.subprocess,'run',side_effect=download):
+            self.assertEqual(runner.published_manifest('fixture/private',7),{'epoch':9})
+        self.assertFalse(seen[0].exists())
+    def test_download_failure_missing_or_invalid_manifest_fails(self):
+        for mode in ('failed','missing','invalid','large'):
+            def download(command,**kwargs):
+                p=Path(command[command.index('-p')+1])/'payload_manifest.json'
+                if mode=='invalid':p.write_text('invalid')
+                if mode=='large':p.write_bytes(b'x'*(1024*1024+1))
+                return subprocess.CompletedProcess(command,1 if mode=='failed' else 0)
+            with self.subTest(mode=mode),patch.object(runner.subprocess,'run',side_effect=download),self.assertRaises(ValueError):
+                runner.published_manifest('fixture/private',7)
+
 @unittest.skipUnless(PACKAGE.exists() and (PRIMARY/'scripts/colab_tracka_persist.py').exists(),'Reviewed package and authoritative persister required')
 class RunnerTests(unittest.TestCase):
     def setUp(self):
@@ -40,7 +62,7 @@ class RunnerTests(unittest.TestCase):
         (work/'run_fold0.json').write_text(json.dumps(record))
         staging=Path(self.c['persistence']['staging']);staging.mkdir(exist_ok=True)
         payload={'dataset':self.c['persistence']['dataset'],'fold':0,'epoch':9,'resume_sha256':runner.sha(work/'raptor_resume_fold0.pt')}
-        (staging/'payload_manifest.json').write_text(json.dumps(payload))
+        self.published_payload=payload
         st=(work/'raptor_resume_fold0.pt').stat()
         return {'dataset':self.c['persistence']['dataset'],'fold':0,'verified_epoch':9,'verified_version':2,'verified_signature':[st.st_size,st.st_mtime_ns],
                 'final':{'state':'verified','epoch':9,'version':2}}
@@ -61,7 +83,7 @@ class RunnerTests(unittest.TestCase):
         defaults={'popen':self.factory(),'probe':lambda c,e:{'device':'cuda','threads':1,'studies':4345,'timm':'1.0.26'},
             'privacy':lambda d:self.privacy_calls.append(d),'read_status':lambda _:self.status,'install_signals':False,'sleep':lambda _:None}
         defaults.update(kw)
-        with patch('builtins.print'):return runner.run(self.c,**defaults)
+        with patch('builtins.print'),patch.object(runner,'published_manifest',side_effect=lambda dataset,version:self.published_payload):return runner.run(self.c,**defaults)
     def test_success_final_epoch9_keeps_resume_and_old_versions(self):
         r=self.invoke();self.assertEqual(r['status'],'PASS');self.assertTrue(r['resume_preserved'])
         self.assertEqual(self.procs[0].signals,[signal.SIGUSR1]);self.assertIn('--keep-old-versions',self.calls[0][0]);self.assertNotIn('--delete-old-versions',self.calls[0][0])
@@ -69,6 +91,21 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(len(self.privacy_calls),2)
     def test_training_failure_still_requests_final_backup(self):
         r=self.invoke(popen=self.factory(train_rc=1));self.assertEqual(r['status'],'FAIL');self.assertTrue(r['resume_preserved']);self.assertEqual(self.procs[0].signals,[signal.SIGUSR1])
+    def test_final_uses_published_version_after_staging_cleanup(self):
+        status=self.artifacts()
+        self.assertFalse((Path(self.c['persistence']['staging'])/'payload_manifest.json').exists())
+        with patch.object(runner,'published_manifest',return_value=self.published_payload) as download:
+            result=runner.final_verified(self.c,status)
+        download.assert_called_once_with('fixture/private-backup',2)
+        self.assertEqual(result['epoch'],9)
+        for key,value in [('dataset','fixture/wrong'),('fold',1),('epoch',8),('resume_sha256','c'*64)]:
+            with self.subTest(key=key),patch.object(runner,'published_manifest',return_value={**self.published_payload,key:value}):
+                with self.assertRaises(ValueError):runner.final_verified(self.c,status)
+    def test_final_rejects_missing_remote_manifest_even_with_local_copy(self):
+        status=self.artifacts()
+        (Path(self.c['persistence']['staging'])/'payload_manifest.json').write_text(json.dumps(self.published_payload))
+        with patch.object(runner,'published_manifest',side_effect=ValueError('unavailable')):
+            with self.assertRaises(ValueError):runner.final_verified(self.c,status)
     def test_backup_failure_and_stale_final_signature_fail(self):
         r=self.invoke(popen=self.factory(persist_rc=3));self.assertEqual(r['status'],'FAIL')
         self.procs=[];self.calls=[];self.c['resume']=True;self.c['resume_sha256']=runner.sha(Path(self.c['workdir'])/'raptor_resume_fold0.pt')
