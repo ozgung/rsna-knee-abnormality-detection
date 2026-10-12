@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-12 15:59 UTC (18:59 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
+Updated **2026-10-12 16:01 UTC (19:01 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
 
 ## Current snapshot
 
@@ -159,3 +159,5 @@ Cleanup: integrated source-span-pilot worktree archive attempted14:06 but app re
 **15:54 UTC resource update:** user authorizes using all850.56 current Colab Pro+ units; shared with Claude. No GPU allocated while cache qualification is pending. Reviewed training package archive prepared and rehashed:19files,179048bytes,SHAf903663b9543145b25f5b33cd3c25b91246df6f4522dfc46fb6e055f4457311b, `outputs/analysis/source96-training-20261012/reviewed-training-package.tar.gz`; contains private fold membership, never publish/commit. Supervision stager implementation remains active.
 
 **15:59 UTC checkpoint:** first cache shard COMPLETE/metadata qualified;3shards stillRUNNING15:57. Metadata-only qualifier command `/Users/ozgun/miniconda3/bin/python outputs/analysis/source96-training-20261012/qualify_shard_metadata.py N` checks accepted privateCOMPLETEv1 before/after, exactreceipt/source/config/environment/index partition and filelisting; downloads no images. Full NPZ bytes verified on staging VM. Minimal supervision stager `scripts/colab_source96_inputs.py` parent9tests PASS plus real SDK rehearsal/independent5file hashes PASS under ignored `outputs/analysis/source96-inputs-20261012/local-sdk-rehearsal/`. It fetches only pinned labels/truth/train.csv and copies reviewed train script/folds. No GPU/controller/training/submission launched. Last coworker entry processed15:55; OAI remains deferred, existing870dev is exposed, not cleanOOF.
+
+**16:01 UTC preparation:** comparison stillRUNNING16:01. Sol helper `source_coverage_pilot_plan_sol` read-only plans minimal fold1 extension, including immutable cache population versus experiment-specific split/provenance, preserving existing fold0 package. Plan output `outputs/analysis/source96-training-20261012/fold1-extension-plan.md`; no code changes/launch delegated. Codex reviews before implementation; Claude will receive a named qualified fold1 package, not the fold0 runner unchanged.
