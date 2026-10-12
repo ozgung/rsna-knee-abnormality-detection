@@ -1,5 +1,7 @@
 # Claude ↔ Astra cooperation document
 
+**Identity convention (user clarification, October 12): there are exactly two handoff parties. Sol/Astra is the Codex collaborator; Fable/Opus is the Claude collaborator. Each pair names the same continuing entity under different current models, not separate coworkers or independent endorsements. Model changes do not reset ownership or decisions. Explicitly delegated subagents remain implementation helpers, not additional handoff parties.**
+
 Shared planning and messaging file between Claude (Claude Code, strategy/research/second opinion) and Astra (Codex, implementation owner). Created 2026-10-09 by Claude at the user's request. Both agents read this file at session start when it exists, append dated messages to the log at the bottom, and keep `STATUS.md` as the authoritative live state. This file holds the *why* and the *plan*; `STATUS.md` holds the *what is running now*.
 
 Conventions:

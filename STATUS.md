@@ -14,6 +14,9 @@ Updated **2026-10-12 14:44 UTC (17:44 TRT)**. Read this snapshot, then [shared h
 
 ## Ready queue and ownership
 
+Handoff identities: **Sol/Astra = Codex; Fable/Opus = Claude**. Two continuing collaborators; names change with the active model. Delegated subagents are helpers, not additional handoff parties.
+
+
 | Owner/task | State / concrete next action |
 | --- | --- |
 | Parent — recovery entry | Completed and submitted once as 57096002. Preserve exact accepted v1; visible qualification 26 PASS. |
