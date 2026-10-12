@@ -1,4 +1,4 @@
-"""Synthetic-only tests for the K16 / K94 / K94+mirror secondary inference module.
+"""Synthetic-only tests for the K16 / K94 / header-gated and legacy ungated mirror secondary inference module.
 
 No competition data, no timm download, no GPU: a tiny stand-in backbone and a stand-in trainer source
 (same eval-path semantics as the pinned StudyWindows/RaptorClassifier) drive the real module code. When the
@@ -379,7 +379,8 @@ class _Fixture:
     def run_it(self, out=None, vols=None, masks=None, **kwargs):
         settings = dict(work=self.work, fold=0, checkpoint=self.checkpoint, definitions=self.defs, vols=self.vols if vols is None else vols,
                         masks=self.masks if masks is None else masks, ids=self.ids, id2row=self.id2row, out=out or self.root / 'out',
-                        device='cpu', res=TEST_RES, batch_studies=2, k94_win_chunk=16)
+                        device='cpu', res=TEST_RES, batch_studies=2, k94_win_chunk=16,
+                        mode=sec.MODE_UNGATED)   # historical tests request the legacy ungated arm explicitly
         settings.update(kwargs)
         return sec.run_secondary(**settings)
 
@@ -570,7 +571,10 @@ class EndToEndTests:
             self.run_it(self.root / 'fail', saved_oof=oof)
         saved = json.loads((self.root / 'fail/receipt.json').read_text())
         self.assertEqual(saved['status'], 'PARITY_FAIL')
-        self.assertTrue((self.root / 'fail/k94_mirror_tta-private.npz').exists())      # outputs are kept for inspection
+        self.assertEqual(sorted(os.listdir(self.root / 'fail')), ['receipt.json'])         # failure receipt only: no arm output, K16 included
+        self.assertEqual(saved['outputs'], {})
+        self.assertIs(saved['k94_and_mirror_views_run'], False)
+        self.assertFalse(saved['parity']['k16_vs_primary']['within_tolerance'])
         recorded = self.run_it(self.root / 'recorded', saved_oof=oof, enforce_parity=False)
         self.assertEqual(recorded['status'], 'PASS')
         self.assertFalse(recorded['parity']['k16_vs_primary']['within_tolerance'])
@@ -665,7 +669,7 @@ class EndToEndTests:
             self.assertNotIn('mirror_orientation_verified', r['outputs']['k94_plain'])
         self.assertFalse(bool(self.npz(out, 'k94_mirror_tta')['mirror_orientation_verified']))
 
-    def test_corrupt_primary_reference_fails_closed_and_preserves_artifacts(self):
+    def test_corrupt_primary_reference_fails_closed_before_any_k94_work_and_writes_no_arm_output(self):
         k16 = None
         self.run_it(self.root / 'first')
         k16 = self.npz(self.root / 'first', 'k16_plain')['probabilities']
@@ -688,14 +692,14 @@ class EndToEndTests:
                     self.run_it(out, saved_oof=oof, enforce_parity=enforce)
                 saved = json.loads((out / 'receipt.json').read_text())
                 self.assertEqual(saved['status'], 'FAIL')
-                self.assertTrue(all((out / f'{arm}.csv').exists() and (out / f'{arm}-private.npz').exists() for arm in sec.ARMS))
+                self.assertEqual(sorted(os.listdir(out)), ['receipt.json'])      # the corrupt reference stops the run before any arm output
 
     # ----- CLI orchestration: the frozen primary is bound and qualified before any corpus open
-    def cli_argv(self, out=None, sha=None):
+    def cli_argv(self, out=None, sha=None, mode=('--ungated-mirror-tta',)):
         trainer = self.root / 'trainer_source.py'
         trainer.write_text(self.source)
         return ['--work', str(self.work), '--trainer-source', str(trainer), '--trainer-sha256', sha or self.sha, '--labels', 'labels.parquet',
-                '--truth', 'truth.parquet', '--out', str(out or self.root / 'cli-out'), '--device', 'cpu', '--skip-parity']
+                '--truth', 'truth.parquet', '--out', str(out or self.root / 'cli-out'), '--device', 'cpu', '--skip-parity', *mode]
 
     def test_cli_binds_and_qualifies_primary_before_any_corpus_open(self):
         self.write_primary(res=sec.RES)       # the CLI is pinned to the frozen 224 resolution
@@ -791,12 +795,821 @@ class EndToEndTests:
         self.assertFalse((self.root / 'cli-out').exists())
 
 
-class StandInDefinitionsTests(EndToEndTests, _Fixture, unittest.TestCase):
+# ---------------------------------------------------------------------------------------------- pinned orientation artifacts
+ORIENT_VERSION = 'orientation-audit-kernel-v2'
+REAL_AUDIT = ROOT / 'outputs/kaggle/orientation-audit-v2-20261012-result-v1/orientation_audit'
+REAL_CONTRACT = ROOT / 'outputs/kaggle/orientation-audit-v2-20261012/build-contract.json'
+
+
+def sha(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+class SyntheticAudit:
+    """Writes a small synthetic header-audit artifact set (same structure and hash rules as knee.orientation_audit) and its pins.
+
+    edit(docs) runs after the consistent documents and their integrity hashes are built, so it creates exactly one
+    inconsistency; file pins are then computed from the final bytes (a tamper must trip the guard under test, not the file hash).
+    """
+    NAMES = {'aggregate': 'train-orientation.json', 'routing': 'routing-private-train.json', 'contract': 'build-contract.json'}
+
+    def __init__(self, root, ids, routes, edit=None, repin=True):
+        self.root = Path(root)
+        self.root.mkdir(parents=True, exist_ok=True)
+        ids, routes = list(ids), list(routes)
+        contract = {'version': ORIENT_VERSION, 'train_series_csv_sha256': 'c' * 64, 'synthetic': True}
+        canonical = sha(json.dumps(contract, sort_keys=True, separators=(',', ':'), allow_nan=False).encode())
+        counts = {r: routes.count(r) for r in sec.ROUTES}
+        n = len(ids)
+        ids_hash, routing_hash = sha('\n'.join(ids).encode()), sha(json.dumps(routes).encode())
+        shares = {'Sagittal': 954, 'Coronal': 971, 'Axial': 981}
+        aggregate = {'version': ORIENT_VERSION, 'status': 'COMPLETE', 'studies_done': n, 'studies_planned': n, 'labels_read': False,
+                     'pixels_decoded': False, 'identifiers_in_aggregate': False, 'private_routing_file': self.NAMES['routing'],
+                     'config': {'split': 'train', 'contract_sha256': canonical, 'series_csv_sha256': 'c' * 64},
+                     'aggregate': {'studies_total': n, 'study_routing': counts, 'ordered_study_ids_sha256': ids_hash,
+                                   'routing_array_sha256': routing_hash},
+                     'descriptive_summary': {'threshold_fraction': 0.99, 'min_studies': 100, 'role': 'descriptive only; per-study routing governs',
+                                             'per_plane': {p: {'all_ok_standard': k, 'studies': 1000, 'fraction': k / 1000, 'at_or_above_threshold': False}
+                                                           for p, k in shares.items()}}}
+        routing = {'version': ORIENT_VERSION, 'private': True, 'split': 'train', 'routes': list(sec.ROUTES), 'study_ids': ids, 'routing': routes,
+                   'slot_names': ['sag0', 'sag1', 'cor0', 'cor1', 'ax'], 'slot_route': [[r] * 5 for r in routes],
+                   'slot_status': [['ok_standard'] * 5 for _ in routes]}
+        self.docs = {'aggregate': aggregate, 'routing': routing, 'contract': contract}
+        if edit:
+            edit(self.docs)
+        self.paths = {k: self.root / name for k, name in self.NAMES.items()}
+        for key, path in self.paths.items():
+            path.write_text(json.dumps(self.docs[key], indent=1))
+        self.pins = {'orientation_version': ORIENT_VERSION, 'split': 'train', 'studies': n,
+                     'contract_canonical_sha256': canonical, 'ordered_study_ids_sha256': ids_hash, 'routing_array_sha256': routing_hash}
+        for key, name in self.NAMES.items():
+            self.pins[f'{key}_file'] = name
+            self.pins[f'{key}_file_sha256'] = sha(self.paths[key].read_bytes())
+
+    def load(self, **overrides):
+        return sec.load_routing_artifacts(self.paths['aggregate'], self.paths['routing'], self.paths['contract'], pins={**self.pins, **overrides})
+
+    def append(self, key):
+        with self.paths[key].open('ab') as stream:
+            stream.write(b' ')
+
+
+IDS5 = [f'synthetic-study-{i}' for i in range(5)]
+ROUTES5 = ['mirror_ok', 'bypass_plain', 'mirror_ok', 'needs_transform', 'mirror_ok']
+
+
+class RoutingArtifactTests(unittest.TestCase):
+    """Dependency-free: strict consumption of the pinned audit artifacts."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+    def build(self, name='a', ids=IDS5, routes=ROUTES5, **kwargs):
+        return SyntheticAudit(self.root / name, ids, routes, **kwargs)
+
+    def test_valid_artifacts_load_and_record_the_failed_descriptor(self):
+        audit = self.build()
+        verified = audit.load()
+        self.assertEqual(verified.population_route_counts, {'mirror_ok': 3, 'bypass_plain': 1, 'needs_transform': 1})
+        self.assertEqual(len(verified), 5)
+        descriptor = verified.descriptor
+        self.assertFalse(descriptor['all_planes_pass'])
+        self.assertEqual(descriptor['threshold_fraction'], 0.99)
+        self.assertEqual({p: v['passes_99_percent'] for p, v in descriptor['per_plane'].items()}, {'Sagittal': False, 'Coronal': False, 'Axial': False})
+        self.assertAlmostEqual(descriptor['per_plane']['Sagittal']['all_standard_share'], 0.954)
+        self.assertFalse(verified.receipt['pins_are_frozen_default'])     # synthetic pins are never mistaken for the frozen ones
+        self.assertEqual(set(verified.receipt['file_sha256']), set(SyntheticAudit.NAMES.values()))
+        self.assertNotIn(IDS5[0], json.dumps(verified.receipt) + json.dumps(descriptor))
+
+    def test_join_is_by_study_id_not_position(self):
+        verified = self.build().load()
+        shuffled = [IDS5[3], IDS5[0], IDS5[4], IDS5[1]]                    # different order and a subset of the audited studies
+        self.assertEqual(sec.join_routes(shuffled, verified), ['needs_transform', 'mirror_ok', 'mirror_ok', 'bypass_plain'])
+        self.assertEqual(sec.join_routes(IDS5, verified), ROUTES5)
+
+    def test_missing_route_for_an_evaluation_study_is_refused(self):
+        verified = self.build().load()
+        with self.assertRaisesRegex(ValueError, 'Missing routes for 1 '):
+            sec.join_routes([*IDS5[:2], 'not-audited'], verified)
+        with self.assertRaisesRegex(ValueError, 'Missing routes for 2 '):
+            sec.join_routes(['x', 'y'], verified)
+
+    def test_duplicate_evaluation_ids_and_forged_routes_are_refused(self):
+        verified = self.build().load()
+        with self.assertRaisesRegex(ValueError, 'Unique'):
+            sec.join_routes([IDS5[0], IDS5[0]], verified)
+        with self.assertRaises(ValueError):
+            sec.join_routes([], verified)
+        with self.assertRaisesRegex(ValueError, 'load_routing_artifacts'):
+            sec.join_routes(IDS5, dict(zip(IDS5, ROUTES5)))                 # an unchecked mapping is not accepted
+        with self.assertRaisesRegex(ValueError, 'only by load_routing_artifacts'):
+            sec.VerifiedRouting(object(), {}, '', '', {}, {}, {}, {})
+
+    def test_duplicate_routing_ids_are_refused(self):
+        audit = self.build('dup', ids=[*IDS5[:4], IDS5[0]])                 # every hash is consistent with the duplicated list
+        with self.assertRaisesRegex(ValueError, 'Duplicate study IDs'):
+            audit.load()
+
+    def test_unknown_route_strings_are_refused(self):
+        audit = self.build('unknown', routes=['mirror_ok', 'maybe_ok', 'mirror_ok', 'bypass_plain', 'mirror_ok'])
+        with self.assertRaisesRegex(ValueError, 'Unknown route'):
+            audit.load()
+
+    def test_altered_file_bytes_fail_each_file_pin(self):
+        for key in ('aggregate', 'routing', 'contract'):
+            with self.subTest(key):
+                audit = self.build('hash-' + key)
+                audit.load()
+                audit.append(key)
+                with self.assertRaisesRegex(ValueError, 'file hash differs'):
+                    audit.load()
+
+    def test_altered_contract_is_refused(self):
+        def edit(docs):
+            docs['contract']['train_series_csv_sha256'] = 'd' * 64
+        # (a) contract edited and its FILE pin refreshed: the canonical-contract pin still refuses it
+        audit = self.build('contract-a', edit=edit)
+        with self.assertRaisesRegex(ValueError, 'Contract hash differs'):
+            audit.load()
+        # (b) both contract pins refreshed too: the aggregate still refers to the original contract
+        canonical = sha(json.dumps(audit.docs['contract'], sort_keys=True, separators=(',', ':'), allow_nan=False).encode())
+        with self.assertRaisesRegex(ValueError, 'different contract'):
+            audit.load(contract_canonical_sha256=canonical)
+
+    def test_changed_id_order_and_route_array_are_refused(self):
+        def reorder(docs):
+            ids = docs['routing']['study_ids']
+            ids[0], ids[1] = ids[1], ids[0]
+        with self.assertRaisesRegex(ValueError, 'order differs from its hash'):
+            self.build('order', edit=reorder).load()
+
+        def reroute(docs):
+            docs['routing']['routing'][1] = 'mirror_ok'
+            docs['routing']['slot_route'][1] = ['mirror_ok'] * 5
+        with self.assertRaisesRegex(ValueError, 'Route array differs from its hash'):
+            self.build('route', edit=reroute).load()
+
+    def test_other_integrity_failures_are_refused(self):
+        def set_(path, value):
+            def edit(docs):
+                node = docs[path[0]]
+                for k in path[1:-1]:
+                    node = node[k]
+                node[path[-1]] = value
+            return edit
+        cases = {'partial audit': set_(('aggregate', 'status'), 'RUNNING'), 'labels read': set_(('aggregate', 'labels_read'), True),
+                 'identifiers in aggregate': set_(('aggregate', 'identifiers_in_aggregate'), True),
+                 'relaxed descriptor threshold': set_(('aggregate', 'descriptive_summary', 'threshold_fraction'), 0.9),
+                 'count mismatch': set_(('aggregate', 'aggregate', 'study_routing'), {'mirror_ok': 5, 'bypass_plain': 0, 'needs_transform': 0}),
+                 'wrong split': set_(('routing', 'split'), 'test'), 'not private': set_(('routing', 'private'), False),
+                 'other version': set_(('routing', 'version'), 'v1'), 'short per-slot array': set_(('routing', 'slot_route'), []),
+                 'route vocabulary': set_(('routing', 'routes'), ['mirror_ok']),
+                 'descriptor flag': set_(('aggregate', 'descriptive_summary', 'per_plane', 'Sagittal', 'at_or_above_threshold'), True)}
+        for name, edit in cases.items():
+            with self.subTest(name), self.assertRaises(ValueError):
+                self.build('case-' + name.replace(' ', '-'), edit=edit).load()
+
+    def test_file_name_and_symlink_are_checked(self):
+        audit = self.build('names')
+        renamed = audit.root / 'copy-of-routing.json'
+        renamed.write_bytes(audit.paths['routing'].read_bytes())
+        with self.assertRaisesRegex(ValueError, 'file name differs'):
+            sec.load_routing_artifacts(audit.paths['aggregate'], renamed, audit.paths['contract'], pins=audit.pins)
+        link_dir = self.root / 'links'
+        link_dir.mkdir()
+        link = link_dir / 'routing-private-train.json'
+        link.symlink_to(audit.paths['routing'])
+        with self.assertRaisesRegex(ValueError, 'file required'):
+            sec.load_routing_artifacts(audit.paths['aggregate'], link, audit.paths['contract'], pins=audit.pins)
+
+    def test_verified_routing_payload_is_immutable(self):
+        verified = self.build().load()
+        before = sec.join_routes(IDS5, verified)
+        with self.assertRaises(TypeError):
+            verified.route_by_id[IDS5[1]] = 'mirror_ok'                      # in-place route edit: bypass_plain -> mirror_ok
+        for call in (lambda: verified.route_by_id.update({IDS5[1]: 'mirror_ok'}), lambda: verified.route_by_id.pop(IDS5[1]),
+                     lambda: verified.route_by_id.__delitem__(IDS5[1])):
+            with self.assertRaises((AttributeError, TypeError)):
+                call()
+        for name in ('route_by_id', 'ordered_study_ids_sha256', 'routing_array_sha256', '_counts', '_pins', '_receipt', 'population_route_counts', 'new_attribute'):
+            with self.subTest(name), self.assertRaises(AttributeError):
+                setattr(verified, name, {} if name == 'route_by_id' else 'x')   # replacing the route map or any attribute
+            with self.subTest('delete ' + name), self.assertRaises(AttributeError):
+                delattr(verified, name)
+        verified.descriptor['all_planes_pass'] = True                        # nested data is handed out as copies
+        verified.population_route_counts['mirror_ok'] = 99
+        verified.receipt['pins_are_frozen_default'] = True
+        verified.pins['routing_array_sha256'] = 'x'
+        self.assertFalse(verified.descriptor['all_planes_pass'])
+        self.assertEqual(verified.population_route_counts['mirror_ok'], 3)
+        self.assertFalse(verified.receipt['pins_are_frozen_default'])
+        self.assertEqual(verified.pins['routing_array_sha256'], self.build('again').pins['routing_array_sha256'])
+        self.assertEqual(sec.join_routes(IDS5, verified), before)
+
+    def test_join_revalidates_the_content_binding_at_use(self):
+        import gc
+        verified = self.build().load()
+        underlying = gc.get_referents(verified.route_by_id)[0]
+        underlying[IDS5[1]] = 'mirror_ok'                                    # swapped behind the read-only view
+        with self.assertRaisesRegex(ValueError, 'no longer match'):
+            sec.join_routes(IDS5, verified)
+        underlying[IDS5[1]] = 'bypass_plain'
+        self.assertEqual(sec.join_routes(IDS5, verified), ROUTES5)
+        object.__setattr__(verified, 'route_by_id', {**verified.route_by_id, IDS5[1]: 'mirror_ok'})     # attribute replaced behind __setattr__
+        with self.assertRaisesRegex(ValueError, 'no longer match'):
+            sec.join_routes(IDS5, verified)
+        reordered = self.build('reordered').load()
+        object.__setattr__(reordered, 'route_by_id', dict(reversed(list(reordered.route_by_id.items()))))   # same routes per ID, other order
+        with self.assertRaisesRegex(ValueError, 'ID order'):
+            sec.join_routes(IDS5, reordered)
+
+    def test_forged_verified_routing_with_original_hashes_is_refused(self):
+        verified = self.build().load()
+        altered = {**verified.route_by_id, IDS5[1]: 'mirror_ok'}
+        with self.assertRaisesRegex(ValueError, 'no longer match'):
+            sec.VerifiedRouting(sec._VERIFIED, altered, verified.ordered_study_ids_sha256, verified.routing_array_sha256,
+                                verified.population_route_counts, verified.descriptor, verified.pins, verified.receipt)
+        ids_hash, routing_hash, counts = sec.route_hashes(altered)        # hashes recomputed for the altered routes, pins still original
+        with self.assertRaisesRegex(ValueError, 'no longer match'):
+            sec.VerifiedRouting(sec._VERIFIED, altered, ids_hash, routing_hash, counts, verified.descriptor, verified.pins, verified.receipt)
+        with self.assertRaisesRegex(ValueError, 'Unknown route'):
+            sec.VerifiedRouting(sec._VERIFIED, {**verified.route_by_id, IDS5[1]: 'maybe'}, verified.ordered_study_ids_sha256,
+                                verified.routing_array_sha256, verified.population_route_counts, verified.descriptor, verified.pins, verified.receipt)
+        genuine = sec.VerifiedRouting(sec._VERIFIED, verified.route_by_id, verified.ordered_study_ids_sha256, verified.routing_array_sha256,
+                                      verified.population_route_counts, verified.descriptor, verified.pins, verified.receipt)
+        self.assertEqual(sec.join_routes(IDS5, genuine), ROUTES5)
+
+    def test_default_pins_are_the_frozen_audit_and_route_vocabulary_matches_the_audit_module(self):
+        from knee import orientation_audit
+        self.assertEqual(sec.ROUTES, orientation_audit.ROUTES)
+        self.assertEqual(sec.DESCRIPTOR_MIN_FRACTION, orientation_audit.DESCRIPTIVE_MIN_FRACTION)
+        self.assertEqual(sec.ORIENTATION_PINS['studies'], 4407)
+        self.assertEqual(sec.ORIENTATION_PINS['aggregate_file_sha256'], 'bb44eedc9c487aee653b0cea7e4e93256e05e65d68fe8fccdcbc039965ded92a')
+        self.assertIs(sec.UNIVERSAL_GEOMETRY_VERIFIED, False)
+        self.assertIs(sec.MIRROR_ORIENTATION_VERIFIED, False)
+
+    @unittest.skipUnless(all((REAL_AUDIT / name).is_file() for name in ('train-orientation.json', 'routing-private-train.json'))
+                         and REAL_CONTRACT.is_file(), 'Real audit artifacts not present locally')
+    def test_real_audit_artifacts_verify_under_the_frozen_pins(self):
+        verified = sec.load_routing_artifacts(REAL_AUDIT / 'train-orientation.json', REAL_AUDIT / 'routing-private-train.json', REAL_CONTRACT)
+        self.assertEqual(verified.population_route_counts, {'mirror_ok': 4128, 'bypass_plain': 279, 'needs_transform': 0})
+        self.assertTrue(verified.receipt['pins_are_frozen_default'])
+        self.assertFalse(verified.descriptor['all_planes_pass'])
+        shares = {p: v['all_standard_share'] for p, v in verified.descriptor['per_plane'].items()}
+        self.assertAlmostEqual(shares['Sagittal'], 0.95462, places=4)
+        self.assertAlmostEqual(shares['Coronal'], 0.97164, places=4)
+        self.assertAlmostEqual(shares['Axial'], 0.98162, places=4)
+        self.assertEqual(len(verified), 4407)
+
+
+@unittest.skipUnless(HAS_NUMPY, 'NumPy unavailable')
+class ComparisonHelperTests(unittest.TestCase):
+    """compare_plain_vs_gated only computes; synthetic labels only."""
+
+    @staticmethod
+    def brute_auc(y, p):
+        pos, neg = [a for a, b in zip(p, y) if b == 1], [a for a, b in zip(p, y) if b == 0]
+        if not pos or not neg:
+            return None
+        return sum((a > b) + 0.5 * (a == b) for a in pos for b in neg) / (len(pos) * len(neg))
+
+    def data(self, n=40, seed=0):
+        import numpy as np
+        rng = np.random.default_rng(seed)
+        y = rng.integers(0, 2, size=(n, 12))
+        m = rng.integers(0, 2, size=(n, 12))
+        m[:, 11] = 1
+        y[:, 11] = 1                                        # target 11: one class only, so its AUC is undefined
+        plain = np.round(rng.random((n, 12)), 1).astype(np.float32)   # rounding creates ties
+        eligible = rng.random(n) < 0.6
+        gated = plain.copy()
+        gated[eligible] = np.clip(plain[eligible] + rng.normal(0, .1, size=(int(eligible.sum()), 12)), 0, 1).astype(np.float32)
+        return y, m, plain, gated, eligible
+
+    def test_auc_matches_brute_force_including_ties_and_support(self):
+        import numpy as np
+        y, m, plain, gated, eligible = self.data()
+        result = sec.compare_plain_vs_gated(y, m, plain, gated, eligible)
+        for population, rows in (('full_population', np.ones(len(y), bool)), ('eligible_subset', eligible)):
+            for arm, pred in (('plain', plain), ('gated', gated)):
+                for t, target in enumerate(sec.TARGETS):
+                    use = rows & (m[:, t] == 1)
+                    entry = result[population][arm]['per_target'][target]
+                    expected = self.brute_auc(y[use, t].tolist(), pred[use, t].tolist())
+                    if expected is None:
+                        self.assertIsNone(entry['auc'])
+                    else:
+                        self.assertAlmostEqual(entry['auc'], expected, places=12)
+                    self.assertEqual((entry['support'], entry['positives'], entry['negatives']),
+                                     (int(use.sum()), int((y[use, t] == 1).sum()), int((y[use, t] == 0).sum())))
+        self.assertEqual(result['full_population']['studies'], len(y))
+        self.assertEqual(result['eligible_subset']['studies'], int(eligible.sum()))
+        self.assertEqual(result['full_population']['plain']['undefined_targets'], [sec.TARGETS[11]])
+        defined = [v['auc'] for v in result['full_population']['gated']['per_target'].values() if v['auc'] is not None]
+        self.assertAlmostEqual(result['full_population']['gated']['macro_auc'], sum(defined) / len(defined))
+        self.assertEqual(result['full_population']['gated']['defined_targets'], 11)
+        json.dumps(result, allow_nan=False)                 # JSON-safe: no NaN
+
+    def test_equal_arms_give_zero_delta_and_non_eligible_rows_must_match_plain(self):
+        import numpy as np
+        y, m, plain, _gated, eligible = self.data(seed=1)
+        same = sec.compare_plain_vs_gated(y, m, plain, plain.copy(), eligible)
+        self.assertTrue(all(v in (0.0, None) for v in same['eligible_subset']['gated_minus_plain_auc'].values()))
+        bad = plain.copy()
+        index = int((~eligible).nonzero()[0][0])
+        bad[index, 0] = np.float32((float(bad[index, 0]) + 0.37) % 1.0)
+        with self.assertRaisesRegex(ValueError, 'non-eligible'):
+            sec.compare_plain_vs_gated(y, m, plain, bad, eligible)
+
+    def test_inputs_are_not_mutated_and_bad_inputs_are_refused(self):
+        import numpy as np
+        y, m, plain, gated, eligible = self.data(seed=2)
+        arrays = [a.copy() for a in (y, m, plain, gated, eligible)]
+        for a in (y, m, plain, gated, eligible):
+            a.flags.writeable = False
+        sec.compare_plain_vs_gated(y, m, plain, gated, eligible)
+        for before, after in zip(arrays, (y, m, plain, gated, eligible)):
+            self.assertTrue(np.array_equal(before, after))
+        for name, args in {'labels not binary': (y + 1, m, plain, gated, eligible), 'mask not binary': (y, m + 2, plain, gated, eligible),
+                           'prob > 1': (y, m, plain, gated + 1, eligible), 'nan': (y, m, plain, gated * np.nan, eligible),
+                           'eligible not bool': (y, m, plain, gated, eligible.astype(int)), 'shape': (y[:-1], m, plain, gated, eligible)}.items():
+            with self.subTest(name), self.assertRaises(ValueError):
+                sec.compare_plain_vs_gated(*args)
+
+    def test_empty_eligible_subset_is_undefined_not_an_error(self):
+        import numpy as np
+        y, m, plain, _gated, _eligible = self.data(seed=3)
+        result = sec.compare_plain_vs_gated(y, m, plain, plain.copy(), np.zeros(len(y), bool))
+        self.assertEqual(result['eligible_subset']['studies'], 0)
+        self.assertIsNone(result['eligible_subset']['plain']['macro_auc'])
+        self.assertEqual(result['eligible_subset']['plain']['defined_targets'], 0)
+
+
+class RoutedEndToEndTests:
+    """Plain-only and header-gated modes through the real module path (mixed into each definitions provider)."""
+    ROUTES = ROUTES5
+
+    def audit(self, routes=None, name='audit', ids=None, **kwargs):
+        return SyntheticAudit(self.root / name, ids or self.ids, routes or self.ROUTES, **kwargs)
+
+    def run_gated(self, out=None, routes=None, audit_name='audit', **kwargs):
+        audit = self.audit(routes, audit_name)
+        return audit, self.run_it(out or self.root / 'gated', mode=sec.MODE_GATED, routing=audit.load(), **kwargs)
+
+    def mirrored(self):
+        import numpy as np
+        return (np.stack([sec.mirror_volume(v) for v in self.vols]), np.stack([sec.mirror_mask(m) for m in self.masks]))
+
+    def test_gated_arm_set_flags_and_membership_receipt(self):
+        out = self.root / 'gated'
+        audit, receipt = self.run_gated(out)
+        self.assertEqual(receipt['status'], 'PASS')
+        self.assertEqual(receipt['mode'], sec.MODE_GATED)
+        self.assertEqual(receipt['version'], sec.VERSION_ROUTED)
+        self.assertEqual(tuple(receipt['outputs']), ('k16_plain', 'k94_plain', 'k94_header_gated_approx_lr_tta'))
+        self.assertEqual(sec.GATED_ARM, 'k94_header_gated_approx_lr_tta')
+        saved = json.loads((out / 'receipt.json').read_text())
+        for r in (receipt, saved):
+            self.assertIs(r['mirror_orientation_verified'], False)
+            self.assertIs(r['universal_geometry_verified'], False)
+            arm = r['outputs'][sec.GATED_ARM]
+            self.assertIs(arm['mirror_orientation_verified'], False)
+            self.assertIs(arm['universal_geometry_verified'], False)
+            self.assertTrue(arm['bypass_rows_byte_identical_to_k94_plain'] and arm['full_membership_preserved'])
+            self.assertEqual((arm['mirrored_studies'], arm['plain_passthrough_studies'], arm['rows']), (3, 2, 5))
+            self.assertNotIn('mirror_orientation_verified', r['outputs']['k94_plain'])
+            routing = r['routing']
+            self.assertEqual(routing['full_population']['studies'], 5)
+            self.assertEqual(routing['eligible_subset']['studies'], 3)
+            self.assertEqual(routing['route_counts'], {'mirror_ok': 3, 'bypass_plain': 1, 'needs_transform': 1})
+            self.assertEqual(routing['full_population']['ids_sha256'], smoke.digest(smoke.canonical(self.ids)))
+            self.assertEqual(r['ids_sha256'], routing['full_population']['ids_sha256'])
+            eligible = [i for i, route in zip(self.ids, self.ROUTES) if route == 'mirror_ok']
+            self.assertEqual(routing['eligible_subset']['ids_sha256'], smoke.digest(smoke.canonical(eligible)))
+            self.assertNotEqual(routing['eligible_subset']['ids_sha256'], routing['full_population']['ids_sha256'])
+            self.assertEqual(routing['artifacts']['ordered_study_ids_sha256'], audit.pins['ordered_study_ids_sha256'])
+            self.assertEqual(routing['artifacts']['routing_array_sha256'], audit.pins['routing_array_sha256'])
+            self.assertFalse(routing['cohort_descriptor_99_percent']['all_planes_pass'])
+            self.assertEqual(set(routing['cohort_descriptor_99_percent']['per_plane']), {'Sagittal', 'Coronal', 'Axial'})
+            self.assertIn('label invariance', routing['note'])
+            self.assertEqual(r['window_plans']['k94_mirror_view']['windows'], 94 * 3)   # only the eligible studies are mirrored
+        text = (out / 'receipt.json').read_text()
+        self.assertFalse(any(u in text for u in self.ids))
+
+    def test_bypass_rows_are_byte_identical_to_plain_and_eligible_rows_are_the_equal_mean(self):
+        import numpy as np
+        out = self.root / 'gated'
+        self.run_gated(out)
+        plain = self.npz(out, 'k94_plain')['probabilities']
+        gated = self.npz(out, sec.GATED_ARM)
+        tta = gated['probabilities']
+        bypass = [i for i, r in enumerate(self.ROUTES) if r != 'mirror_ok']
+        eligible = [i for i, r in enumerate(self.ROUTES) if r == 'mirror_ok']
+        self.assertEqual(bypass, [1, 3])
+        for i in bypass:
+            self.assertEqual(tta[i].tobytes(), plain[i].tobytes())
+        self.assertEqual(tta[bypass].tobytes(), plain[bypass].tobytes())
+        plain_csv = list(csv.reader((out / 'k94_plain.csv').read_text().splitlines()))
+        gated_csv = list(csv.reader((out / f'{sec.GATED_ARM}.csv').read_text().splitlines()))
+        for i in bypass:
+            self.assertEqual(plain_csv[1 + i], gated_csv[1 + i])
+        mv, mm = self.mirrored()
+        mirror_reference = self.reference(94, mv, mm, group=1)
+        np.testing.assert_allclose(gated['mirror_view_eligible'], mirror_reference[eligible], rtol=0, atol=1e-6)
+        np.testing.assert_array_equal(gated['plain_view'], plain)
+        expected = (0.5 * (plain[eligible] + gated['mirror_view_eligible'])).astype(np.float32)
+        np.testing.assert_array_equal(tta[eligible], expected)
+        self.assertGreater(float(np.abs(tta[eligible] - plain[eligible]).max()), 1e-6)    # the mirror is applied to mirror_ok studies
+        self.assertEqual(gated['eligible'].tolist(), [True, False, True, False, True])
+        self.assertEqual(gated['routes'].tolist(), self.ROUTES)
+
+    def test_full_membership_is_preserved_in_every_artifact_and_order_follows_the_evaluation_ids(self):
+        out = self.root / 'gated'
+        self.run_gated(out)
+        for arm in ('k16_plain', 'k94_plain', sec.GATED_ARM):
+            self.assertEqual(self.npz(out, arm)['ids'].tolist(), self.ids)
+            rows = list(csv.reader((out / f'{arm}.csv').read_text().splitlines()))
+            self.assertEqual([r[0] for r in rows[1:]], self.ids)
+        # the route join is by study ID: evaluating the studies in a different order moves the routes with the IDs
+        order = [4, 2, 0, 3, 1]
+        ids = [self.ids[i] for i in order]
+        audit = self.audit()
+        receipt = self.run_it(self.root / 'reordered', ids=ids, mode=sec.MODE_GATED, routing=audit.load())
+        self.assertEqual(receipt['routing']['route_counts'], {'mirror_ok': 3, 'bypass_plain': 1, 'needs_transform': 1})
+        data = self.npz(self.root / 'reordered', sec.GATED_ARM)
+        self.assertEqual(data['routes'].tolist(), [self.ROUTES[i] for i in order])
+        plain = self.npz(self.root / 'reordered', 'k94_plain')['probabilities']
+        for position, i in enumerate(order):
+            if self.ROUTES[i] != 'mirror_ok':
+                self.assertEqual(data['probabilities'][position].tobytes(), plain[position].tobytes())
+
+    def test_all_bypass_equals_plain_and_all_eligible_equals_the_legacy_ungated_arm(self):
+        import numpy as np
+        out = self.root / 'none'
+        _audit, receipt = self.run_gated(out, routes=['bypass_plain', 'needs_transform'] * 2 + ['bypass_plain'], audit_name='none-audit')
+        self.assertEqual(receipt['routing']['eligible_subset']['studies'], 0)
+        self.assertEqual(receipt['window_plans']['k94_mirror_view'].get('windows', 0), 0)
+        self.assertEqual(self.npz(out, sec.GATED_ARM)['probabilities'].tobytes(), self.npz(out, 'k94_plain')['probabilities'].tobytes())
+        all_ok = self.root / 'all'
+        self.run_gated(all_ok, routes=['mirror_ok'] * 5, audit_name='all-audit')
+        legacy = self.root / 'legacy'
+        self.run_it(legacy)
+        np.testing.assert_array_equal(self.npz(all_ok, sec.GATED_ARM)['probabilities'], self.npz(legacy, 'k94_mirror_tta')['probabilities'])
+        for arm in ('k16_plain', 'k94_plain'):          # the plain arms do not depend on the mode
+            np.testing.assert_array_equal(self.npz(all_ok, arm)['probabilities'], self.npz(legacy, arm)['probabilities'])
+
+    def test_inputs_and_masks_are_not_mutated_by_gated_inference(self):
+        import numpy as np
+        vols, masks = self.vols.copy(), self.masks.copy()
+        before = (vols.tobytes(), masks.tobytes())
+        vols.flags.writeable = False
+        masks.flags.writeable = False
+        audit = self.audit()
+        verified = audit.load()
+        route_before = dict(verified.route_by_id)
+        ids = list(self.ids)
+        self.run_it(self.root / 'ro', vols=vols, masks=masks, ids=ids, mode=sec.MODE_GATED, routing=verified)
+        self.assertEqual((vols.tobytes(), masks.tobytes()), before)
+        self.assertEqual(ids, self.ids)
+        self.assertEqual(verified.route_by_id, route_before)
+
+    def test_gated_refuses_missing_and_unverified_routing_before_creating_outputs(self):
+        audit = self.audit(name='partial', ids=self.ids[:4], routes=self.ROUTES[:4])        # no route for the fifth evaluation study
+        out = self.root / 'missing'
+        with self.assertRaisesRegex(ValueError, 'Missing routes for 1 '):
+            self.run_it(out, mode=sec.MODE_GATED, routing=audit.load())
+        self.assertFalse(out.exists())
+        for routing in (None, dict(zip(self.ids, self.ROUTES))):
+            with self.assertRaisesRegex(ValueError, 'verified routing'):
+                self.run_it(self.root / 'forged', mode=sec.MODE_GATED, routing=routing)
+        self.assertFalse((self.root / 'forged').exists())
+
+    def test_gated_k16_parity_is_still_enforced(self):
+        first = self.run_it(self.root / 'first')
+        k16 = self.npz(self.root / 'first', 'k16_plain')['probabilities']
+        oof = self.root / 'oof_fold0.csv'
+        def write(delta):
+            lines = [','.join(['StudyInstanceUID', *sec.TARGETS, 'set'])]
+            for sid, row in zip(self.ids, k16):
+                lines.append(','.join([sid, *[repr(float(v) + delta) for v in row], 'val']))
+            oof.write_text('\n'.join(lines) + '\n')
+        write(0.0)
+        passed = self.run_it(self.root / 'pass', saved_oof=oof, mode=sec.MODE_GATED, routing=self.audit(name='a1').load())
+        self.assertTrue(passed['parity']['k16_vs_primary']['within_tolerance'])
+        self.assertEqual(passed['parity']['k16_vs_primary']['absolute_tolerance'], 1e-4)
+        write(0.01)
+        with self.assertRaisesRegex(ValueError, 'primary export'):
+            self.run_it(self.root / 'fail', saved_oof=oof, mode=sec.MODE_GATED, routing=self.audit(name='a2').load())
+        self.assertEqual(json.loads((self.root / 'fail/receipt.json').read_text())['status'], 'PARITY_FAIL')
+        self.assertEqual(first['status'], 'PASS')
+
+    # ----- K16 parity first
+    def oof_file(self, delta=0.0):
+        self.run_it(self.root / 'oof-reference', mode=sec.MODE_PLAIN)
+        k16 = self.npz(self.root / 'oof-reference', 'k16_plain')['probabilities']
+        oof = self.root / f'oof-{delta}.csv'
+        lines = [','.join(['StudyInstanceUID', *sec.TARGETS, 'set'])]
+        for sid, row in zip(self.ids, k16):
+            lines.append(','.join([sid, *[repr(float(v) + delta) for v in row], 'val']))
+        oof.write_text('\n'.join(lines) + '\n')
+        return oof
+
+    def spied_run(self, out, **kwargs):
+        """Run with spies on every model forward (batch, windows) and every window-centre plan (k); returns (calls, plans, result)."""
+        calls, plans = [], []
+        real_predict, real_plan = sec.predict, sec.center_plan
+
+        def predict(model, x, device, fp16):
+            calls.append((int(x.shape[0]), int(x.shape[1])))
+            return real_predict(model, x, device, fp16)
+
+        def center_plan(mask, sampler, k):
+            plans.append(k)
+            return real_plan(mask, sampler, k)
+
+        with patch.object(sec, 'predict', predict), patch.object(sec, 'center_plan', center_plan):
+            result = self.run_it(out, **kwargs)
+        return calls, plans, result
+
+    def mode_kwargs(self, mode, name):
+        return {'mode': mode, 'routing': self.audit(name=name).load() if mode == sec.MODE_GATED else None}
+
+    def test_parity_mismatch_stops_after_k16_with_no_k94_or_mirror_forward_and_no_arm_output(self):
+        oof = self.oof_file(0.01)
+        for mode in (sec.MODE_PLAIN, sec.MODE_GATED, sec.MODE_UNGATED):
+            out = self.root / f'mismatch-{mode}'
+            calls, plans, forwarded = [], [], []
+            real_predict, real_plan = sec.predict, sec.center_plan
+
+            def predict(model, x, device, fp16):
+                calls.append((int(x.shape[0]), int(x.shape[1])))
+                return real_predict(model, x, device, fp16)
+
+            def center_plan(mask, sampler, k):
+                plans.append(k)
+                return real_plan(mask, sampler, k)
+
+            def boom(*args, **kwargs):
+                raise AssertionError('no mirror work may happen after a K16 parity mismatch')
+
+            def no_arm_write(*args, **kwargs):
+                raise AssertionError('no arm output may be written after a K16 parity mismatch')
+
+            with self.subTest(mode), patch.object(sec, 'predict', predict), patch.object(sec, 'center_plan', center_plan), \
+                    patch.object(sec, 'mirror_volume', boom), patch.object(sec, 'mirror_mask', boom), \
+                    patch.object(sec, 'write_npz', no_arm_write), patch.object(sec, 'write_csv', no_arm_write):
+                with self.assertRaisesRegex(ValueError, 'primary export'):
+                    self.run_it(out, saved_oof=oof, **self.mode_kwargs(mode, f'a-{mode}'))
+            self.assertEqual(calls, [(2, 16), (2, 16), (1, 16)], mode)           # only the three K16 batches of 2+2+1 studies
+            self.assertEqual(set(plans), {16}, mode)
+            self.assertEqual(plans.count(16), 5, mode)
+            self.assertEqual(sorted(os.listdir(out)), ['receipt.json'], mode)
+            saved = json.loads((out / 'receipt.json').read_text())
+            self.assertEqual(saved['status'], 'PARITY_FAIL')
+            self.assertEqual(saved['outputs'], {})
+            self.assertIs(saved['k94_and_mirror_views_run'], False)
+            self.assertEqual(set(saved['window_plans']), {'k16_plain'})
+            self.assertFalse(saved['parity']['k16_vs_primary']['within_tolerance'])
+            self.assertGreater(saved['parity']['k16_vs_primary']['max_absolute_error'], 1e-4)
+            self.assertEqual(saved['k16_completed_studies'], 5)
+            self.assertEqual(saved['completed_studies'], 0)
+
+    def test_parity_pass_keeps_k16_first_ordering_full_membership_and_identical_results(self):
+        import numpy as np
+        oof = self.oof_file(0.0)
+        for mode in (sec.MODE_GATED, sec.MODE_UNGATED, sec.MODE_PLAIN):
+            with self.subTest(mode):
+                calls, plans, checked = self.spied_run(self.root / f'checked-{mode}', saved_oof=oof, **self.mode_kwargs(mode, f'b-{mode}'))
+                n_mirrored = {sec.MODE_GATED: 3, sec.MODE_UNGATED: 5, sec.MODE_PLAIN: 0}[mode]
+                self.assertEqual(calls, [(2, 16), (2, 16), (1, 16)] + [(1, 94)] * (5 + n_mirrored))     # every K16 forward precedes every K94 forward
+                self.assertEqual(plans[:5], [16] * 5)
+                self.assertNotIn(16, plans[5:])
+                self.assertTrue(checked['parity']['k16_vs_primary']['within_tolerance'])
+                self.assertEqual(checked['completed_studies'], 5)
+                _calls, _plans, unchecked = self.spied_run(self.root / f'unchecked-{mode}', **self.mode_kwargs(mode, f'c-{mode}'))
+                self.assertEqual(tuple(checked['outputs']), sec.MODE_ARMS[mode])
+                for arm in sec.MODE_ARMS[mode]:
+                    a, b = self.npz(self.root / f'checked-{mode}', arm), self.npz(self.root / f'unchecked-{mode}', arm)
+                    self.assertEqual(a['probabilities'].tobytes(), b['probabilities'].tobytes())
+                    self.assertEqual(a['ids'].tolist(), self.ids)
+                    self.assertEqual(checked['outputs'][arm]['csv_sha256'], unchecked['outputs'][arm]['csv_sha256'])
+                self.assertEqual(checked['window_plans'], unchecked['window_plans'])
+                if mode == sec.MODE_GATED:
+                    plain = self.npz(self.root / f'checked-{mode}', 'k94_plain')['probabilities']
+                    gated = self.npz(self.root / f'checked-{mode}', sec.GATED_ARM)['probabilities']
+                    for i in (1, 3):
+                        self.assertEqual(gated[i].tobytes(), plain[i].tobytes())
+
+    def test_unenforced_parity_mismatch_is_recorded_after_k16_and_the_run_continues(self):
+        oof = self.oof_file(0.01)
+        calls, plans, receipt = self.spied_run(self.root / 'unenforced', saved_oof=oof, enforce_parity=False, **self.mode_kwargs(sec.MODE_GATED, 'd'))
+        self.assertEqual(calls[:3], [(2, 16), (2, 16), (1, 16)])
+        self.assertEqual(calls[3:], [(1, 94)] * 8)
+        self.assertEqual(receipt['status'], 'PASS')
+        self.assertFalse(receipt['parity']['k16_vs_primary']['within_tolerance'])
+        self.assertFalse(receipt['parity']['k16_vs_primary']['enforced'])
+        self.assertEqual(tuple(receipt['outputs']), sec.MODE_ARMS[sec.MODE_GATED])
+        self.assertTrue((self.root / 'unenforced' / f'{sec.GATED_ARM}.csv').exists())
+
+    # ----- plain-only mode
+    def test_plain_only_runs_without_routing_or_any_mirror(self):
+        import numpy as np
+        out = self.root / 'plain'
+        def boom(*args, **kwargs):
+            raise AssertionError('plain_only must not mirror anything')
+        with patch.object(sec, 'mirror_volume', boom), patch.object(sec, 'mirror_mask', boom), \
+                patch.object(sec, 'load_routing_artifacts', boom), patch.object(sec, 'join_routes', boom):
+            receipt = self.run_it(out, mode=sec.MODE_PLAIN)
+        self.assertEqual(receipt['status'], 'PASS')
+        self.assertEqual(tuple(receipt['outputs']), ('k16_plain', 'k94_plain'))
+        self.assertEqual(receipt['mode'], sec.MODE_PLAIN)
+        self.assertFalse(receipt['routing']['used'])
+        self.assertNotIn('k94_mirror_view', receipt['window_plans'])
+        self.assertIs(receipt['mirror_orientation_verified'], False)
+        self.assertIs(receipt['universal_geometry_verified'], False)
+        self.assertFalse(any(name.startswith('k94_mirror') or 'gated' in name for name in os.listdir(out)))
+        legacy = self.run_it(self.root / 'legacy')
+        for arm in ('k16_plain', 'k94_plain'):
+            np.testing.assert_array_equal(self.npz(out, arm)['probabilities'], self.npz(self.root / 'legacy', arm)['probabilities'])
+            self.assertEqual(receipt['outputs'][arm]['k'], legacy['outputs'][arm]['k'])
+
+    def test_python_api_default_mode_is_plain_only_and_never_mirrors_or_reads_routing(self):
+        import inspect
+        self.assertEqual(inspect.signature(sec.run_secondary).parameters['mode'].default, sec.MODE_PLAIN)
+        def boom(*args, **kwargs):
+            raise AssertionError('an omitted mode must not mirror or open routing')
+        settings = dict(work=self.work, fold=0, checkpoint=self.checkpoint, definitions=self.defs, vols=self.vols,
+                        masks=self.masks, ids=self.ids, id2row=self.id2row, out=self.root / 'default-mode',
+                        device='cpu', res=TEST_RES, batch_studies=2, k94_win_chunk=16)   # no mode argument
+        with patch.object(sec, 'mirror_volume', boom), patch.object(sec, 'mirror_mask', boom), \
+                patch.object(sec, 'load_routing_artifacts', boom), patch.object(sec, 'join_routes', boom):
+            receipt = sec.run_secondary(**settings)
+        self.assertEqual(receipt['mode'], sec.MODE_PLAIN)
+        self.assertEqual(tuple(receipt['outputs']), ('k16_plain', 'k94_plain'))
+        self.assertFalse(receipt['routing']['used'])
+
+    def test_plain_only_rejects_routing_and_k16_parity_still_enforced(self):
+        verified = self.audit().load()
+        with self.assertRaisesRegex(ValueError, 'plain_only'):
+            self.run_it(self.root / 'with-routing', mode=sec.MODE_PLAIN, routing=verified)
+        self.assertFalse((self.root / 'with-routing').exists())
+        with self.assertRaisesRegex(ValueError, 'ungated'):
+            self.run_it(self.root / 'legacy-routing', mode=sec.MODE_UNGATED, routing=verified)
+        with self.assertRaisesRegex(ValueError, 'Unknown mode'):
+            self.run_it(self.root / 'bad-mode', mode='gated')
+        self.run_it(self.root / 'first')
+        k16 = self.npz(self.root / 'first', 'k16_plain')['probabilities']
+        oof = self.root / 'oof_fold0.csv'
+        lines = [','.join(['StudyInstanceUID', *sec.TARGETS, 'set'])]
+        for sid, row in zip(self.ids, k16):
+            lines.append(','.join([sid, *[repr(float(v) + 0.01) for v in row], 'val']))
+        oof.write_text('\n'.join(lines) + '\n')
+        with self.assertRaisesRegex(ValueError, 'primary export'):
+            self.run_it(self.root / 'plain-fail', saved_oof=oof, mode=sec.MODE_PLAIN)
+        self.assertEqual(json.loads((self.root / 'plain-fail/receipt.json').read_text())['status'], 'PARITY_FAIL')
+
+    # ----- legacy ungated arm unchanged
+    def test_legacy_ungated_arm_keeps_its_semantics_and_is_marked_ungated(self):
+        import numpy as np
+        out = self.root / 'legacy'
+        receipt = self.run_it(out)
+        self.assertEqual(receipt['mode'], sec.MODE_UNGATED)
+        self.assertEqual(receipt['version'], sec.VERSION)
+        self.assertEqual(tuple(receipt['outputs']), sec.ARMS)
+        self.assertIs(receipt['ungated'], True)
+        self.assertIs(receipt['outputs']['k94_mirror_tta']['ungated'], True)
+        self.assertIn('dominant axis', receipt['orientation_audit_required_before_tta_interpretation'])
+        self.assertNotIn('routing', receipt)
+        self.assertEqual(receipt['window_plans']['k94_mirror_view']['windows'], 94 * 5)    # every study is mirrored
+        tta = self.npz(out, 'k94_mirror_tta')
+        self.assertEqual(tta['mirror_view'].shape, (5, 12))
+        np.testing.assert_array_equal(tta['probabilities'], (0.5 * (tta['plain_view'] + tta['mirror_view'])).astype(np.float32))
+
+    # ----- CLI
+    def prepare_cli(self):
+        self.write_primary(res=sec.RES)
+        (self.work / 'folds_v0.json').write_text(json.dumps({'folds': {u: 0 for u in self.ids}}))
+        (self.work / 'excluded_ids.json').write_text(json.dumps({'quarantined_study_ids': []}))
+
+    def cli_patches(self, events, audit=None):
+        real_load = sec.load_routing_artifacts
+
+        def definitions(source, sha, **kwargs):
+            events.append('definitions')
+            return self.defs
+
+        def corpus(**kwargs):
+            events.append('corpus')
+            return self.vols, self.masks, self.ids
+
+        def verify(*args, **kwargs):
+            events.append('verify_inputs')
+
+        def routing(aggregate, routes, contract):
+            events.append('routing')
+            return real_load(aggregate, routes, contract, pins=audit.pins)
+
+        patches = [patch.object(sec, 'load_definitions', definitions), patch.object(guard, 'staged_corpus', corpus),
+                   patch.object(guard, 'verify_export_inputs', verify)]
+        if audit is not None:
+            patches.append(patch.object(sec, 'load_routing_artifacts', routing))
+        return patches
+
+    def gated_argv(self, audit, out=None):
+        return self.cli_argv(out, mode=('--header-gated-tta', '--orientation-aggregate', str(audit.paths['aggregate']),
+                                        '--orientation-routing', str(audit.paths['routing']), '--orientation-contract', str(audit.paths['contract'])))
+
+    def test_cli_plain_only_skips_routing_artifacts_entirely(self):
+        self.prepare_cli()
+        events = []
+        def boom(*args, **kwargs):
+            raise AssertionError('plain-only must not touch routing artifacts')
+        with contextlib.ExitStack() as stack:
+            for patcher in self.cli_patches(events):
+                stack.enter_context(patcher)
+            stack.enter_context(patch.object(sec, 'load_routing_artifacts', boom))
+            stack.enter_context(patch.object(sec, 'join_routes', boom))
+            stack.enter_context(patch.object(sec, 'read_pinned_file', boom))
+            printed = stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+            sec.main(self.cli_argv(mode=('--plain-only',)))
+        self.assertEqual(events, ['definitions', 'corpus', 'verify_inputs'])
+        saved = json.loads((self.root / 'cli-out' / 'receipt.json').read_text())
+        self.assertEqual((saved['status'], saved['mode']), ('PASS', sec.MODE_PLAIN))
+        self.assertEqual(tuple(saved['outputs']), ('k16_plain', 'k94_plain'))
+        self.assertEqual(json.loads(printed.getvalue())['mode'], sec.MODE_PLAIN)
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+            sec.main(self.cli_argv(self.root / 'cli-bad', mode=('--plain-only', '--orientation-aggregate', 'x')))
+
+    def test_cli_requires_exactly_one_explicit_mode_and_all_three_artifacts_for_gating(self):
+        self.prepare_cli()
+        with contextlib.redirect_stderr(io.StringIO()):
+            for mode in ((), ('--plain-only', '--ungated-mirror-tta'), ('--header-gated-tta',),
+                         ('--header-gated-tta', '--orientation-aggregate', 'a', '--orientation-routing', 'r'),
+                         ('--ungated-mirror-tta', '--orientation-contract', 'c')):
+                with self.subTest(mode), self.assertRaises(SystemExit):
+                    sec.main(self.cli_argv(mode=mode))
+
+    def test_cli_gated_verifies_routing_after_the_checkpoint_and_before_the_corpus(self):
+        self.prepare_cli()
+        audit = self.audit()
+        events = []
+        real_bind = sec.bind_checkpoint
+        def bind(*args, **kwargs):
+            events.append('bind')
+            return real_bind(*args, **kwargs)
+        with contextlib.ExitStack() as stack:
+            for patcher in self.cli_patches(events, audit):
+                stack.enter_context(patcher)
+            stack.enter_context(patch.object(sec, 'bind_checkpoint', bind))
+            stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+            sec.main(self.gated_argv(audit))
+        self.assertEqual(events[:5], ['bind', 'routing', 'definitions', 'corpus', 'verify_inputs'])
+        saved = json.loads((self.root / 'cli-out' / 'receipt.json').read_text())
+        self.assertEqual((saved['status'], saved['mode']), ('PASS', sec.MODE_GATED))
+        self.assertEqual(saved['routing']['eligible_subset']['studies'], 3)
+
+    def test_cli_gated_with_altered_artifacts_cannot_open_the_corpus(self):
+        self.prepare_cli()
+        opened = []
+        def spy(*args, **kwargs):
+            opened.append('corpus opener called')
+            raise AssertionError('corpus opened before the routing artifacts were verified')
+        for name in ('aggregate', 'routing', 'contract'):
+            audit = self.audit(name='altered-' + name)
+            audit.append(name)
+            events = []
+            with self.subTest(name), contextlib.ExitStack() as stack:
+                for patcher in self.cli_patches(events, audit):
+                    stack.enter_context(patcher)
+                stack.enter_context(patch.object(guard, 'staged_corpus', spy))
+                stack.enter_context(patch.object(guard, 'verify_export_inputs', spy))
+                stack.enter_context(patch.object(loader, 'open_corpus', spy))
+                with self.assertRaisesRegex(ValueError, 'file hash differs'):
+                    sec.main(self.gated_argv(audit, self.root / ('cli-' + name)))
+                self.assertEqual(opened, [])
+                self.assertEqual(events, ['routing'])
+                self.assertFalse((self.root / ('cli-' + name)).exists())
+
+    def test_cli_gated_missing_route_for_a_development_study_fails_before_outputs(self):
+        self.prepare_cli()
+        audit = self.audit(name='short', ids=self.ids[:4], routes=self.ROUTES[:4])
+        events = []
+        with contextlib.ExitStack() as stack:
+            for patcher in self.cli_patches(events, audit):
+                stack.enter_context(patcher)
+            with self.assertRaisesRegex(ValueError, 'Missing routes'):
+                sec.main(self.gated_argv(audit))
+        self.assertFalse((self.root / 'cli-out').exists())
+
+
+class StandInDefinitionsTests(EndToEndTests, RoutedEndToEndTests, _Fixture, unittest.TestCase):
     pass
 
 
 @unittest.skipUnless(PINNED_TRAINER.is_file() and HAS_TORCH, 'Byte-pinned public trainer source unavailable')
-class PinnedTrainerTests(EndToEndTests, _Fixture, unittest.TestCase):
+class PinnedTrainerTests(EndToEndTests, RoutedEndToEndTests, _Fixture, unittest.TestCase):
     """Same tests, but StudyWindows/RaptorClassifier/build_backbone are the real pinned definitions."""
     sha = smoke.SOURCE_SHA
 
