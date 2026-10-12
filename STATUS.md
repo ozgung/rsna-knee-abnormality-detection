@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-12 13:49 UTC (16:49 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
+Updated **2026-10-12 13:56 UTC (16:56 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
 
 ## Current snapshot
 
@@ -10,7 +10,7 @@ Updated **2026-10-12 13:49 UTC (16:49 TRT)**. Read this snapshot, then [shared h
 - CPU recovery sensitivity: all 13 frozen scenarios PASS; worst macro delta +.006614209, paired 2,000-bootstrap CI[+.002551465,+.010174061], no supported-target damage. Independent 22 checks PASS. This is exposed synthetic sensitivity, not natural-failure accuracy or a public-score forecast.
 - Fixed 870-study development comparison: original 0.951330909 → fixed 70:30 blend 0.962963989, delta +.011633080, all 12 targets improved; paired CI[+.009787471,+.013714779]. Public training/report/gold exposure and unavailable patient identities prevent independent-generalization claims. [Comparison](docs/experiments/s6-fixed-evaluation-result-20261011.md).
 - Strict S6 submission **57086107** and full384 **57083497** failed with generic unhandled hidden-rerun errors, empty scores/output. No traceback or established failing phase. Preserve both; never blindly resubmit. [Official failure receipt](outputs/analysis/s6-hidden-failure-20261012/official-state.json).
-- GPU allowance at13:34UTC: **43.28/45h used,1.72h remaining**, before194s probe and next comparison. Current one comparison still queued13:48UTC below; no training or new submission. Four submissions remained at12:14. Existing Colab credits are usable per user clarification; no active session at12:57. Respect actual platform limits, no purchases/new terms.
+- GPU allowance at13:34UTC: **43.28/45h used,1.72h remaining**, before194s probe and next comparison. Current one comparison still queued13:53UTC below; no training or new submission. Four submissions remained at12:14. Existing Colab credits are usable per user clarification; no active session at12:57. Respect actual platform limits, no purchases/new terms.
 
 ## Ready queue and ownership
 
@@ -19,8 +19,8 @@ Updated **2026-10-12 13:49 UTC (16:49 TRT)**. Read this snapshot, then [shared h
 | Parent — recovery entry | Completed and submitted once as 57096002. Preserve exact accepted v1; visible qualification 26 PASS. |
 | Parent — balanced blend | Deferred after Opus review: exposed870 cannot select generalizing weights. Fresh Heliosli public source already uses50:50 with the same S6 bundle; this is not a new method. Preserve diagnostic receipts, no submission. |
 | Opus — next-direction review | Read through12:54; Fable accepts recipe corrections and proposes inference-side audit, aligned with active K16/K42 diagnostic. Parent noted96-source span2–98% versus44-source15–85%; isolate or explicitly bundle depth/span. |
-| Parent — own-base diagnostic | New same-run comparison QUEUED: `ozgung/knee-own224-window-samerun-20261012` v1/kernel138336842, accepted17PASS13:41UTC, stillQUEUED13:48. CPU thread mismatch isolated/fixed in32-study probe. Collect/audit full870 K16/K42; original parity failure preserved. |
-| Parent — native inputs / next training | SolMedium `source_coverage_pilot_plan_sol` preparing concrete source-span/depth pilot using existing cache/training infrastructure; no edits/download/compute. Plan output `outputs/analysis/base-gap-20261012/coverage-pilot-plan.md`. Native ROI source review already complete; gold58-tuned heuristics and rejected center90 retained as limitations. Preserve matched labels/split/initialization; blended labels and top3SWA already used, so do not repeat them as new factors. |
+| Parent — own-base diagnostic | New same-run comparison QUEUED: `ozgung/knee-own224-window-samerun-20261012` v1/kernel138336842, accepted17PASS13:41UTC, stillQUEUED13:53. CPU thread mismatch isolated/fixed in32-study probe. Collect/audit full870 K16/K42; original parity failure preserved. |
+| Parent — native inputs / next training | SolMedium `source_coverage_pilot_plan_sol` implementing CPU-only paired32 cache pilot in managed `source-span-pilot` worktree: fixed44/336/140mm, span15–85% versus2–98%, exact published-control parity, deterministic nongold selection. No launch/training yet. Plan `outputs/analysis/base-gap-20261012/coverage-pilot-plan.md`; parent owns review/integration/one CPU launch. |
 | Parent — S6 reproduction | Sol source audit finds missing per-study likelihood-ratio/state targets, exact membership/init pin/full flags. Extra exact S6 seeds/folds are not currently reproducible. A new recipe must be named and evaluated as such. |
 | Parent — deferred alternatives | Full384 extra views have positive exposed evidence but add runtime. Own224/384/R2/public-adaptation rejected recipes stay closed. MRI checkpoint leads still need release/license verification. |
 
@@ -108,4 +108,6 @@ Prepared, NOT launched: `outputs/kaggle/own224-window-samerun-20261012-reviewed-
 
 **13:42 UTC launch checkpoint:** new comparison138336842 QUEUED, exact source/settings17PASS. Probe complete and original failure preserved. Focused11PASS/1pyarrow skip; no full-suite claim. Last Fable entry processed13:34, replied through13:42. No local controllers or active subagents. Next terminal collection and independent review above.
 
-**13:49 UTC coordination:** current comparison stillQUEUED13:48; no new Fable entries after13:34 (parent replied13:42). One SolMedium read-only planner now prepares executable span/depth pilot while queue waits; no duplicate compute. Last processed coworker13:34. Next: collect due comparison, read planner output, select bounded input feasibility.
+**13:49 UTC coordination:** current comparison stillQUEUED13:53; no new Fable entries after13:34 (parent replied13:42). One SolMedium read-only planner now prepares executable span/depth pilot while queue waits; no duplicate compute. Last processed coworker13:34. Next: collect due comparison, read planner output, select bounded input feasibility.
+
+**13:56 UTC preparation:** planner complete; accepted first32 CPU paired44 source-span feasibility, no96 arm or fit yet. Exact historical reader had prior5-study pixel parity; reuse it and expand control check to32. No local images; Kaggle mounted raw inputs will supply CPU pilot. Sol implementation isolated at `/Users/ozgun/.codex/worktrees/source-span-pilot/rsna-knee-abnormality-detection`, basefe236bad, owns three new source/builder/test files, no commits/launch. Prior TRAIN04 six-slot/ConvNeXt/confidence-label negative recipe remains closed. Full matched224 pair later needs about7.16T4h from historical runtime and new corpus staging (rough43.17GB twoarms); cannot launch current Colab driver unchanged. Agent preparing bounded CPU pilot only, parent will review next. Current GPU comparison stillQUEUED13:53; no duplicate launch.
