@@ -24,7 +24,7 @@ def definitions(source,names,*,remove_imports=False):
     return ast.unparse(ast.Module(body=nodes,type_ignores=[]))+'\n'
 
 
-def build(destination,slug,evidence_root):
+def build(destination,slug,evidence_root,probe_only=False):
     e=Path(evidence_root);out=Path(destination)
     diagnostic.require(not out.exists() and re.fullmatch('[a-z0-9]+(?:-[a-z0-9]+)*',slug),'Fresh build and valid slug required')
     diagnostic.require(not out.resolve().is_relative_to(ROOT) or out.resolve().is_relative_to(ROOT/'outputs'),'Ignored output destination required')
@@ -43,6 +43,7 @@ def build(destination,slug,evidence_root):
     utilities+=definitions((ROOT/'knee/public_adaptation_fit.py').read_text(),('load_binary_truth','metric_report','paired_bootstrap','report_components'),remove_imports=True)
     compile(model,'model','exec');compile(utilities,'utilities','exec')
     files=('knee/__init__.py','knee/own224_window_diagnostic.py','knee/fresh_reader_setup.py')
+    if probe_only:files+=('knee/own224_parity_probe.py',)
     sources={name:(ROOT/name).read_text() for name in files}
     private={name:(package/name).read_text() for name in ('folds_v0.json','excluded_ids.json')}
     for name,key in [('folds_v0.json','folds_sha256'),('excluded_ids.json','excluded_ids_sha256')]:
@@ -71,6 +72,11 @@ def build(destination,slug,evidence_root):
         'limits':['K42 is fixed legacy selection including duplicate centers; masked and boundary windows are reported, not repaired',
             'Initial volume hash observed, not independently pinned; K16 historical parity gates interpretation',
             'Same fold selected epochs/SWA; repeatedly exposed development, not independent generalization','One model used sequentially; no retraining, fitting, source96, ROI or TTA']}
+    if probe_only:
+        contract['probe_only']=True
+        contract['probe_protocol']={'studies':32,'selection':'first32 in historical order','batch':4,
+            'variants':['direct_default','direct_repeat','direct_fp32','workers2','direct_thread1'],
+            'acceptance':'Investigation only; never bypass historical parity or run K42'}
     entry=("import json,sys,hashlib\nfrom pathlib import Path\n"
         f'SOURCES={sources!r}\nPRIVATE={private!r}\nCONTRACT={contract!r}\nMODEL={model!r}\nUTILITIES={utilities!r}\n'
         "base=Path('/kaggle/working/own224_code')\nbase.mkdir(exist_ok=False)\n"
@@ -83,6 +89,9 @@ def build(destination,slug,evidence_root):
     notebook={'nbformat':4,'nbformat_minor':5,'metadata':{'kernelspec':{'name':'python3','display_name':'Python3','language':'python'}},'cells':[
         {'cell_type':'markdown','metadata':{},'source':['# Fixed own224 fold0 evaluation coverage\n','K16 versus fixed legacy K42; same checkpoint, same870, no optimizer updates. Saved K16 parity required before interpretation.\n']},
         {'cell_type':'code','metadata':{},'execution_count':None,'outputs':[],'source':entry.splitlines(True)}]}
+    if probe_only:
+        notebook['cells'][0]['source']=['# Own224 numerical parity investigation\n',
+            'First32 historical rows; repeated FP16, FP32, and CPU loader/thread comparisons. No K42, training, submission, or tolerance changes.\n']
     blob=(json.dumps(notebook,indent=2)+'\n').encode();diagnostic.require(len(blob)<900000,'Notebook source limit')
     metadata={'id':'ozgung/'+slug,'title':slug.replace('-',' ').title(),'code_file':'notebook.ipynb','language':'python','kernel_type':'notebook','is_private':True,
         'enable_gpu':True,'enable_tpu':False,'enable_internet':False,'competition_sources':['rsna-knee-abnormality-detection'],
@@ -98,4 +107,5 @@ def build(destination,slug,evidence_root):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('destination',type=Path);p.add_argument('slug');p.add_argument('--evidence-root',type=Path,required=True)
+    p.add_argument('--probe-only',action='store_true')
     print(json.dumps(build(**vars(p.parse_args())),indent=2))

@@ -79,6 +79,17 @@ class DiagnosticTests(unittest.TestCase):
         with self.assertRaises(ValueError):d.endpoint(['a']*4,y,m,p,p)
         with self.assertRaises(ValueError):d.endpoint(['a','b','c','d'],y,m+1,p,p)
 
+    def test_probe_reports_differences_without_qualifying(self):
+        from knee.own224_parity_probe import compare
+        n=self.np;p=n.zeros((32,12));q=p.copy();q[0,0]=.001
+        self.assertEqual(compare(p,p)['exact'],True)
+        r=compare(p,q)
+        self.assertEqual(r['above_1e4'],1)
+        self.assertEqual(r['max_abs'],.001)
+        self.assertFalse(r['exact'])
+        with self.assertRaises(ValueError):compare(p,n.full_like(p,n.nan))
+        with self.assertRaises(ValueError):compare(p[:4],q[:4])
+
     def test_corpus_schema_without_allocating_images(self):
         n=self.np
         class Volume:

@@ -180,6 +180,15 @@ def run(inputs,out,contract,model_code,utility_code):
         bb=ns['build_backbone'](ARCH,pretrained=False);model=ns['RaptorClassifier'](bb,F_dim=bb.num_features).to('cuda');model.win_chunk=0
         model.load_state_dict(checkpoint['model'],strict=True);model.eval();del checkpoint
         before=state_digest(model);receipt['state_before']=before;write();preds={};aggregate={}
+        if contract.get('probe_only'):
+            from knee.own224_parity_probe import probe
+            receipt['phase']='parity_probe';write()
+            result=probe(ns['StudyWindows'],Volumes(),masks,dev,id2row,labels,model,saved_p)
+            require(state_digest(model)==before,'Model parameters/buffers changed')
+            save(out/'probe.json',result)
+            receipt.update(status='PROBE_COMPLETE',phase='complete',state_after=state_digest(model),
+                           completed={'probe_studies':32},artifacts={'probe.json':file_sha(out/'probe.json')})
+            write();return
         for k in (16,42):
             arm='k'+str(k);receipt['phase']=arm;arm_started=time.monotonic();stats={}
             ds=ns['StudyWindows']('',dev,id2row,labels,224,k,False,aug=False,norm='imagenet',roi=False);ds.vols=Volumes();ds.masks=masks
