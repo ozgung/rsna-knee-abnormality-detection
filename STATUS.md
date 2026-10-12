@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-12 12:55 UTC (15:55 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
+Updated **2026-10-12 12:59 UTC (15:59 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
 
 ## Current snapshot
 
@@ -18,7 +18,7 @@ Updated **2026-10-12 12:55 UTC (15:55 TRT)**. Read this snapshot, then [shared h
 | --- | --- |
 | Parent — recovery entry | Completed and submitted once as 57096002. Preserve exact accepted v1; visible qualification 26 PASS. |
 | Parent — balanced blend | Deferred after Opus review: exposed870 cannot select generalizing weights. Fresh Heliosli public source already uses50:50 with the same S6 bundle; this is not a new method. Preserve diagnostic receipts, no submission. |
-| Opus — next-direction review | Read12:36/12:38 and full strategy review; accepted native-ROI feasibility12:40 with matched controls and second-fold replication before scale. Shared file remains coordination channel. |
+| Opus — next-direction review | Read through12:54; Fable accepts recipe corrections and proposes inference-side audit, aligned with active K16/K42 diagnostic. Parent noted96-source span2–98% versus44-source15–85%; isolate or explicitly bundle depth/span. |
 | Sol implementation / parent integration — own-base diagnostic | ACTIVE: `/root/own224_window_diagnostic_sol` builds fixed own224 fold0 K16-vs-K42 evaluation on existing44 cache in managed worktree `own224-window-diagnostic`. Parent reviews/tests/commits then launches once. No training or GPU started. [Acceptance](docs/experiments/own-base-gap-audit-20261012.md). |
 | Parent — native inputs / next training | Source review complete: external localizer weights but gold58-tuned anchor heuristics; center90 previously rejected; current helper hardcodes320. Next bounded full-context-plus-ROI geometry/runtime qualification alongside96-source coverage design. Preserve matched labels/split/initialization; blended labels and top3SWA already used, so do not repeat them as new factors. |
 | Parent — S6 reproduction | Sol source audit finds missing per-study likelihood-ratio/state targets, exact membership/init pin/full flags. Extra exact S6 seeds/folds are not currently reproducible. A new recipe must be named and evaluated as such. |
@@ -77,3 +77,5 @@ Reconcile through `api.competition_submissions('rsna-knee-abnormality-detection'
 **12:45 UTC coordination checkpoint:** Fable12:41 accepts the ROI refinements. Include measured localizer failure/out-of-volume/routing rates for accessible inputs; hidden rates remain unknown unless returned by Kaggle. Existing `continue-rsna-knee-experiments` heartbeat updated and verified ACTIVE every five minutes, with incremental shared-handoff checks and quiet unchanged runs. Last coworker entry processed:12:41. No new training/submission.
 
 **12:55 UTC checkpoint:** Fable12:49/12:52 processed; base-first priority accepted with corrections. Recipe audit completed; one implementation agent active for K16/K42 diagnostic, exact task/worktree above. No GPU/controller/training/submission launched. Next: inspect agent result, qualify baseline parity/build, reconcile actual resources immediately before one run. Native source review is complete, new real-input ROI execution is not.
+
+**12:59 UTC checkpoint:** implementation agent established exact checkpoint/source/OOF/cache metadata availability and remains active; no diagnostic executed yet. K42 retains exact legacy fixed-count duplicate/fallback behavior. Kaggle actual12:57:43.191879/45h used, zero reserved; Colab no active sessions. Last coworker entry processed12:54. New source-span finding and historical candidate-window artifact counts posted to shared handoff; no GPU launched.
