@@ -17,3 +17,15 @@ Build `outputs/kaggle/source96-cache-shard0-20261012-reviewed-v1/`. NotebookSHA 
 Launch executed once: `/Users/ozgun/miniconda3/bin/kaggle kernels push -p outputs/kaggle/source96-cache-shard0-20261012-reviewed-v1`. Accepted evidence and small-output collector: `outputs/analysis/source96-cache-shard0-20261012/`. Run `collect_terminal_v1.py` with miniconda Python when terminal; collector downloads aggregate receipt/log only, not private image corpus. Remote output `/kaggle/working/source96_cache/`; retain `run-contract.json`, `index-private.json`, receipt/history andNPZs for exact-contract recovery. Stop via Kaggle session control if required; no automatic restart. No local controller.
 
 Next: inspect terminal counts/source/environment/index hash and storage/runtime; prepare remaining shards and verified direct-to-Colab staging. Training integration still pending; no96training launched.
+
+## Parallel shards and loader —14:53UTC
+
+Loader commit `0f0507c`: parent33focusedtestsPASS/0skip (including exact RNG-restored dense/proxy K8train/K16eval tensors, fork/spawn, corruption and membership); syntheticCPU smokePASS. Full-corpus staging/training still unverified. All file/raw hashes checked at staging; subsequent access checks file signatures and bounded schema/CRC, one pair per worker. Read-only trusted staging is required.
+
+Shard0 remainsRUNNING14:49. To reduce wall time, launched remaining disjoint shards after synthetic/real32 qualification, without claiming fullshard startup/decoding verified: live output endpoint returned no files/log; explicit version_label=1 returned404. Each scientific contract matches shard0. Each new shard accepted17checksPASS/privateCPU/offline; no GPUquota used for cache.
+
+- Shard1: `ozgung/knee-source96-cache-shard1-20261012` v1/kernel138345304, RUNNING14:52UTC,1086studies. NotebookSHA `c19d7c68bd2a7b63e1a5ddce4e6ef08344bbf0b68fab686be71e7f18823a04b4`. Build `outputs/kaggle/source96-cache-shard1-20261012-reviewed-v1/`; source0f0507c.
+- Shard2: `ozgung/knee-source96-cache-shard2-20261012` v1/kernel138345324, RUNNING14:52UTC,1086studies. NotebookSHA `342238bb2c6f644d45b0887d42a2cfba462773098c06dd78a678a1c9a8ad14c3`. Build `outputs/kaggle/source96-cache-shard2-20261012-reviewed-v1/`; source0f0507c.
+- Shard3: `ozgung/knee-source96-cache-shard3-20261012` v1/kernel138345351, RUNNING14:52UTC,1086studies. NotebookSHA `67a9c3ebe0e9e83e102d2b4d408757fa99b94bd00f19bde98e2802d528bf8462`. Build `outputs/kaggle/source96-cache-shard3-20261012-reviewed-v1/`; source0f0507c.
+
+For each shardN, launch executed once as `kaggle kernels push -p outputs/kaggle/source96-cache-shardN-20261012-reviewed-v1`; collector `outputs/analysis/source96-cache-shardN-20261012/collect_terminal_v1.py` with minicondaPython fetches aggregate receipt/log only. Exact contracts/build hashes/accepted sources stored adjacent. Same remote output/recovery paths as shard0; no localcontrollers. Do not rerun. Collect terminal receipts and qualify all4before training.
