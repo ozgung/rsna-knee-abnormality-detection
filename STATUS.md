@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-12 15:45 UTC (18:45 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
+Updated **2026-10-12 15:48 UTC (18:48 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
 
 ## Current snapshot
 
@@ -21,7 +21,7 @@ Handoff identities: **Sol/Astra = Codex; Fable/Opus = Claude**. Two continuing c
 | --- | --- |
 | Parent — recovery entry | Completed and submitted once as 57096002. Preserve exact accepted v1; visible qualification 26 PASS. |
 | Parent — balanced blend | Deferred after Opus review: exposed870 cannot select generalizing weights. Fresh Heliosli public source already uses50:50 with the same S6 bundle; this is not a new method. Preserve diagnostic receipts, no submission. |
-| Opus — next-direction review | Read through12:54; Fable accepts recipe corrections and proposes inference-side audit, aligned with active K16/K42 diagnostic. Parent noted96-source span2–98% versus44-source15–85%; isolate or explicitly bundle depth/span. |
+| Claude — parallel preparation | Accepted15:44 proposal: OAI target mapping, final-entry runtime/calendar audit, and isolated CPU-tested frozen96 K94/anatomical mirror inference. Keep primary K16/checkpoint selection unchanged; no compute launches. |
 | Parent — own-base diagnostic | Same-run comparison RUNNING: `ozgung/knee-own224-window-samerun-20261012` v1/kernel138336842, accepted17PASS13:41UTC, RUNNING14:49. CPU thread mismatch isolated/fixed in32-study probe. Collect/audit full870 K16/K42; original parity failure preserved. |
 | Parent — native inputs / next training | CPU32pilot COMPLETE. All4privateCPU96shards RUNNING:138342688/138345304/138345324/138345351,4345disjointstudies. Each17acceptedchecksPASS. Loader0f0507c/parent33focusedPASS. Colabstager6fe954b/15focusedPASS; Trainingpackagecdad021/14focusedPASS; Initializer1949742 now real CPU qualified (29.32s); VM runner reviewed, parent20 focused PASS. Temporary CPU session terminated; no training yet. |
 | Parent — S6 reproduction | Sol source audit finds missing per-study likelihood-ratio/state targets, exact membership/init pin/full flags. Extra exact S6 seeds/folds are not currently reproducible. A new recipe must be named and evaluated as such. |
@@ -150,3 +150,5 @@ Cleanup: integrated source-span-pilot worktree archive attempted14:06 but app re
 **15:35 UTC checkpoint:** initializer reviewed/committed1949742,15focusedPASS/0skip. All5Kagglejobs stillRUNNING15:29; no duplicate/restart. Boundedlive-log probe returnedHTTP400/no logs; no failurephase established. Existing terminalcollectors remain usable. Sol now implements VMrunner/persistence wrapper. No localML dependency install or weightdownload. Last Claude entry14:46.
 
 **15:45 UTC checkpoint:** CPU initializer qualification passed on real weights; temporary session released. VM runner parent review fixed diagnostic loss and unbounded TERM retry;20 focused runner/training tests PASS, synthetic smoke PASS. Comparison still RUNNING15:42, four CPU shards still RUNNING15:45. Read-only Kaggle UI confirms five active saved runs but provides no logs/phase; elapsed time alone does not establish failure. No restart, training or submission. Last coworker entry processed14:46.
+
+**15:48 UTC coordination:** processed Claude15:44 parallel-work proposal; accepted OAI mapping/runtime audit and isolated secondary inference additions, with explicit per-plane anatomical mirror tests and unchanged primary endpoint. Codex retains compute/staging ownership. No new jobs or repeated status polls since15:45; accepted division recorded in shared handoff.
