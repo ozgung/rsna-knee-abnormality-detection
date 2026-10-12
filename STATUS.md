@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-12 14:00 UTC (17:00 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
+Updated **2026-10-12 14:06 UTC (17:06 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
 
 ## Current snapshot
 
@@ -20,11 +20,16 @@ Updated **2026-10-12 14:00 UTC (17:00 TRT)**. Read this snapshot, then [shared h
 | Parent — balanced blend | Deferred after Opus review: exposed870 cannot select generalizing weights. Fresh Heliosli public source already uses50:50 with the same S6 bundle; this is not a new method. Preserve diagnostic receipts, no submission. |
 | Opus — next-direction review | Read through12:54; Fable accepts recipe corrections and proposes inference-side audit, aligned with active K16/K42 diagnostic. Parent noted96-source span2–98% versus44-source15–85%; isolate or explicitly bundle depth/span. |
 | Parent — own-base diagnostic | New same-run comparison QUEUED: `ozgung/knee-own224-window-samerun-20261012` v1/kernel138336842, accepted17PASS13:41UTC, stillQUEUED13:58. CPU thread mismatch isolated/fixed in32-study probe. Collect/audit full870 K16/K42; original parity failure preserved. |
-| Parent — native inputs / next training | SolMedium `source_coverage_pilot_plan_sol` implementing CPU-only paired32 cache pilot in managed `source-span-pilot` worktree: 44narrow/44wide plus96wide at336/140mm, exact published-control parity, deterministic nongold selection. Combined96wide accepted as next training priority; historical-control reuse subject recipe identity. No launch/training yet. Plan `outputs/analysis/base-gap-20261012/coverage-pilot-plan.md`; parent owns review/integration/one CPU launch. |
+| Parent — native inputs / next training | Three-arm32 CPU pilot RUNNING `ozgung/knee-source-span-pilot-20261012` v1/kernel138339609, accepted17PASS14:05. Parent integrated/reviewed;16focused testsPASS. Collect32 control pixel/mask parity and44/96 input mechanics before96 cache staging/training. Agent complete. |
 | Parent — S6 reproduction | Sol source audit finds missing per-study likelihood-ratio/state targets, exact membership/init pin/full flags. Extra exact S6 seeds/folds are not currently reproducible. A new recipe must be named and evaluated as such. |
 | Parent — deferred alternatives | Full384 extra views have positive exposed evidence but add runtime. Own224/384/R2/public-adaptation rejected recipes stay closed. MRI checkpoint leads still need release/license verification. |
 
 ## Active job and recovery
+
+**CURRENT RUNNING CPU pilot:** `ozgung/knee-source-span-pilot-20261012` **v1/kernel138339609**, accepted14:05:26UTC,17checksPASS, private/offline/noGPU/noTPU. Source **823e659**; build `outputs/kaggle/source-span-pilot-20261012-reviewed-v1/`; notebookSHA **55a5e783bda80f5cd3da3e36384e6a2cf456d66ae75f21a754c876aa6ff9615a**, contractSHAa94522cb691d6c9d4935fe758dbbd0acea7ab14439a5604563a7976f186566eb. One push already executed with `/Users/ozgun/miniconda3/bin/kaggle kernels push -p outputs/kaggle/source-span-pilot-20261012-reviewed-v1`. Same32 nongold studies,44narrow/44wide/96wide. No training/images exported. Estimate minutes plus22GB mounted-corpus hashing, actual runtime unknown. No local controller; stop through Kaggle session if required, no blind retry.
+
+When due: `/Users/ozgun/miniconda3/bin/python outputs/analysis/source-span-pilot-20261012/collect_terminal_v1.py`, then `python3.12 outputs/analysis/source-span-pilot-20261012/review_terminal_v1.py`. Output `outputs/kaggle/source-span-pilot-20261012-result-v1/source_span_pilot/receipt.json`; checks actual aggregate source/config/membership/control/repeat/sampler consistency, not independent raw-DICOM re-execution. Error/MISMATCH remain unqualified. Review against [protocol](docs/experiments/source-span-pilot-20261012.md).
+
 
 **CURRENT QUEUED comparison:** `ozgung/knee-own224-window-samerun-20261012` **v1/kernel138336842**, accepted13:41:54UTC,17source/settingschecksPASS. Source **f0d48ce**; build `outputs/kaggle/own224-window-samerun-20261012-thread1-v1/`; notebookSHA **76ce700d49e8cf537372ad7b20e1db68f4133762cf6a610f90e5a44ff6e691ec**, contractSHA6c4efd08e0dd89cab34d649b5fc56b8a8b9bd8dc0243d88fea5dd9947610b2e0. Private/offline/one T4, same870 K16/K42, CPU preprocessing one thread matching original workers. One push already executed: `/Users/ozgun/miniconda3/bin/kaggle kernels push -p outputs/kaggle/own224-window-samerun-20261012-thread1-v1 --accelerator NvidiaTeslaT4`. No local controller, training or submission. Expected roughly10–20minutes including startup/scoring, estimate only. Stop via Kaggle session control if needed; never blindly restart.
 
@@ -115,3 +120,7 @@ Prepared, NOT launched: `outputs/kaggle/own224-window-samerun-20261012-reviewed-
 **14:00 UTC decision:** Fable13:57 processed; combined96wide next training priority accepted. Sol active in source-span-pilot adds96wide to boundedCPU32 feasibility, no extra fit. Preserve historical10epoch/top3SWA selection policy; fixed-last3 suggestion rejected as extra factor. New96 frozen checkpoint matchedK16 primary/K94 secondary, promotion≥.005+positivepairedCI then secondfold. ActualGPU1.65h; Colab no active server sessions, no resources started. ComparisonstillQUEUED13:58; no quota exhaustion identified. Last coworker processed13:57, reply14:00.
 
 **14:04 UTC implementation checkpoint:** three-arm CPU pilot integrated/reviewed; parent16focused testsPASS/0skip using existing temporary dependency overlay (bareenv11PASS/5skip), CPU smokePASS. Source/decoder behavior reviewed; real32 control parity still unverified. See [pilot protocol](docs/experiments/source-span-pilot-20261012.md). Parent preparing immutable CPU build/one launch; agent complete. Main GPU comparison stillQUEUED14:02.
+
+**14:06 UTC launch checkpoint:** CPU pilot138339609 RUNNING and exactsource/settings17PASS; collector/aggregate auditor prepared, actualreviewPENDING. Main GPU comparison stillQUEUED14:02; no resubmission. Agent implementation complete, three new files integrated and committed823e659. Last coworker processed13:57/replied14:06. Next collect both due runs, then96 staging work after mechanical qualification.
+
+Cleanup: integrated source-span-pilot worktree archive attempted14:06 but app refused because pinned/protected. Preserve it; no checkout deletion or unpin workaround.
