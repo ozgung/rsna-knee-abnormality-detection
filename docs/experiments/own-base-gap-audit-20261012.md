@@ -21,3 +21,13 @@ SolMedium implements a separate evaluator/builder/tests in managed worktree `own
 ## Native-ROI feasibility findings
 
 The SKM-TEA localizer weights have verified upstream identity, but public anchor-selection heuristics explicitly used gold58 montages. Thus the complete preprocessing is not gold-unexposed. The previously qualified mechanical center90 crop failed anatomical review; do not reuse it as a successful ROI result. Existing S6 full-field-plus-local union passed a limited visible anatomy screen, which does not qualify a new24-view subset. Current native crop helper hardcodes320 resampling;224/384 need an explicit contract. Measure actual resampling, out-of-field and depth-boundary projections, fallback routes, and preserve full context. Hidden-test failure rates remain unknown. Evidence: `outputs/analysis/native-roi-feasibility-20261012/source-review.json`.
+
+## Diagnostic implementation qualification — 13:06 UTC
+
+Separate evaluator/builder/tests implemented; original production source unchanged. Parent review caught gold58 included in a derived training count (3533 instead of3475), fixed the exclusion and added regression coverage. Scoring membership/groups are checked before GPU work. Actual pinned486-tensor checkpoint loaded safely with finite/identity checks. Local real-data preflight reproduces saved macro0.901842101355689,870 development IDs,3475 training IDs and843 report components; gold58 excluded. Failed pre-fix receipt preserved.
+
+Focused new tests10PASS/1pyarrow skip; combined legacy/new15PASS/4 dependency skips. The installed-pyarrow interpreter separately exercised actual truth/grouping/metrics, and source-pinned sampler/tensor parity was checked synthetically by Sol. CPU smoke and diff checks PASS. These do not establish CUDA prediction parity; runtime requires K16 versus saved probabilities absolute error≤1e-4 before interpreting K42. Both arms use the historical CSV-export configuration batch4/chunk0/FP16 (not the training evaluator batch2/chunk8). Exact source output remains completedv3, verified13:05UTC.
+
+Both arms are evaluation-only; hypothesis, endpoint and stop condition are fixed above. The bounded cohort is870 studies. Runtime remains unmeasured for this evaluator; approximately tens of minutes is a planning estimate, not a cap. Use an existing Kaggle T4 allocation (1.808h available12:57UTC), preserve failures/checkpoints, and stop on source/schema/parity/resource failure without silently reducing batch size or relaxing tolerance. No competition submission is authorized by this diagnostic result alone.
+
+Evidence: `outputs/analysis/own224-window-diagnostic-20261012/{local-endpoint-preflight.json,local-endpoint-preflight-before-fix.json,input-source-live.json}`.
