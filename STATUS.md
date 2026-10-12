@@ -1,30 +1,30 @@
 # Project status and session handoff
 
-Updated **2026-10-11 22:38 UTC (October 12 01:38 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Earlier exact recovery/history](docs/status-archive/status-before-20261011-s6-v4-terminal.md).
+Updated **2026-10-12 02:41 UTC (05:41 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Earlier exact recovery/history](docs/status-archive/status-before-20261011-s6-v4-terminal.md).
 
 ## Current snapshot
 
 - Best public score remains **0.950**, submission 56986393. The tenth displayed leaderboard row was 0.963 on October 11 at 20:06 UTC (rounded scores and ties).
-- **Repaired S6 submitted: 57086107, PENDING**, accepted October 11 at 21:40:07 UTC. Exact notebook `ozgung/knee-public-s6-entry-20261011`, **version 2 / kernel 138226549**. No public score yet. Do not launch a duplicate or overwrite this notebook while hidden evaluation runs.
+- **S6 submission 57086107 FAILED**, exact version2 / kernel138226549. Parent official SDK02:34UTC confirms generic unhandled rerun error, empty scores and zero output bytes. No traceback or failing phase; PENDING timing includes queue time. Best public remains0.950. Preserve the failed version and all qualification evidence; no blind resubmission.
 - The repaired rehearsal v4 completed with all **39 genuine predictions from both arms**; actual host mirror17/native2 stress suites and **35 independent parent checks PASS**. Runtime 23.86 minutes. Hidden runtime projections: base 5.23 h, conservative 7.18 h; a larger sensitivity exceeds 9 h, so these are not bounds. [Result and repair](docs/experiments/s6-dual-rehearsal-result-20261011.md).
 - Pure entry v2 completed in **152.48 seconds**, with all three visible studies, zero imputation and **21 independent checks PASS**. Visible CSV and raw arm probabilities match v4 exactly. Build and accepted-source checks: 15 and 16 PASS respectively.
 - Fixed 870-study development comparison: original 0.951330909 → fixed 70:30 rank blend **0.962963989**, delta +0.011633080, paired 2,000-bootstrap CI [+0.009787471, +0.013714779]; all 12 targets improved. Independent audit: 73 PASS / 0 FAIL / 3 UNKNOWN. Public training/report/gold exposure and unavailable patient identities prevent an independent-generalization claim or public score forecast. [Comparison](docs/experiments/s6-fixed-evaluation-result-20261011.md).
 - Full384 submission **57083497 failed** with Notebook Threw Exception; API COMPLETE with empty score. No traceback or established hidden cause. Preserve it; no blind retry.
-- Latest actual GPU allowance, 22:37 UTC: **42.6980 / 45 h used, 2.3020 h remaining, zero reserved**. Hidden-evaluation quota accounting is unknown. No ordinary training jobs, local controllers or Colab runtimes remained; agents are done. Submission acceptance reported **three slots remaining today**; S6 is still PENDING at 22:35 UTC. Respect actual limits; no invented reserve or purchases.
+- Latest actual GPU allowance, October12 02:34 UTC: **42.6980 / 45 h used, 2.3020 h remaining, zero reserved**. Hidden-evaluation quota accounting is unknown. No ordinary GPU training jobs, local controllers or Colab runtimes. New Sol CPU recovery implementation is active; Astra decision and Sol resource audit are done. Daily allowance must be refreshed before a new submission. Respect actual limits; no invented reserve or purchases.
 
 ## Ready queue and ownership
 
 | Owner / task | State / next action |
 | --- | --- |
-| Parent — S6 hidden evaluation | Reconcile submission 57086107 at the next meaningful checkpoint. Preserve exact version 2; inspect score or official error before selecting another predictor. |
-| Parent — next experiment | Await S6 public result. Standalone S6, full384 blend, weight sweeps and larger batches remain unselected and need prospective comparisons. |
+| Parent — failed S6 entry | Failure confirmed by SDK. Exact cause remains unknown. Preserve57086107; do not resubmit version2. |
+| SolMedium — capped recovery CPU qualification | Active in isolated `s6-capped-recovery` worktree. [Frozen13-scenario protocol](docs/experiments/s6-capped-recovery-protocol-20261012.md). Parent reviews evidence before runtime implementation and fresh image-only rehearsal; no GPU launch or submission yet. |
 | Parent — domain checkpoint preparation | Metadata audit completed without GPU use: OrthoFoundation lacks a verified license; KneePreM code supplies no weights. [Evidence](docs/research/mri-domain-checkpoint-audit-20261011.md). Keep both as research leads until artifact permission/provenance is verified. |
 | Fable — independent review | May inspect counterexamples and planning risks; no compute claimed. Coordinate in the shared log. |
 | Parent — failed/closed paths | Preserve full384 exception and two-fold evidence. Input-policy regression is established, but its role in the hidden failure is unknown. Own224/384/R2 and public-adaptation negative recipes remain closed. |
 
 ## Active job and recovery
 
-**Competition evaluation:** submission **57086107**, accepted `2026-10-11T21:40:07.610000`, PENDING in the official API. Submitted exactly once with:
+**Failed competition evaluation:** submission **57086107**, accepted `2026-10-11T21:40:07.610000`, now COMPLETE with generic unhandled rerun error/empty score. Parent failure receipt `outputs/analysis/s6-hidden-failure-20261012/official-state.json`. Submitted exactly once with:
 
 ```bash
 /Users/ozgun/miniconda3/bin/kaggle competitions submit rsna-knee-abnormality-detection \
@@ -32,7 +32,7 @@ Updated **2026-10-11 22:38 UTC (October 12 01:38 TRT)**. Read this snapshot, the
   -m 'Fixed 70:30 original320/S6 rank blend; source-compatible partial inputs; dual-T4 image-only rehearsal and exact visible parity passed'
 ```
 
-Reconcile using `kaggle competitions submissions rsna-knee-abnormality-detection --format json`. Ordinary notebook COMPLETE is distinct from hidden evaluation completion. Do not resubmit, resume or overwrite while pending. Preserve any error; generic API COMPLETE/empty score requires checking the official submissions UI for the error message.
+Reconcile using `kaggle competitions submissions rsna-knee-abnormality-detection --format json`. Ordinary notebook COMPLETE is distinct from hidden evaluation completion. Do not resubmit or resume the failed version. SDK `error_description` verifies this failure despite generic COMPLETE status. Preserve all previous evidence.
 
 **Submitted build:** `outputs/kaggle/public-s6-entry-20261011-reviewed-v2/`; source **96dbcea95713a4d53493c6f6ca201a4ff0b2527b**, repair `9af1acf`. Notebook 561,581 bytes; SHA256 **c4f6ec7e5bba475da30a7eb61b349656d85ad35ecf7108485b752570bfd757d3**. Scientific bundle **aa5ebdb12f3fbc3c638bcc2591d5894a5d1cb8bd1201e2fc7ea657b5e43428ff**. All 39 mechanics fixtures removed. One ordinary push; accepted private/offline/T4 source verified.
 
@@ -50,6 +50,8 @@ Reconcile using `kaggle competitions submissions rsna-knee-abnormality-detection
 
 ## Latest checkpoint
 
-**2026-10-11 22:38 UTC:** S6 submission 57086107 remains PENDING with no score; its ordinary version 2 notebook and prior rehearsal/full384 jobs are COMPLETE. Colab reports no active sessions; local process inspection finds no project trainer/controller; agents remain done. GPU allowance 2.3020 h remaining, zero reserved. Evidence `outputs/analysis/public-s6-entry-20261011/pure-entry/submissions-2235.json` and `capacity-2237.json`. No duplicate job or submission.
+**2026-10-12 02:41 UTC:** parent verified S6/full384 generic hidden exceptions directly through the official SDK. No traceback; startup/data-local/resource cause remains unknown. Native observer gates still reject source-recorded localizer/decode errors or skipped series. Astra recommends prospectively qualifying capped arm-wise recovery; parent accepts it as a new method, not unchanged source reproduction. Union cap3%, means across both shards, fill before whole-population ranks; global/source/state/schema/resource failures remain fatal. No deadline substitution. [Frozen protocol](docs/experiments/s6-capped-recovery-protocol-20261012.md).
 
-Independent preparation: [domain checkpoint audit](docs/research/mri-domain-checkpoint-audit-20261011.md), ten metadata/content checks PASS. OrthoFoundation binds a 1.31 GB LFS object but has no verified repository/weight license; KneePreM has Apache-2.0 code with explicit user-supplied checkpoints, no distributed model. No weights downloaded, external code executed or GPU used. Next inspect the S6 hidden score/error before selecting a new predictor. Local branch `codex/token-efficient-instructions`, no remote; preserve user AGENTS edits and Fable untracked files. Protected worktrees remain recoverable; do not force archive.
+`/root/s6_capped_recovery_sol` owns CPU implementation/evaluation at `/Users/ozgun/.codex/worktrees/s6-capped-recovery/rsna-knee-abnormality-detection`, base200bd1d. Current source implementation task only; no GPU or submission authorized by its task. Private outputs `outputs/analysis/s6-capped-recovery-20261012/` in the primary repo. Parent owns review, integration, commits and subsequent runtime rehearsal/entry. Existing interpreter `.venv/bin/python`; preserve failed runs, do not restart blindly.
+
+Independent [resource audit](outputs/analysis/s6-resource-audit-20261012/report.md) exercised actual stage/orchestration/ledgers/merge with1300 fake studies and injected failure teardown: PASS. Real readers/models/GPU were mocked, so no real-data safety claim. Fake worker peaks49–58MiB, final retained files5.47MiB; ledger-only multi-GB growth unsupported. Potential one-study full-window GPU allocation and hashing copies remain; small FORCED_SIDE leak identified. Do not patch frozen upstream code silently. Official rules/code pages refreshed October12:5/day, offline9h, free public assets; no inspected prohibition of aggregation solely over test-image predictions, but this is an interpretation, not host approval. Existing asset eligibility caveats remain. CPU sensitivity and fresh image-only rehearsal must pass before another entry. Colab empty, no local trainers; GPU2.302h remaining/zero reserved. Local Git/no remote; preserve user AGENTS and Fable files.

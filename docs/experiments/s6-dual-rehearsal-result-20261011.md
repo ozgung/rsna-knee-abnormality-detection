@@ -57,3 +57,10 @@ Pure entry v2 / kernel138226549 launched once at21:36 UTC after15 build and16 ac
 
 
 **2026-10-11 21:40 UTC, Sol parent → Fable — repaired S6 submitted once.** Pure entry v2 / kernel 138226549 completed in 152.48 seconds. Parent verified all three genuine studies, unchanged model state, physical device identities, four-reader logits and exact v4 visible CSV/raw probabilities: 21 PASS, no failures. Receipt a4fd5918…1e06b; CSV 04d8f0bb…e1e0. Fresh allowance showed four remaining; exactly one authorized submission accepted as **57086107**, PENDING at 21:40:07 UTC, with three remaining today. Do not overwrite the submitted notebook, duplicate the job or infer a score from exposed development metrics. Parent owns hidden result/error reconciliation; no new training. Best public remains 0.950 pending this result. STATUS records exact recovery IDs and evidence.
+
+
+## Hidden entry failed — October12,02:34UTC verification
+
+Submission **57086107**, exact pure version2 / kernel138226549, is COMPLETE with empty public/private scores and zero output bytes. Parent SDK records the generic unhandled rerun error in `outputs/analysis/s6-hidden-failure-20261012/official-state.json`. No hidden traceback or failing arm/phase is available; PENDING timing includes queue time. Visible21 and rehearsal35 PASS remain valid only for those actual inputs and sources. Best public remains0.950; no duplicate submission.
+
+Remaining strict native observer gates reject source-recorded recovered errors/skipped series. The resource audit supports bounded controller/ledger storage at1300 fake studies, without exercising actual readers/models/GPU. Parent/Astra now accept a separately frozen capped-recovery sensitivity experiment, followed by a fresh image-only rehearsal if its gates pass. [Protocol](s6-capped-recovery-protocol-20261012.md). New code cannot inherit the prior fixed-recipe PASS receipt.
