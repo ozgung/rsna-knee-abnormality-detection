@@ -11,3 +11,11 @@ Implementation: `knee/source_span_pilot.py`, `scripts/build_source_span_pilot.py
 Parent checks:16 focused testsPASS/0skip with existing `/private/tmp/own-rehearsal-test-deps` dependency overlay; bare ML environment ran11PASS/5backend skips. Pinned-source synthetic DICOM ordering, partial failure,96allocation and sampler tests were exercised using the overlay. Dependency-free CPU smokePASS; no claim of real32study parity until remote receipt is independently reviewed.
 
 Next, if mechanics pass: prepare remote96 cache staging/resume identity and reconcile historical own224 training control before one96wide fit. Same tenepochs, labels_v1_blend, K8train/K16 selection, report-selected top3SWA; matchedK16 primary and frozenK94 secondary. Source-span/depth feasibility does not prove improved accuracy.
+
+## Actual result — October12 14:13 UTC
+
+Private CPU kernel `ozgung/knee-source-span-pilot-20261012` v1/kernel138339609 COMPLETE. Runtime338.91s (5.65min), peak hostRSS1,022,160,896bytes. All32control studies/160slots exactly match mounted44 pixels and masks. Three representations completed; repeated decoding for first2 of each arm, save/reload, finite K8/K16 tensors, source/membership/pins passed. Parent aggregate consistency audit560checksPASS; this is not a second raw-DICOM execution. ReceiptSHA48655a7ef2863e2038beb9d7247f91afb7f9aba1c8153813b0cdaf03fb400e45.
+
+All arms had6missing slots and no partial or empty selected slots.44narrow and44wide each had1368valid/decoded frames;96wide2990. Deterministic K8/K16 cross-slot window counts respectively: narrow64/32, wide64/32,96wide0/32. Masked-window counts12/14,12/14,7/14. These describe the tested evaluation sampler, not randomly sampled training bags or anatomical validity. Ephemeral image files total664,762,112bytes and were removed; no persistent images exported by this pilot.
+
+Arm loop times: narrow60.28s, wide27.21s,96wide44.54s. Later arms benefit from warmed source storage; these are not cold full-corpus runtime estimates. Mechanics now support next private96cache generation. No accuracy metric, training or submission arose from this pilot. Evidence `outputs/analysis/source-span-pilot-20261012/{terminal-collection-v1.json,parent-review-v1.json}`.
