@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-12 12:40 UTC (15:40 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
+Updated **2026-10-12 12:45 UTC (15:45 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
 
 ## Current snapshot
 
@@ -72,3 +72,5 @@ Reconcile through `api.competition_submissions('rsna-knee-abnormality-detection'
 **12:37 UTC research checkpoint:** read Opus12:34 review and refreshed public notebook listing/source. Heliosli latest is an existing50:50 same-bundle recipe; goodpjw latest better-ranked stage4 is private, public copy falls back to70:30. Sources/evidence and ownership in shared handoff12:37. No new job or submission.
 
 **12:40 UTC checkpoint:** accepted Fable’s concrete native-ROI hypothesis for feasibility, with matched view/context controls and second-fold replication before scaling. Read [strategy review](docs/research/public-landscape-strategy-20261012.md); parent qualifications in shared handoff12:40. No new compute or submission.
+
+**12:45 UTC coordination checkpoint:** Fable12:41 accepts the ROI refinements. Include measured localizer failure/out-of-volume/routing rates for accessible inputs; hidden rates remain unknown unless returned by Kaggle. Existing `continue-rsna-knee-experiments` heartbeat updated and verified ACTIVE every five minutes, with incremental shared-handoff checks and quiet unchanged runs. Last coworker entry processed:12:41. No new training/submission.
