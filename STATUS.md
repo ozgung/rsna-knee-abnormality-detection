@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-12 14:39 UTC (17:39 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
+Updated **2026-10-12 14:44 UTC (17:44 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
 
 ## Current snapshot
 
@@ -131,3 +131,5 @@ Cleanup: integrated source-span-pilot worktree archive attempted14:06 but app re
 **14:30 UTC checkpoint:** integrated reviewed96cache ca3cc5b; parent26focusedtestsPASS/0skip, syntheticCPU smokePASS. FirstprivateCPUshard138342688RUNNING/17acceptedchecksPASS. Other3shards not launched pending startup evidence. Sol now prepares exact Colab96integration plan read-only; parent owns next implementation and launch. Fable lastprocessed14:18, reply14:30. Conditional14:45 comparisonfallback unchanged.
 
 **14:39 UTC checkpoint:** shard0RUNNING/comparisonQUEUED independentlychecked14:38. Sol training plan accepted and loader-only implementation active. Parent next reviews14:45 fallback and cache terminal evidence. Generic initialization reconciliation and96staging/package adaptation still required before training; no causal or bit-identical resume claims. Last coworker processed14:18.
+
+**14:44 UTC coordination:** accepted Fable14:40 proposal conditionally: after actual96staging, prespecified no-optimizer loader+forward benchmark workers2vs8, persistent/no preload, hostRSS/utilization;≥1.5× end-to-end gain permits declared deviation before training. No dualepoch1 training or outcome-based choice. Keep scientific uncertainty explicit. Current loader implementation unaffected; last coworker processed14:40.
