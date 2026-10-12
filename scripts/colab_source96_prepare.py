@@ -6,6 +6,7 @@ contract_file_sha256, index_sha256, receipt_sha256. Accepted notebook files are
 small reviewed uploads. URLs exist only in transport memory, never receipts.
 """
 import argparse
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 import hashlib
 import json
 import os
@@ -199,7 +200,42 @@ def _metadata_plan(plans,validation):
     return files
 
 
-def prepare(config,transport,*,allow_fixture=False):
+def _transfer_images(items, transport, workers, complete):
+    """At most workers independent downloads; SDK metadata and receipts stay on caller thread."""
+    largest=max((item['row']['bytes'] for item in items),default=0)
+    def download(item):
+        row=item['row']
+        if shutil.disk_usage(item['path'].parent).free < 2*workers*largest+DISK_RESERVE:
+            raise OSError('Disk changed during staging')
+        return _download(transport,item['url'],item['path'],row['file_sha256'],expected_bytes=row['bytes'],max_bytes=cache.MAX_FILE_BYTES)
+    if workers==1:
+        for item in items:complete(download(item))
+        return
+    remaining=iter(items)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        pending=set()
+        def fill():
+            while len(pending)<workers:
+                item=next(remaining,None)
+                if item is None:break
+                pending.add(pool.submit(download,item))
+        fill()
+        try:
+            while pending:
+                done,pending_rest=wait(pending,return_when=FIRST_COMPLETED)
+                pending=pending_rest
+                # Do not enqueue more work if any completion failed. Other in-flight
+                # operations finish atomically before the caller writes ERROR.
+                results=[future.result() for future in done]
+                for result in results:complete(result)
+                fill()
+        except BaseException:
+            for future in pending:future.cancel()
+            raise
+
+
+def prepare(config,transport,*,allow_fixture=False,download_workers=1):
+    if type(download_workers) is not int or not 1<=download_workers<=8:raise ValueError('Download workers must be1..8')
     root=Path(config['cache_root'])
     if config.get('version')!=VERSION or root.is_symlink() or len(config['sources'])!=4:raise ValueError('Staging configuration differs')
     if config['validation'].get('fixture') and not allow_fixture:raise ValueError('Fixture staging not allowed in production')
@@ -222,7 +258,7 @@ def prepare(config,transport,*,allow_fixture=False):
             previous.replace(history/(name+'.'+smoke.file_sha(previous)))
     report={'version':VERSION,'status':'RUNNING','phase':'metadata','authority_sha256':authority_sha,
             'sources':[{'ref':b['ref'],'version':1,'cell_sources_sha256':b['cell_sources_sha256']} for b in bindings],
-            'new_downloaded_bytes':0,'completed_files':0,'aggregate_contains_ids':False}
+            'new_downloaded_bytes':0,'completed_files':0,'aggregate_contains_ids':False,'download_workers':download_workers}
     started=time.monotonic()
     def write():
         report['elapsed_seconds']=time.monotonic()-started;cache.atomic_json(root/'staging-receipt.json',report)
@@ -250,15 +286,14 @@ def prepare(config,transport,*,allow_fixture=False):
                 if path.is_symlink() or path.stat().st_size!=row['bytes'] or smoke.file_sha(path)!=row['file_sha256']:
                     raise ValueError('Completed private artifact differs; preserve and stop')
             else:missing.append(item)
-        required=sum(i['row']['bytes'] for i in missing)+2*max((i['row']['bytes'] for i in files),default=0)+DISK_RESERVE
+        required=sum(i['row']['bytes'] for i in missing)+2*download_workers*max((i['row']['bytes'] for i in files),default=0)+DISK_RESERVE
         free=shutil.disk_usage(root).free;report['disk_preflight']={'free_bytes':free,'required_bytes':required,'remaining_files':len(missing)}
         if free<required:raise OSError('Insufficient complete cache staging disk')
         report['phase']='images';report['completed_files']=len(files)-len(missing);write()
-        for item in missing:
-            row=item['row']
-            if shutil.disk_usage(root).free<2*row['bytes']+DISK_RESERVE:raise OSError('Disk changed during staging')
-            report['new_downloaded_bytes']+=_download(transport,item['url'],item['path'],row['file_sha256'],expected_bytes=row['bytes'],max_bytes=cache.MAX_FILE_BYTES)
+        def completed(count):
+            report['new_downloaded_bytes']+=count
             report['completed_files']+=1;write()
+        _transfer_images(missing,transport,download_workers,completed)
         for binding in bindings:_snapshot(transport,binding)
         report['phase']='assemble';write()
         descriptors=[]
@@ -279,10 +314,10 @@ def prepare(config,transport,*,allow_fixture=False):
 
 
 def main(argv=None):
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--config',required=True)
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--config',required=True);parser.add_argument('--download-workers',type=int,default=1)
     args=parser.parse_args(argv)
     try:
-        config=json.loads(Path(args.config).read_bytes());report=prepare(config,KaggleTransport())
+        config=json.loads(Path(args.config).read_bytes());report=prepare(config,KaggleTransport(),download_workers=args.download_workers)
     except BaseException:
         raise RuntimeError('Private96 staging failed; inspect sanitized staging receipt') from None
     print(json.dumps({'event':'SOURCE96_PREPARE_OK','studies':report['studies'],'manifest_sha256':report['manifest_sha256'],'content_sha256':report['content_sha256']}))

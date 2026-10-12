@@ -55,6 +55,55 @@ class PrepareTests(unittest.TestCase):
     def prepare(self):return stage.prepare(self.config,self.transport,allow_fixture=True)
     def receipt(self):return json.loads((self.output/'staging-receipt.json').read_text())
     def npz_calls(self):return [u for u in self.transport.calls if '.npz?' in u]
+    def test_concurrent_downloads_are_bounded_and_receipts_serialized(self):
+        import threading,time
+        active=0;peak=0;lock=threading.Lock();caller=threading.get_ident()
+        original=self.transport.iter_chunks
+        def chunks(url):
+            nonlocal active,peak
+            if '.npz?' not in url:
+                yield from original(url);return
+            with lock:active+=1;peak=max(peak,active)
+            try:
+                time.sleep(.03)
+                yield from original(url)
+            finally:
+                with lock:active-=1
+        self.transport.iter_chunks=chunks
+        atomic=stage.cache.atomic_json
+        def write(path,value):
+            self.assertEqual(threading.get_ident(),caller);return atomic(path,value)
+        with patch.object(stage.cache,'atomic_json',side_effect=write):
+            report=stage.prepare(self.config,self.transport,allow_fixture=True,download_workers=2)
+        self.assertEqual(report['status'],'PASS');self.assertEqual(peak,2);self.assertEqual(active,0)
+        self.assertEqual(report['completed_files'],4)
+        again=self.prepare();self.assertEqual(again['content_sha256'],report['content_sha256'])
+        self.assertEqual(len(self.npz_calls()),4)
+
+    def test_concurrent_corruption_preserves_good_files_and_resumes_missing(self):
+        ref=self.config['sources'][0]['ref']
+        url=next(i['url'] for i in self.transport.inventory[ref] if i['name'].endswith('.npz'))
+        original=self.transport.data[url];self.transport.data[url]=original+b'bad'
+        with self.assertRaises(RuntimeError):stage.prepare(self.config,self.transport,allow_fixture=True,download_workers=2)
+        self.assertEqual(self.receipt()['status'],'ERROR');self.assertFalse(list(self.output.glob('source*/*.tmp')))
+        good={p:smoke.file_sha(p) for p in self.output.glob('source*/*.npz')}
+        self.transport.data[url]=original
+        report=stage.prepare(self.config,self.transport,allow_fixture=True,download_workers=2)
+        self.assertEqual(report['status'],'PASS')
+        for p,h in good.items():self.assertEqual(smoke.file_sha(p),h)
+
+    def test_parallel_source_race_is_fatal_after_completed_bytes(self):
+        first=self.config['sources'][0]['ref']
+        self.transport.race=lambda ref,count,result:result|{'version':2} if ref==first and count>=4 else result
+        with self.assertRaises(RuntimeError):stage.prepare(self.config,self.transport,allow_fixture=True,download_workers=2)
+        self.assertEqual(self.receipt()['status'],'ERROR');self.assertEqual(len(list(self.output.glob('source*/*.npz'))),4)
+        self.assertFalse((self.output/'cache96-manifest-private.json').exists())
+
+    def test_worker_count_rejected_before_output(self):
+        for count in [0,9,True,1.5]:
+            with self.assertRaises(ValueError):stage.prepare(self.config,self.transport,allow_fixture=True,download_workers=count)
+        self.assertFalse(self.output.exists())
+
     def test_direct_stage_shuffled_sources_manifest_and_resume_no_urls_or_ids(self):
         report=self.prepare();self.assertEqual(report['status'],'PASS');self.assertEqual(report['studies'],4)
         manifest=json.loads((self.output/'cache96-manifest-private.json').read_text())
