@@ -158,13 +158,29 @@ class SanitizerTests(unittest.TestCase):
         class API:
             def authenticate(self):pass
             def dataset_metadata(self,dataset,t):
-                p=Path(t)/'dataset-metadata.json';p.write_text(json.dumps({'isPrivate':True}));return str(p)
+                p=Path(t)/'dataset-metadata.json';p.write_text(json.dumps({'id':dataset,'isPrivate':True}));return str(p)
         with patch.dict('sys.modules',{'kaggle.api.kaggle_api_extended':SimpleNamespace(KaggleApi=API)}):
             self.assertTrue(runner.private_dataset('fixture/private')['private'])
         class Public(API):
             def dataset_metadata(self,dataset,t):
                 p=Path(t)/'dataset-metadata.json';p.write_text(json.dumps({'isPrivate':False}));return str(p)
         with patch.dict('sys.modules',{'kaggle.api.kaggle_api_extended':SimpleNamespace(KaggleApi=Public)}),self.assertRaises(ValueError):runner.private_dataset('fixture/public')
+
+    def test_current_nested_metadata_requires_exact_identity_and_boolean_privacy(self):
+        from types import SimpleNamespace
+        value={'info':{'ownerUser':'fixture','datasetSlug':'private','isPrivate':True}}
+        class API:
+            def authenticate(self):pass
+            def dataset_metadata(self,dataset,t):
+                p=Path(t)/'dataset-metadata.json';p.write_text(json.dumps(value));return str(p)
+        with patch.dict('sys.modules',{'kaggle.api.kaggle_api_extended':SimpleNamespace(KaggleApi=API)}):
+            self.assertTrue(runner.private_dataset('fixture/private')['private'])
+            for bad in [{'info':{'ownerUser':'other','datasetSlug':'private','isPrivate':True}},
+                        {'info':{'ownerUser':'fixture','datasetSlug':'private','isPrivate':False}},
+                        {'info':{'ownerUser':'fixture','datasetSlug':'private','isPrivate':'true'}},
+                        {'isPrivate':True}]:
+                value=bad
+                with self.assertRaises(ValueError):runner.private_dataset('fixture/private')
 
     def test_logs_whitelist_only_numeric_progress(self):
         self.assertEqual(runner.sanitized('[train:fold0] ep1 loss 0.2 | OOF masked macro-AUC 0.8 ID private'),'ep1 loss 0.2 | OOF masked macro-AUC 0.8')

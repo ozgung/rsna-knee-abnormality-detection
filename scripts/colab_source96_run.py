@@ -138,7 +138,9 @@ def private_dataset(dataset):
     api=KaggleApi();api.authenticate()
     with tempfile.TemporaryDirectory() as t:
         m=json.loads(Path(api.dataset_metadata(dataset,t)).read_bytes())
-    if m.get('isPrivate') is not True:raise ValueError('Existing backup dataset privacy is unverified/public')
+    info=m.get('info',m)
+    identity=(str(info.get('ownerUser'))+'/'+str(info.get('datasetSlug'))) if 'info' in m else info.get('id')
+    if identity!=dataset or info.get('isPrivate') is not True:raise ValueError('Existing backup dataset identity/privacy is unverified/public')
     return {'dataset':dataset,'private':True}
 
 
