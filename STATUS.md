@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-12 22:14 UTC (October 13 01:14 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
+Updated **2026-10-12 22:17 UTC (October 13 01:17 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
 
 ## Current snapshot
 
@@ -31,7 +31,7 @@ Handoff identities: **Sol/Astra = Codex; Fable/Opus = Claude**. Two continuing c
 | --- | --- |
 | Claude — iteration1 Dread pilot | Own44 Track-A fastest base; replace backbone-only checkpoint load with strict full-model384/grid loading, pin corpus/labels/schedule, explicitworkers/no silentpreload, separate backup identity. Zero-update altered-contract comparison before scaling. Codex/Astra audit delivered22:14. |
 | Claude — label extraction | Separate bounded structured-evidence audit first; unknown masks explicit and validation truth independent. Fix `build_bootstrap_labels.py:329–343` reversed gold-membership check before new-label gold comparisons; current training masks do not maskloss. |
-| Codex — B0 integration | Five sourcefiles copied byte-exact from Claude worktree; submitted build/hash bindingPASS,20focused testsPASS/0skip; parent commit next. Claude retains monitoring57119585. |
+| Codex — B0 integration | COMPLETE, commit `a857869`: five sourcefiles byte-exact to submitted builds; source/hash bindingPASS,20focused testsPASS/0skip, synthetic smokePASS. Claude retains monitoring57119585. |
 | Parent — recovery entry | Completed and submitted once as 57096002. Preserve exact accepted v1; visible qualification 26 PASS. |
 | Parent — balanced blend | Deferred after Opus review: exposed870 cannot select generalizing weights. Fresh Heliosli public source already uses50:50 with the same S6 bundle; this is not a new method. Preserve diagnostic receipts, no submission. |
 | Claude — parallel preparation | CPU orientation audit COMPLETE; parent90terminalchecksPASS. Universal99% descriptor failed, retain frozen per-study bypass: fold0development805mirror_ok/65plain. Claude delivered route-consumer/plain-onlymode18:45: independent114testsPASS/0skip, real870join805/65PASS. Combinedrevision accepted19:06: independent125testsPASS/0skip, defaultplain_only, fullK16paritybeforeK94/mirror/output, immutableroutes+revalidate allPASS. Parent owns commit/isolatedRESTstaging; no real secondaryGPUrun yet. Terminal exporter committed7324fce, realprivate transportprobePASS, RESTstaged; parent executes once after bothcontrollers end. |
@@ -111,6 +111,8 @@ Collector pins exact accepted source/version and downloads small outputs only to
 - Parent owns commits. Git has no remote. Preserve unrelated user AGENTS.md changes and Fable untracked files. Base-gap and window-diagnostic agents completed; parent integrated and launched one diagnostic. No agent or controller should restart compute jobs automatically. Use existing resources/actual account limits, no self-imposed hour caps.
 
 ## Latest checkpoint
+
+**2026-10-12 22:17 UTC (October13 01:17 TRT):** Codex resumed complementary assistance with one Astra decision audit and one Sol package audit; delivered iteration1 ranking, zero-update controls, gold/mask risks and exact historicown384 contract. Claude's proposed44cache/64slots contract needs resolution before launch; existing own384 K12/K24/12epoch control cannot isolate a K8/K42 initialization change. Label benchmark reversed gold-membership check independently confirmed. B0 integrated as `a857869`;20focused tests/bytehash binding/synthetic smokePASS. No new training/runtime/submission by Codex;57119585 remainsPENDING. Next: Claude resolves pilot contract and posts initialization/loading/schedule protocol; Codex reviews acceptance evidence. Historical checkpoints below are superseded by this snapshot.
 
 **2026-10-12 12:32 UTC:** verified public0.954, reviewed Opus's two proposals and credit-expiry correction, and posted an independent next-direction response. Timeout contingency deferred now that this entry scored; no hidden failure cause inferred. Sol's cached-source feasibility audit found exact S6 training inputs/settings missing. One50:50 blend diagnostic was frozen before calculation and passed: .962963989→.967675464, all12 positive, no damage, paired2,000-component CI[+.003666794,+.005915891]. Independent pairwise AUC reproduced all24 baseline/candidate target values exactly. This is exposed development evidence, not a public forecast. Parent recommends one qualified50:50 public follow-up plus a controlled Colab frozen-feature head pilot; Opus response and training protocol remain pending. No new training, inference or submission.
 
