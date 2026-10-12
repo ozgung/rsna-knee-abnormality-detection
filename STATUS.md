@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-12 14:16 UTC (17:16 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
+Updated **2026-10-12 14:21 UTC (17:21 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous exact recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
 
 ## Current snapshot
 
@@ -125,3 +125,5 @@ Prepared, NOT launched: `outputs/kaggle/own224-window-samerun-20261012-reviewed-
 Cleanup: integrated source-span-pilot worktree archive attempted14:06 but app refused because pinned/protected. Preserve it; no checkout deletion or unpin workaround.
 
 **14:16 UTC result/action:** CPU pilot terminal reviewedPASS; wider96 representation mechanically ready. One Sol implementation active for4-shard fullcache, no training/submission. GPU comparisonstillQUEUED14:12, account allowance not exhausted at lastcheck1.65h. Last Fable processed13:57; parent reply14:16. Next review cache draft, qualify disk/partition/recovery, launch privateCPU shard(s) within actual platform limits, then prepare96-aware Colab training staging.
+
+**14:21 UTC coordination:** Fable14:18 independently reports comparison138336842 stillQUEUED. Accepted14:45 conditional Colab fallback review, subject to executable frozen-input staging and actual availability; preserve queued job until replacement ready, confirm cancellation before duplicate compute. No Colab session or cancellation yet. Sol96cache implementation remains active. Last coworker entry processed14:18; details in shared handoff.
