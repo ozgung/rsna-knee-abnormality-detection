@@ -29,3 +29,9 @@ Shard0 remainsRUNNING14:49. To reduce wall time, launched remaining disjoint sha
 - Shard3: `ozgung/knee-source96-cache-shard3-20261012` v1/kernel138345351, RUNNING14:52UTC,1086studies. NotebookSHA `67a9c3ebe0e9e83e102d2b4d408757fa99b94bd00f19bde98e2802d528bf8462`. Build `outputs/kaggle/source96-cache-shard3-20261012-reviewed-v1/`; source0f0507c.
 
 For each shardN, launch executed once as `kaggle kernels push -p outputs/kaggle/source96-cache-shardN-20261012-reviewed-v1`; collector `outputs/analysis/source96-cache-shardN-20261012/collect_terminal_v1.py` with minicondaPython fetches aggregate receipt/log only. Exact contracts/build hashes/accepted sources stored adjacent. Same remote output/recovery paths as shard0; no localcontrollers. Do not rerun. Collect terminal receipts and qualify all4before training.
+
+## Colab staging implemented —15:02UTC
+
+Commit `6fe954b`: VM-side `scripts/colab_source96_prepare.py`, parent15focused staging/loader testsPASS/0skip. Injected transport covers metadata-first exact4shard coverage, source/version races, path/URL bounds, corrupted bytes, interruptions and disk refusal. Live VM authentication/URLs/transfer remain unverified. Stage requires all4terminalPASS receipts and reviewed accepted notebook/contract/privateindex/receipt hashes. Streams1MiB chunks directly toVM; no laptop image relay, no logged signedURLs. Actualdisk preflight reserves full remaining compressed bytes, two largest temporary buffers and5GiB operational space. Completed files and failed receipts preserved; readiness published only after full loader assembly and finalsource check.
+
+One helper now implements immutable96training package adaptation; no training launched. Historical generic initializer hash is not yet reconciled; use recipe-level comparison language. Exact sampler/model/scientific recipe preservation, everyepoch checkpoints and explicit persistent-worker RNG resume limitation remain required.
