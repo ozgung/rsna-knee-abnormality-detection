@@ -190,6 +190,10 @@ def run(inputs,out,contract,model_code,utility_code):
             receipt.update(status='PROBE_COMPLETE',phase='complete',state_after=state_digest(model),
                            completed={'probe_studies':32},artifacts={'probe.json':file_sha(out/'probe.json')})
             write();return
+        # Historical DataLoader workers force one CPU thread. The bounded T4
+        # probe reproduced historical predictions only with that input path.
+        torch.set_num_threads(1)
+        receipt['environment']['preprocessing_cpu_threads']=torch.get_num_threads()
         for k in (16,42):
             arm='k'+str(k);receipt['phase']=arm;arm_started=time.monotonic();stats={}
             ds=ns['StudyWindows']('',dev,id2row,labels,224,k,False,aug=False,norm='imagenet',roi=False);ds.vols=Volumes();ds.masks=masks

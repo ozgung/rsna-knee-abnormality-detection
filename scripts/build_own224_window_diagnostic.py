@@ -91,6 +91,7 @@ def build(destination,slug,evidence_root,probe_only=False,same_run=False):
         contract['schema']=2
         contract['prior_failure_receipt_sha256']=diagnostic.file_sha(prior_path)
         contract['endpoint_policy']='same_run_v2'
+        contract['settings']['preprocessing_cpu_threads']=1
         contract['limits'][1]='Volume hashes pinned to preserved historical-reproduction run; checkpoint/source/metadata pins enforced. Historical prediction comparison descriptive, not qualification.'
         contract['comparison_protocol']={
             'hypothesis':'Additional fixed legacy windows improve same-run development macro AUC',
