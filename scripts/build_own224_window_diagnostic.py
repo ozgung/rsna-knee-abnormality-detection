@@ -24,7 +24,8 @@ def definitions(source,names,*,remove_imports=False):
     return ast.unparse(ast.Module(body=nodes,type_ignores=[]))+'\n'
 
 
-def build(destination,slug,evidence_root,probe_only=False):
+def build(destination,slug,evidence_root,probe_only=False,same_run=False):
+    diagnostic.require(not (probe_only and same_run),'Probe and comparison are separate experiments')
     e=Path(evidence_root);out=Path(destination)
     diagnostic.require(not out.exists() and re.fullmatch('[a-z0-9]+(?:-[a-z0-9]+)*',slug),'Fresh build and valid slug required')
     diagnostic.require(not out.resolve().is_relative_to(ROOT) or out.resolve().is_relative_to(ROOT/'outputs'),'Ignored output destination required')
@@ -77,6 +78,27 @@ def build(destination,slug,evidence_root,probe_only=False):
         contract['probe_protocol']={'studies':32,'selection':'first32 in historical order','batch':4,
             'variants':['direct_default','direct_repeat','direct_fp32','workers2','direct_thread1'],
             'acceptance':'Investigation only; never bypass historical parity or run K42'}
+    if same_run:
+        prior_path=e/'outputs/kaggle/own224-window-diagnostic-20261012-result-v1/own224_window_diagnostic/receipt.json'
+        prior=json.loads(prior_path.read_text())
+        diagnostic.require(prior['status']=='FAIL' and prior['phase']=='k16' and prior['completed']=={'k16':870},'Preserved historical failure required')
+        diagnostic.require(prior['contract']['owned_pins']==contract['owned_pins'],'Historical checkpoint artifacts differ')
+        for name,pin in cache_pins.items():
+            observed=prior['cache_files'][name]
+            diagnostic.require(observed['bytes']==pin['bytes'],'Historical cache size differs')
+            if 'sha256' in pin:diagnostic.require(pin['sha256']==observed['sha256'],'Historical metadata differs')
+            pin['sha256']=observed['sha256']
+        contract['schema']=2
+        contract['prior_failure_receipt_sha256']=diagnostic.file_sha(prior_path)
+        contract['endpoint_policy']='same_run_v2'
+        contract['limits'][1]='Volume hashes pinned to preserved historical-reproduction run; checkpoint/source/metadata pins enforced. Historical prediction comparison descriptive, not qualification.'
+        contract['comparison_protocol']={
+            'hypothesis':'Additional fixed legacy windows improve same-run development macro AUC',
+            'primary':'K42 minus same-run K16; same checkpoint, 870 IDs, truth/masks and batch4 FP16 process',
+            'historical':'Original failed parity protocol preserved; observed max .00173277 and macro delta -0.000005803579',
+            'promotion':'Positive macro delta and paired2000-component CI lower bound above zero; inspect all per-target support/damage before next action',
+            'stop':'Source/schema/nonfinite/state/resource failure; no silent input/batch fallback',
+            'interpretation':'Exposed development only; K-dependent numerical error need not cancel; no automatic submission'}
     entry=("import json,sys,hashlib\nfrom pathlib import Path\n"
         f'SOURCES={sources!r}\nPRIVATE={private!r}\nCONTRACT={contract!r}\nMODEL={model!r}\nUTILITIES={utilities!r}\n'
         "base=Path('/kaggle/working/own224_code')\nbase.mkdir(exist_ok=False)\n"
@@ -92,6 +114,9 @@ def build(destination,slug,evidence_root,probe_only=False):
     if probe_only:
         notebook['cells'][0]['source']=['# Own224 numerical parity investigation\n',
             'First32 historical rows; repeated FP16, FP32, and CPU loader/thread comparisons. No K42, training, submission, or tolerance changes.\n']
+    elif same_run:
+        notebook['cells'][0]['source']=['# Same-run own224 K16 versus K42\n',
+            'Prospective v2 endpoint: paired same-run control. Historical reproduction is reported descriptively; the original failed experiment remains failed.\n']
     blob=(json.dumps(notebook,indent=2)+'\n').encode();diagnostic.require(len(blob)<900000,'Notebook source limit')
     metadata={'id':'ozgung/'+slug,'title':slug.replace('-',' ').title(),'code_file':'notebook.ipynb','language':'python','kernel_type':'notebook','is_private':True,
         'enable_gpu':True,'enable_tpu':False,'enable_internet':False,'competition_sources':['rsna-knee-abnormality-detection'],
@@ -108,4 +133,5 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('destination',type=Path);p.add_argument('slug');p.add_argument('--evidence-root',type=Path,required=True)
     p.add_argument('--probe-only',action='store_true')
+    p.add_argument('--same-run',action='store_true')
     print(json.dumps(build(**vars(p.parse_args())),indent=2))

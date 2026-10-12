@@ -74,6 +74,10 @@ class DiagnosticTests(unittest.TestCase):
         d.endpoint(['a','b','c','d'],y,m,p,p)
         self.assertEqual(d.parity(p,p)['max_absolute_error'],0)
         with self.assertRaises(ValueError):d.parity(p,p+.01)
+        observed=d.parity(p,p+.01,enforce=False)
+        self.assertFalse(observed['within_historical_tolerance'])
+        self.assertFalse(observed['enforced'])
+        self.assertGreater(observed['max_absolute_error'],d.PARITY_ATOL)
         for bad in (n.full_like(p,n.nan),p+1,p[:3]):
             with self.assertRaises(ValueError):d.endpoint(['a','b','c','d'],y,m,p,bad)
         with self.assertRaises(ValueError):d.endpoint(['a']*4,y,m,p,p)

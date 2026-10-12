@@ -93,11 +93,12 @@ def endpoint(ids,y,masks,control,candidate):
     return probabilities(control,len(ids)),probabilities(candidate,len(ids))
 
 
-def parity(current,saved):
+def parity(current,saved,*,enforce=True):
     import numpy as np
     a,b=probabilities(current,len(saved)),probabilities(saved,len(saved));error=float(np.max(np.abs(a-b)))
-    require(error<=PARITY_ATOL,'Historical K16 FP16 parity failed')
+    if enforce:require(error<=PARITY_ATOL,'Historical K16 FP16 parity failed')
     return {'max_absolute_error':error,'absolute_tolerance':PARITY_ATOL,'relative_tolerance':0,
+            'within_historical_tolerance':error<=PARITY_ATOL,'enforced':enforce,
             'reason':'Same Tesla T4, torch2.10/cu128, timm1.0.26, FP16, chunk0 and batch4; allow small nondeterministic FP16 reduction differences. No tolerance tuning.'}
 
 
@@ -208,7 +209,8 @@ def run(inputs,out,contract,model_code,utility_code):
             np.savez(out/(arm+'-private.npz'),ids=np.asarray(dev),probabilities=p)
             require(state_digest(model)==before,'Model parameters/buffers changed')
             aggregate[arm]={**stats,'studies':870,'seconds':time.monotonic()-arm_started,'plans_sha256':fingerprint(plans)}
-            if k==16:receipt['saved_oof_parity']=parity(p,saved_p)
+            if k==16:
+                receipt['saved_oof_parity']=parity(p,saved_p,enforce=contract.get('endpoint_policy','historical_parity')!='same_run_v2')
             write()
         receipt['phase']='endpoint'
         control,candidate=endpoint(dev,y,m,preds['k16'],preds['k42'])
