@@ -1,0 +1,13 @@
+# Source-span and depth feasibility — October12
+
+This CPU-only pilot checks three image representations on the same deterministic32 nongold, nonquarantine studies:44 slices across15–85% source extent,44 across2–98%, and96 across2–98%. All retain336-pixel storage,140mm crop, the same series routing, ordering, intensity algorithm and image-only reader. Selected-slice intensity statistics may change. The96 arm uses slots26/22/18/12/18; this is a combined depth/span intervention, not an exact reproduction of every public preprocessing choice.
+
+The control reader previously matched the published44 corpus exactly on5studies/25slots. This run expands the exact pixel/mask comparison to32. Mandatory checks also include source AST equivalence except the declared constants/allocation, pinned source/corpus/metadata/codecs, unique frozen cohort, finite own224 K8/K16 inputs, save/reload equality, first2 repeated decodes for all3arms, masks/partial/missing routing and resource-error propagation. Full-empty inputs fail. Control mismatch is preserved as MISMATCH, operational failures as ERROR; neither qualifies training.
+
+No models, labels as outcomes, training or score calculation. Gold exclusion uses cell presence only. Only aggregate receipts persist; ephemeral image files are removed. Normalized ordinal source extent is reported; physical coverage cannot be inferred from it. The legacy sampler can cross slots or include masked neighbors; both counts are reported rather than silently repaired.
+
+Implementation: `knee/source_span_pilot.py`, `scripts/build_source_span_pilot.py`, `tests/test_source_span_pilot.py`. Parent reviewed source/partial-frame behavior and reused existing offline-codec packaging. Required CPU resources are existing Kaggle competition/corpus mounts; no local raw images or bulk download. Runtime is expected in minutes from previous5/32study pilots, not a hard spending cap; actual CPU platform12h limit applies.
+
+Parent checks:16 focused testsPASS/0skip with existing `/private/tmp/own-rehearsal-test-deps` dependency overlay; bare ML environment ran11PASS/5backend skips. Pinned-source synthetic DICOM ordering, partial failure,96allocation and sampler tests were exercised using the overlay. Dependency-free CPU smokePASS; no claim of real32study parity until remote receipt is independently reviewed.
+
+Next, if mechanics pass: prepare remote96 cache staging/resume identity and reconcile historical own224 training control before one96wide fit. Same tenepochs, labels_v1_blend, K8train/K16 selection, report-selected top3SWA; matchedK16 primary and frozenK94 secondary. Source-span/depth feasibility does not prove improved accuracy.
