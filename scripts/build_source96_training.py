@@ -53,7 +53,7 @@ def adapt_trainer(original):
     text='from knee import source96_training as source96\n'+text
     text=replace_once(text,'        dev = "cuda" if torch.cuda.is_available() else "cpu"','        dev = source96.strict_cuda(torch)')
     text=replace_once(text,'    prev = np.clip(np.stack([labels[u] for u in train_ids]).mean(0), 0.03, 0.7)',
-        '    source96.verify_membership(train_ids, oof_ids, gold_ids)\n    prev = np.clip(np.stack([labels[u] for u in train_ids]).mean(0), 0.03, 0.7)')
+        '    source96.verify_membership(train_ids, oof_ids, gold_ids, a.fold, a.fold_file, a.excluded_ids, __file__)\n    prev = np.clip(np.stack([labels[u] for u in train_ids]).mean(0), 0.03, 0.7)')
     old='    use_timm = a.ckpt in ("timm", "pretrained")\n    bb = build_backbone(a.arch, pretrained=use_timm)\n    src = load_raptor(bb, a.ckpt)\n    if use_timm: print(f"[raptor] timm-pretrained backbone: {a.arch}", flush=True)'
     text=replace_once(text,old,'    bb = build_backbone(a.arch, pretrained=False)\n    INITIALIZER = source96.generic_backbone(bb)\n    src = "pinned-generic-imagenet:" + INITIALIZER["file_sha256"]')
     text=replace_once(text,'            print(f"[raptor] grad_ckpt unsupported for {a.arch}: {e}", flush=True)',
@@ -77,9 +77,9 @@ def adapt_trainer(original):
     compile(text,'source96-trainer','exec');return text
 
 
-def adapt_entry(original,workers):
+def adapt_entry(original,workers,fold=0):
     text=original
-    defaults={'FOLD_B':'','TIME_BUDGET_H':'0','RES':'224','ARCH':guard.ARCH,'BS':'4','WORKERS':str(workers),
+    defaults={'FOLD_A':str(fold),'FOLD_B':'','TIME_BUDGET_H':'0','RES':'224','ARCH':guard.ARCH,'BS':'4','WORKERS':str(workers),
               'WORKDIR':'/content/trackA96','ASSET_DIR':'/content/trackA96_pkg','RAPTOR_INPUT':'/content/input','GRAD_CKPT':'1','WIN_CHUNK':'8','ACCUM':'2'}
     tree=ast.parse(text);assign=next(n for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='PARAM_DEFAULTS' for t in n.targets))
     old=ast.get_source_segment(text,assign);values={kw.arg:ast.literal_eval(kw.value) for kw in assign.value.keywords};values.update(defaults);values['RESUME']='0'
@@ -106,25 +106,41 @@ def adapt_entry(original,workers):
         '    source96.export_guard(work, k, ckpt_path, kind, sel_epochs, partial, secondary)\n    suffix = "_k94" if secondary else ""\n    k_eval = 94 if secondary else 16')
     text=replace_once(text,'    dev = "cuda" if torch.cuda.is_available() else "cpu"','    dev = source96.strict_cuda(torch)')
     text=replace_once(text,'    truth = pd.read_parquet(tk._find("train_labels_v1.parquet"))',
-        '    source96.verify_export_inputs(tk._find(c["LABELS_FILE"]), tk._find("train_labels_v1.parquet"), work / "folds_v0.json", work / "excluded_ids.json", val_ids)\n    truth = pd.read_parquet(tk._find("train_labels_v1.parquet"))')
+        '    source96.verify_export_inputs(tk._find(c["LABELS_FILE"]), tk._find("train_labels_v1.parquet"), work / "folds_v0.json", work / "excluded_ids.json", val_ids, k, __file__)\n    truth = pd.read_parquet(tk._find("train_labels_v1.parquet"))')
     text=replace_once(text,'    pv, tv = predict(val_ids)',
-        '    if gold_ids or len(val_ids) != 870: raise ValueError("Export must use fixed870 nongold development only")\n    checkpoint_before = sha256(ckpt_path)\n    pv, tv = predict(val_ids)\n    if sha256(ckpt_path) != checkpoint_before: raise ValueError("Frozen checkpoint mutated during export")')
+        '    if gold_ids or len(val_ids) != source96.SPLITS[k]["development"]: raise ValueError("Export must use pinned nongold development only")\n    checkpoint_before = sha256(ckpt_path)\n    pv, tv = predict(val_ids)\n    if sha256(ckpt_path) != checkpoint_before: raise ValueError("Frozen checkpoint mutated during export")')
     text=text.replace('f"oof_fold{k}.csv"','f"oof_fold{k}{suffix}.csv"').replace('f"run_fold{k}.json"','f"run_fold{k}{suffix}.json"')
     text=replace_once(text,'"caveat": "val AUC is selection-biased (the same fold chose the epochs); gold-58 is the only clean number and is noisy (+-0.03).",',
-        '"caveat": "Exposed report-selected development; no gold scored; historical initializer unresolved; worker RNG resume not bit-identical.",\n        "source96_identity": json.load(open(work / "initial-state-record.json")),\n        "comparison_endpoint": "fixed checkpoint K94 secondary" if secondary else "matched K16 primary",')
+        '"caveat": "Exposed report-selected development; no gold scored; historical initializer unresolved; worker RNG resume not bit-identical.",\n        "source96_identity": json.load(open(work / "initial-state-record.json")),\n        "source96_experiment_split": source96.runtime_split(k, work / "folds_v0.json", work / "excluded_ids.json", __file__)[0],\n        "cache_reference_partition_fold": 0,\n        "source96_cache_content_sha256": os.environ["SOURCE96_CONTENT_SHA256"],\n        "comparison_endpoint": "fixed checkpoint K94 secondary" if secondary else "matched K16 primary",')
     text=replace_once(text,'    else:\n        main()','    elif len(sys.argv) >= 3 and sys.argv[1] == "secondary":\n        export_main(int(sys.argv[2]), secondary=True)\n    else:\n        main()')
     compile(text,'source96-entry','exec');return text
 
 
-def build(destination,*,evidence_root,workers=2,worker_choice_name=None):
+def derive_split(evidence,fold):
+    import numpy as np
+    from knee import source96_cache as cache
+    ids=[]
+    for sub,prefix in [('corpus','all'),('corpus-ext','extra')]:
+        p=evidence/f'outputs/analysis/public-train-recipe-20261009/{sub}/{prefix}_ids.npy'
+        smoke.require_file(p,smoke.PINS[prefix+'_ids.npy']);ids.extend(np.load(p,allow_pickle=False).astype(str).tolist())
+    ip=evidence/'outputs/kaggle/sealed-identity-full-result/sealed_identity/sealed-manifest-private.json';smoke.require_file(ip,smoke.MANIFEST_SHA)
+    fp=evidence/'outputs/kaggle/trackA-coatnet224-fold01-20261009/folds_v0.json';smoke.require_file(fp,guard.FOLDS_SHA);folds=json.loads(fp.read_bytes())['folds']
+    official=evidence/'data/raw/train.csv';smoke.require_file(official,'8ca2203c0e9d61c080c7a314c7cdb51c1b03a1d9eb4770819f7f34af53ef4e33')
+    eligible,_=cache.membership(ids,official,folds,json.loads(ip.read_bytes()))
+    ep=evidence/'outputs/kaggle/trackA-coatnet224-fold01-20261009/excluded_ids.json';smoke.require_file(ep,guard.EXCLUSIONS_SHA)
+    return guard.experiment_split(eligible,folds,json.loads(ep.read_bytes())['quarantined_study_ids'],fold)
+
+
+def build(destination,*,evidence_root,workers=2,worker_choice_name=None,fold=0):
     out=Path(destination);evidence=Path(evidence_root)
+    if type(fold) is not int or fold not in (0,1):raise ValueError('Only reviewed folds0/1 supported')
     if out.exists():raise ValueError('Fresh immutable package directory required')
     if type(workers) is not int or not 0<=workers<=64 or (workers!=2 and not worker_choice_name):raise ValueError('Named frozen worker choice required')
     if worker_choice_name and not re.fullmatch('[a-z0-9][a-z0-9-]{2,63}',worker_choice_name):raise ValueError('Invalid worker choice name')
     old=evidence/'outputs/kaggle/trackA-coatnet224-fold01-20261009'
     train=(old/'train_knee_patched.py').read_text();entry=(old/'tracka_entry.py').read_text()
     if smoke.digest(train.encode())!=TRAIN_SHA or smoke.digest(entry.encode())!=ENTRY_SHA:raise ValueError('Historical source identity differs')
-    trainer=adapt_trainer(train);runner=adapt_entry(entry,workers)
+    trainer=adapt_trainer(train);runner=adapt_entry(entry,workers,fold)
     sources={name:(ROOT/name).read_text() for name in FILES}
     for name,value in sources.items():compile(value,name,'exec')
     policy={'version':1,'recipe':'own224-d96wide-tenepoch-report-top3-v1','workers':workers,'worker_choice_name':worker_choice_name,
@@ -134,6 +150,9 @@ def build(destination,*,evidence_root,workers=2,worker_choice_name=None):
                                 'SOURCE96_INITIALIZER_DESCRIPTOR','SOURCE96_INITIALIZER_DESCRIPTOR_SHA256'],
             'optional_actual_platform_deadline':'SOURCE96_ACTUAL_PLATFORM_DEADLINE_UTC_SECONDS; no assistant budget; last completed epoch recoverable',
             'secondary':'K94 export of unchanged primaryK16 SWA only; no epoch selection'}
+    if fold==1:
+        split,_,_=derive_split(evidence,fold)
+        policy.update(version=2,recipe='own224-d96wide-tenepoch-report-top3-fold1-v1',frozen={**guard.FROZEN,'fold':1},experiment_split=split,experiment_split_sha256=smoke.digest(smoke.canonical(split)),cache_reference_partition_fold=0)
     out.mkdir(parents=True)
     for name,value in sources.items():
         p=out/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(value)
@@ -159,5 +178,5 @@ def build(destination,*,evidence_root,workers=2,worker_choice_name=None):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('destination',type=Path);parser.add_argument('--evidence-root',type=Path,required=True)
-    parser.add_argument('--workers',type=int,default=2);parser.add_argument('--worker-choice-name')
+    parser.add_argument('--workers',type=int,default=2);parser.add_argument('--worker-choice-name');parser.add_argument('--fold',type=int,choices=(0,1),default=0)
     print(json.dumps(build(**vars(parser.parse_args())),indent=2))

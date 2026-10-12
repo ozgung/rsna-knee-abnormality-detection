@@ -56,9 +56,52 @@ def recipe(script):
     return checked_json(root/'source96-recipe.json',manifest['recipe_sha256'])
 
 
+
+SPLITS={0:{'fold':0,'eligible':4345,'training':3475,'development':870,
+    'ordered_eligible_sha256':'15c3d837146dbf280272451d082d2e5e996805844b8e727b49426d6a92c956db',
+    'ordered_training_sha256':'5c669e06b582172921cf64b0cab925b74ee9e119ac572e044bbbe38f3c8923e6',
+    'ordered_development_sha256':'40460d3250445caccd9158f988e3955e2a52392951b00a5104b0d34e87c6f246'},
+ 1:{'fold':1,'eligible':4345,'training':3479,'development':866,
+    'ordered_eligible_sha256':'15c3d837146dbf280272451d082d2e5e996805844b8e727b49426d6a92c956db',
+    'ordered_training_sha256':'af3f37b61ab1a64e03563e0798f6771a9b2c9f101a1f415bdfde8e3b1d321f09',
+    'ordered_development_sha256':'a4291641b93ac8b5a9d836b9293fb778fa9474ff7dfa782e8c4fd5a1391987ff'}}
+
+
+def policy_fold(policy):
+    split=policy.get('experiment_split')
+    if split is None:
+        if policy.get('version')!=1 or policy.get('frozen')!=FROZEN:raise ValueError('Legacy policy is fold0 only')
+        return 0
+    fold=split.get('fold')
+    if type(fold) is not int or fold not in SPLITS or split!=SPLITS[fold] or policy.get('version')!=2 or policy.get('experiment_split_sha256')!=smoke.digest(smoke.canonical(split)) or policy.get('frozen')!={**FROZEN,'fold':fold}:raise ValueError('Pinned experiment split policy differs')
+    return fold
+
+
+def experiment_split(ids,folds,excluded,fold):
+    if type(fold) is not int or fold not in SPLITS:raise ValueError('Only reviewed folds0/1 supported')
+    ids=list(map(str,ids));excluded=set(excluded)
+    if len(ids)!=4345 or len(set(ids))!=4345 or len(excluded)!=4 or excluded.intersection(ids) or any(u not in folds or type(folds[u]) is not int or not 0<=folds[u]<=4 for u in ids):raise ValueError('Eligible population/fold/exclusion coverage differs')
+    train=[u for u in ids if folds[u]!=fold];dev=[u for u in ids if folds[u]==fold]
+    result={'fold':fold,'eligible':len(ids),'training':len(train),'development':len(dev),
+            'ordered_eligible_sha256':smoke.digest(smoke.canonical(ids)),
+            'ordered_training_sha256':smoke.digest(smoke.canonical(train)),
+            'ordered_development_sha256':smoke.digest(smoke.canonical(dev))}
+    if result!=SPLITS[fold]:raise ValueError('Ordered experiment split differs')
+    return result,train,dev
+
+
+def runtime_split(fold,folds_path,excluded_path,script):
+    if policy_fold(recipe(script))!=fold:raise ValueError('Cross-fold experiment forbidden')
+    fmap=checked_json(folds_path,FOLDS_SHA)['folds'];excluded=checked_json(excluded_path,EXCLUSIONS_SHA)['quarantined_study_ids']
+    staged_corpus()
+    result,train,dev=experiment_split(_CORPUS[2],fmap,excluded,fold)
+    return result,train,dev
+
+
 def require_recipe(args,script):
     policy=recipe(script)
-    for key,value in FROZEN.items():
+    fold=policy_fold(policy)
+    for key,value in {**FROZEN,'fold':fold}.items():
         if getattr(args,key,None)!=value:raise ValueError('Frozen training recipe differs: '+key)
     if args.workers!=policy['workers'] or (args.workers!=2 and not policy.get('worker_choice_name')):
         raise ValueError('Unnamed worker override forbidden')
@@ -118,7 +161,7 @@ def run_identity(args,script,labels,initial):
     if smoke.file_sha(labels)!=LABEL_SHA or smoke.file_sha(args.oof_mask)!=TRUTH_SHA or smoke.file_sha(args.fold_file)!=FOLDS_SHA or smoke.file_sha(args.excluded_ids)!=EXCLUSIONS_SHA:
         raise ValueError('Historical supervision/split pins differ')
     body={k:v for k,v in vars(args).items() if k not in ('labels','oof_mask','fold_file','excluded_ids','resume','roi_boxes')}
-    return {'version':1,'recipe':'own224-d96wide-tenepoch-report-top3-v1','fold':args.fold,'n_folds':args.folds,'tag':args.tag,
+    return {'version':1,'recipe':recipe(script)['recipe'],'experiment_split':runtime_split(args.fold,args.fold_file,args.excluded_ids,script)[0],'cache_reference_partition_fold':0,'fold':args.fold,'n_folds':args.folds,'tag':args.tag,
             'corpus_ids_sha256':{'source96_ordered_eligible':_CACHE_IDENTITY['membership']['ordered_eligible_sha256']},
             'epochs_requested':10,'script_sha256':smoke.file_sha(script),
             'helper_sha256':smoke.file_sha(__file__),'loader_sha256':smoke.file_sha(loader.__file__),
@@ -160,18 +203,23 @@ def save_resume(path,state,identity):
         raise SystemExit(0)
 
 
-def verify_membership(train_ids,dev_ids,gold_ids):
+def verify_membership(train_ids,dev_ids,gold_ids,fold=0,folds_path=None,excluded_path=None,script=None):
     staged_corpus();m=_CACHE_IDENTITY['membership']
-    if gold_ids or (len(train_ids),len(dev_ids))!=(3475,870) or smoke.digest(smoke.canonical(train_ids))!=m['ordered_training_sha256'] or smoke.digest(smoke.canonical(dev_ids))!=m['ordered_development_sha256']:
+    if script is not None:m=runtime_split(fold,folds_path,excluded_path,script)[0]
+    elif fold!=0:raise ValueError('Legacy membership is fold0 only')
+    if gold_ids or (len(train_ids),len(dev_ids))!=(m['training'],m['development']) or smoke.digest(smoke.canonical(train_ids))!=m['ordered_training_sha256'] or smoke.digest(smoke.canonical(dev_ids))!=m['ordered_development_sha256']:
         raise ValueError('Fixed eligible training/development membership differs')
 
 
 
-def verify_export_inputs(labels,truth,folds,excluded,development_ids):
+def verify_export_inputs(labels,truth,folds,excluded,development_ids,fold=0,script=None):
     staged_corpus()
     pins=((labels,LABEL_SHA),(truth,TRUTH_SHA),(folds,FOLDS_SHA),(excluded,EXCLUSIONS_SHA))
     if any(smoke.file_sha(path)!=sha for path,sha in pins):raise ValueError('Export supervision/split pins differ')
-    if len(development_ids)!=870 or smoke.digest(smoke.canonical(list(development_ids)))!=_CACHE_IDENTITY['membership']['ordered_development_sha256']:
+    m=_CACHE_IDENTITY['membership']
+    if script is not None:m=runtime_split(fold,folds,excluded,script)[0]
+    elif fold!=0:raise ValueError('Legacy export is fold0 only')
+    if len(development_ids)!=m['development'] or smoke.digest(smoke.canonical(list(development_ids)))!=m['ordered_development_sha256']:
         raise ValueError('Export development membership differs')
 
 
@@ -179,12 +227,13 @@ def entry_guard(c,script):
     policy=recipe(script)
     expected={'ARCH':ARCH,'RES':'224','EPOCHS':'10','CKPT':'timm','BS':'4','K':'8','K_EVAL':'16','SEED':'42','TOPK':'3',
               'GRAD_CKPT':'1','WIN_CHUNK':'8','ACCUM':'2','LABELS_FILE':'labels_v1_blend.parquet','TIME_BUDGET_H':'0',
-              'FOLD_A':'0','FOLD_B':'','BB_LR':'3e-5','HEAD_LR':'1e-3','WD':'0.02','WORKERS':str(policy['workers'])}
+              'FOLD_A':str(policy_fold(policy)),'FOLD_B':'','BB_LR':'3e-5','HEAD_LR':'1e-3','WD':'0.02','WORKERS':str(policy['workers'])}
     if c['SMOKE'] or any(str(c.get(k))!=v for k,v in expected.items()):raise ValueError('Frozen entry parameters differ')
     return policy
 
 
 def export_guard(work,fold,checkpoint_path,kind,epochs,partial,secondary):
+    if (Path(work)/'manifest.json').exists() and policy_fold(recipe(Path(work)/'train_knee_patched.py'))!=fold:raise ValueError('Cross-fold checkpoint export forbidden')
     if partial or kind!='swa_topk' or len(epochs)!=3:raise ValueError('Only completed frozen report-selected top3 SWA may export')
     meta=json.loads((Path(work)/f'raptor_ft_fold{fold}.json').read_bytes())
     if meta.get('partial') or len(meta.get('hist',[]))!=10:raise ValueError('Ten completed epochs required')

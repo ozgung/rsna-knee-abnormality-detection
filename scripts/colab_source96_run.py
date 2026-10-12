@@ -56,7 +56,7 @@ def private_diagnostic(path,text):
 
 
 def validate(c):
-    allowed={'version','name','vm_session_id','package_root','package_manifest_sha256','workdir','input_root','stage_root','manifest_sha256','content_sha256','stage_receipt_sha256','initializer_descriptor','initializer_descriptor_sha256','persister','persister_sha256','persistence','controller_lock','workers','worker_choice_name','resume','resume_sha256','actual_platform_deadline'}
+    allowed={'version','name','vm_session_id','package_root','package_manifest_sha256','workdir','input_root','stage_root','manifest_sha256','content_sha256','stage_receipt_sha256','initializer_descriptor','initializer_descriptor_sha256','persister','persister_sha256','persistence','controller_lock','workers','worker_choice_name','resume','resume_sha256','actual_platform_deadline','fold'}
     if set(c)-allowed:raise ValueError('Unknown runner config parameter')
     if c.get('version')!=VERSION or not re.fullmatch('[a-z0-9][a-z0-9-]{2,63}',c.get('name','')) or not re.fullmatch('[a-zA-Z0-9_-]{3,80}',c.get('vm_session_id','')):raise ValueError('Named immutable VM config required')
     paths=('package_root','workdir','input_root','stage_root','initializer_descriptor','persister','controller_lock')
@@ -83,7 +83,17 @@ def validate(c):
     if r.get('status')!='PASS' or r.get('manifest_sha256')!=c['manifest_sha256'] or r.get('content_sha256')!=c['content_sha256']:raise ValueError('Verified staged cache required')
     d=checked(c['initializer_descriptor'],c['initializer_descriptor_sha256'])
     if Path(d['weights_file']).is_symlink() or sha(d['weights_file'])!=d['weights_sha256']:raise ValueError('Initializer weights differ')
-    resume=work/'raptor_resume_fold0.pt'
+    fold=c.get('fold',0)
+    if type(fold) is not int or fold not in (0,1):raise ValueError('Only reviewed folds0/1 supported')
+    split=policy.get('experiment_split')
+    selected=0 if split is None else split.get('fold')
+    if fold!=selected or policy['frozen']['fold']!=fold or (split is None and policy.get('version')!=1):raise ValueError('Package/config fold differs; legacy policy is fold0 only')
+    if split is not None:
+        expected=hashlib.sha256(json.dumps(split,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        if policy.get('version')!=2 or policy.get('experiment_split_sha256')!=expected or (split.get('eligible'),split.get('training'),split.get('development'))!=(4345,3479,866) or fold!=1:raise ValueError('Fold1 experiment split differs')
+    if fold==1 and any('fold1' not in value for value in (c['name'],work.name,Path(persist['staging']).name,Path(persist['status_file']).name,Path(c['controller_lock']).name,persist['dataset'].split('/')[-1])):raise ValueError('Fold1 requires isolated named work/backup/status/lock paths')
+    if work.exists() and any(re.search(r'fold([01])',p.name) and int(re.search(r'fold([01])',p.name).group(1))!=fold for p in work.glob('raptor_*')):raise ValueError('Cross-fold work artifacts forbidden')
+    resume=work/f'raptor_resume_fold{fold}.pt'
     if c.get('resume',False):
         if type(c['resume']) is not bool or not resume.is_file() or resume.is_symlink() or sha(resume)!=c.get('resume_sha256'):raise ValueError('Explicit pinned resume required')
     elif work.exists() and any(work.glob('raptor_*')):raise ValueError('Existing training artifacts require explicit resume')
@@ -94,7 +104,7 @@ def environment(c):
     tree=ast.parse((Path(c['package_root'])/'tracka_entry.py').read_text())
     defaults=ast.literal_eval(next(n.value for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='PARAM_DEFAULTS' for t in n.targets)))
     env=dict(os.environ);env.update({k:str(v) for k,v in defaults.items()})
-    env.update(WORKDIR=c['workdir'],ASSET_DIR=c['package_root'],RAPTOR_INPUT=c['input_root'],RESUME='1' if c.get('resume') else '0',
+    env.update(FOLD_A=str(c.get('fold',0)),WORKDIR=c['workdir'],ASSET_DIR=c['package_root'],RAPTOR_INPUT=c['input_root'],RESUME='1' if c.get('resume') else '0',
         RAPTOR_PRELOAD='0',PYTHONPATH=c['package_root'],PYTHONUNBUFFERED='1',HF_HUB_OFFLINE='1',TRANSFORMERS_OFFLINE='1',
         SOURCE96_STAGE_ROOT=c['stage_root'],SOURCE96_MANIFEST_SHA256=c['manifest_sha256'],SOURCE96_CONTENT_SHA256=c['content_sha256'],
         SOURCE96_STAGE_RECEIPT_SHA256=c['stage_receipt_sha256'],SOURCE96_INITIALIZER_DESCRIPTOR=c['initializer_descriptor'],
@@ -133,7 +143,7 @@ def private_dataset(dataset):
 
 
 def sanitized(line):
-    line=re.sub(r'^\[(?:train:fold0|persist [0-9:]{8})\]\s*','',line.strip())
+    line=re.sub(r'^\[(?:train:fold[01]|persist [0-9:]{8})\]\s*','',line.strip())
     for pattern in (r'^ep\d+ loss [0-9.eE+-]+ \| OOF masked macro-AUC [0-9.eE+-]+',r'^\[resume\] (?:recoverable completed epoch|completed epoch checkpoint saved)\s*\d*',r'^FINAL PERSIST (?:VERIFIED epoch \d+ version \d+|UNVERIFIED)'):
         match=re.search(pattern,line.strip())
         if match:return match.group(0)
@@ -147,28 +157,29 @@ def stream(process,label,diagnostic_path):
         if safe:print('['+label+'] '+safe,flush=True)
 
 
-def primary_complete(work):
-    record=json.loads((Path(work)/'run_fold0.json').read_bytes())
-    meta=json.loads((Path(work)/'raptor_ft_fold0.json').read_bytes())
-    if record.get('epochs_requested')!=10 or record.get('epochs_completed')!=10 or record.get('stopped_by_time_budget') or record.get('checkpoint_kind')!='swa_topk' or record.get('comparison_endpoint')!='matched K16 primary' or record.get('export',{}).get('k_eval')!=16 or record['export'].get('n_val')!=870 or record['export'].get('n_gold')!=0 or len(record.get('selected_epochs',[]))!=3 or record.get('history')!=meta.get('hist') or meta.get('partial') or [h['ep'] for h in meta.get('hist',[])]!=list(range(10)):
+def primary_complete(work,fold=0,development=870,experiment_split=None,cache_content=None):
+    record=json.loads((Path(work)/f'run_fold{fold}.json').read_bytes())
+    meta=json.loads((Path(work)/f'raptor_ft_fold{fold}.json').read_bytes())
+    if experiment_split is not None and (record.get('source96_experiment_split')!=experiment_split or record.get('cache_reference_partition_fold')!=0 or record.get('source96_cache_content_sha256')!=cache_content):raise ValueError('Export experiment/cache identity differs')
+    if record.get('fold')!=fold or record.get('epochs_requested')!=10 or record.get('epochs_completed')!=10 or record.get('stopped_by_time_budget') or record.get('checkpoint_kind')!='swa_topk' or record.get('comparison_endpoint')!='matched K16 primary' or record.get('export',{}).get('k_eval')!=16 or record['export'].get('n_val')!=development or record['export'].get('n_gold')!=0 or len(record.get('selected_epochs',[]))!=3 or record.get('history')!=meta.get('hist') or meta.get('partial') or [h['ep'] for h in meta.get('hist',[])]!=list(range(10)):
         raise ValueError('Complete ten-epoch primary K16 export required')
     file=record['checkpoint_file']
-    if file!='raptor_ft_fold0_swa.pt' or (Path(work)/file).is_symlink() or sha(Path(work)/file)!=record['checkpoint_sha256']:raise ValueError('Primary checkpoint identity differs')
-    if (Path(work)/'oof_fold0.csv').is_symlink() or not (Path(work)/'oof_fold0.csv').is_file():raise ValueError('Primary prediction artifact missing')
+    if file!=f'raptor_ft_fold{fold}_swa.pt' or (Path(work)/file).is_symlink() or sha(Path(work)/file)!=record['checkpoint_sha256']:raise ValueError('Primary checkpoint identity differs')
+    if (Path(work)/f'oof_fold{fold}.csv').is_symlink() or not (Path(work)/f'oof_fold{fold}.csv').is_file():raise ValueError('Primary prediction artifact missing')
     return record
 
 
 def final_verified(c,status):
-    p=c['persistence'];resume=Path(c['workdir'])/'raptor_resume_fold0.pt';st=resume.stat()
+    fold=c.get('fold',0);p=c['persistence'];resume=Path(c['workdir'])/f'raptor_resume_fold{fold}.pt';st=resume.stat()
     final=status.get('final') or {};version=status.get('verified_version')
-    if status.get('dataset')!=p['dataset'] or status.get('fold')!=0 or final.get('state')!='verified' or status.get('verified_epoch')!=9 or final.get('epoch')!=9 or type(version) is not int or version<=0 or final.get('version')!=version or status.get('verified_signature')!=[st.st_size,st.st_mtime_ns]:raise ValueError('Latest final epoch9 backup is not verified')
+    if status.get('dataset')!=p['dataset'] or status.get('fold')!=fold or final.get('state')!='verified' or status.get('verified_epoch')!=9 or final.get('epoch')!=9 or type(version) is not int or version<=0 or final.get('version')!=version or status.get('verified_signature')!=[st.st_size,st.st_mtime_ns]:raise ValueError('Latest final epoch9 backup is not verified')
     payload=json.loads((Path(p['staging'])/'payload_manifest.json').read_bytes())
-    if payload.get('dataset')!=p['dataset'] or payload.get('fold')!=0 or payload.get('epoch')!=9 or payload.get('resume_sha256')!=sha(resume):raise ValueError('Final backup payload differs from latest resume')
+    if payload.get('dataset')!=p['dataset'] or payload.get('fold')!=fold or payload.get('epoch')!=9 or payload.get('resume_sha256')!=sha(resume):raise ValueError('Final backup payload differs from latest resume')
     return {'epoch':9,'version':version,'resume_sha256':payload['resume_sha256']}
 
 
 def run(c,*,popen=subprocess.Popen,probe=runtime_probe,privacy=private_dataset,sleep=time.sleep,read_status=None,install_signals=True,monotonic=time.monotonic):
-    m,policy,stage,init=validate(c);env=environment(c)
+    m,policy,stage,init=validate(c);env=environment(c);fold=c.get('fold',0);development=866 if fold==1 else 870
     lock=Path(c['controller_lock']);lock.parent.mkdir(parents=True,exist_ok=True)
     if lock.is_symlink():raise ValueError('Unsafe controller lock')
     with open(lock,'a+') as locked:
@@ -179,9 +190,9 @@ def run(c,*,popen=subprocess.Popen,probe=runtime_probe,privacy=private_dataset,s
         fingerprint={'controller_sha256':sha(__file__),'config_sha256_canonical':hashlib.sha256(json.dumps(c,sort_keys=True,separators=(',',':')).encode()).hexdigest(),'version':VERSION,'name':c['name'],'vm_session_id':c['vm_session_id'],'package_manifest_sha256':c['package_manifest_sha256'],
             'cache_manifest_sha256':c['manifest_sha256'],'cache_content_sha256':c['content_sha256'],'initializer_descriptor_sha256':c['initializer_descriptor_sha256'],
             'initializer_weights_sha256':init['weights_sha256'],'persister_sha256':PERSISTER_SHA,'policy':policy,'runtime':runtime,'workers':c.get('workers',2),'RAPTOR_PRELOAD':'0',
-            'resume':bool(c.get('resume')),'worker_rng_resume':'Main RNG only; persistent worker RNG/prefetch not restored', 'benchmark':'No optimizer throughput benchmark performed'}
+            'fold':fold,'experiment_split':policy.get('experiment_split'),'cache_reference_partition_fold':0,'resume':bool(c.get('resume')),'worker_rng_resume':'Main RNG only; persistent worker RNG/prefetch not restored', 'benchmark':'No optimizer throughput benchmark performed'}
         atomic_json(work/'source96-run-fingerprint.json',fingerprint)
-        p=c['persistence'];pcmd=[sys.executable,'-u',c['persister'],'--workdir',c['workdir'],'--fold','0','--dataset',p['dataset'],'--staging',p['staging'],'--status-file',p['status_file'],'--keep-old-versions']
+        p=c['persistence'];pcmd=[sys.executable,'-u',c['persister'],'--workdir',c['workdir'],'--fold',str(fold),'--dataset',p['dataset'],'--staging',p['staging'],'--status-file',p['status_file'],'--keep-old-versions']
         persist=train=None;interrupted={'signal':None,'deadline':None};old={};threads=[];receipt={**fingerprint,'status':'FAIL'}
         def stop(signum,_frame):
             if interrupted['signal'] is not None:return
@@ -223,12 +234,12 @@ def run(c,*,popen=subprocess.Popen,probe=runtime_probe,privacy=private_dataset,s
             for signum,handler in old.items():signal.signal(signum,handler)
         try:
             if train is None or train.returncode!=0 or interrupted['signal'] or persist is None or persist.returncode!=0:raise ValueError('Training/controller/backup subprocess failed')
-            primary=primary_complete(work)
+            primary=primary_complete(work,fold,development,policy.get('experiment_split'),c['content_sha256'])
             status=read_status(c) if read_status else json.loads(Path(p['status_file']).read_bytes())
             backup=final_verified(c,status);privacy(p['dataset'])
             receipt.update(status='PASS',checkpoint_sha256=primary['checkpoint_sha256'],backup=backup)
         except Exception as error:receipt.setdefault('failure',type(error).__name__)
-        receipt['interrupted_signal']=interrupted['signal'];receipt['resume_preserved']=(work/'raptor_resume_fold0.pt').is_file()
+        receipt['interrupted_signal']=interrupted['signal'];receipt['resume_preserved']=(work/f'raptor_resume_fold{fold}.pt').is_file()
         atomic_json(work/'source96-run-receipt.json',receipt)
         return receipt
 

@@ -35,7 +35,7 @@ class RunnerTests(unittest.TestCase):
         (work/'oof_fold0.csv').write_bytes(b'synthetic schema tested separately')
         meta={'partial':False,'hist':[{'ep':i} for i in range(10)]}
         (work/'raptor_ft_fold0.json').write_text(json.dumps(meta))
-        record={'epochs_requested':10,'epochs_completed':10,'stopped_by_time_budget':False,'checkpoint_kind':'swa_topk','comparison_endpoint':'matched K16 primary',
+        record={'fold':0,'epochs_requested':10,'epochs_completed':10,'stopped_by_time_budget':False,'checkpoint_kind':'swa_topk','comparison_endpoint':'matched K16 primary',
             'history':meta['hist'],'export':{'k_eval':16,'n_val':870,'n_gold':0},'selected_epochs':[3,6,9],'checkpoint_file':'raptor_ft_fold0_swa.pt','checkpoint_sha256':runner.sha(work/'raptor_ft_fold0_swa.pt')}
         (work/'run_fold0.json').write_text(json.dumps(record))
         staging=Path(self.c['persistence']['staging']);staging.mkdir(exist_ok=True)

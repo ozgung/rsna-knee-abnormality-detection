@@ -20,6 +20,16 @@ class TrainingTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name)
     def tearDown(self):self.tmp.cleanup()
+    def test_policy_fold_requires_explicit_reviewed_split(self):
+        legacy={'version':1,'frozen':dict(guard.FROZEN)}
+        self.assertEqual(guard.policy_fold(legacy),0)
+        split=dict(guard.SPLITS[1]);policy={'version':2,'frozen':{**guard.FROZEN,'fold':1},'experiment_split':split,'experiment_split_sha256':smoke.digest(smoke.canonical(split))}
+        self.assertEqual(guard.policy_fold(policy),1)
+        split['development']=870
+        with self.assertRaises(ValueError):guard.policy_fold(policy)
+        legacy['frozen']['fold']=1
+        with self.assertRaises(ValueError):guard.policy_fold(legacy)
+
     def test_strict_cuda_and_threads(self):
         fake=SimpleNamespace(cuda=SimpleNamespace(is_available=lambda:False))
         with self.assertRaisesRegex(RuntimeError,'CUDA required'):guard.strict_cuda(fake)
