@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-13 11:26 UTC**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
+Updated **2026-10-13 11:42 UTC**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
 
 ## Current snapshot
 
@@ -24,7 +24,7 @@ Updated **2026-10-13 11:26 UTC**. Read this snapshot, then [shared handoff](docs
 
 **October 13 authorization:** Codex actively owns an independent analyze → choose → implement/research → run → evaluate loop alongside Claude. It may use Astra for consequential direction and research and run complementary Colab/Kaggle/MPS training without waiting for a Claude assignment. Existing job ownership and scientific checks remain binding.
 
-**Scheduled task:** `continue-rsna-knee-experiments` saved configuration verified ACTIVE, every five minutes, same target chat. New [prompt](docs/rsna-campaign-scheduled-prompt.txt) requires useful independent progress while Claude runs, explicit run ownership and resource reconciliation. Receipt: `outputs/analysis/automation-top10-20261013/update-receipt.json`. Configuration readback passed; the next heartbeat has not yet demonstrated scheduler reload.
+**Scheduled task: DELIVERY FAILED despite ACTIVE configuration.** Database prompt matches the new saved prompt and five-minute attempts continue, but today’s app logs show139 failed attempts through11:37UTC, all `already has an active writer` for this target chat. Last delivered heartbeat in thread history is October12 20:09UTC. Configuration readback did not establish execution; the prior claim of active automation must not be interpreted as working delivery. Diagnostic: `outputs/analysis/automation-top10-20261013/delivery-diagnostic.json`. Computer Use blocks Codex app access, so supported UI repair requires user action. Proposed recovery: restart desktop app, then verify an actual delivered/completed heartbeat; if the conflict persists, use a standalone scheduled task reading STATUS/shared handoff. No scheduler database mutation or app/process termination performed.
 
 Handoff identities: **Sol/Astra = Codex; Fable/Opus = Claude**. Two continuing collaborators; names change with the active model. Processed coworker-entry hashes are in ignored `outputs/analysis/handoff-processed-codex.json`; compare every entry, not just lines after our last message, because concurrent entries can arrive out of timestamp order. Delegated subagents are helpers, not additional handoff parties.
 
@@ -33,7 +33,7 @@ Handoff identities: **Sol/Astra = Codex; Fable/Opus = Claude**. Two continuing c
 
 | Owner/task | State / concrete next action |
 | --- | --- |
-| Codex — native joint-crop pilot | Astra recommendation COMPLETE; accepted global + native100mm joint crops with matched views, no compartment routing. Sol implementation ACTIVE in isolated `outputs/worktrees/native-joint-roi-pilot-20261013`, branch `codex/native-joint-roi-pilot-20261013`; helper `native_joint_roi_pilot_sol`. Parent next reviews projection/crop/fallback tests and freezes one private32-study reader qualification before training. No independent runtime allocated. |
+| Codex — native joint-crop pilot | Implementation COMPLETE in isolated worktree; parent independently reproduced40 focused testsPASS/0skip. Immutable32-study build UNLAUNCHED. Next parent source/geometry review and one real reader qualification; local tests do not establish anatomy containment or real train/inference parity. No independent runtime allocated. Scheduler delivery failure must be repaired before relying on unattended continuation. |
 | Claude — raptor64 pilot | in-orig / in-plane running epoch10 at last health, final around noon estimate; dr-orig queued serially. .92 evaluator gate removed per Claude; live v1 source frozen, later v2 bundle includes Codex repair. Preserve exact config and checkpoint identities; review final per-target K42/SWA evidence. |
 | Claude — labels and stacking | Relabel pilot and output stacking closed after reported null/negative findings. Gold-membership bug remains a deferred repair; do not reuse that scorer for new labels. |
 | Codex — B0 integration | COMPLETE, commit `a857869`: five sourcefiles byte-exact to submitted builds; source/hash bindingPASS,20focused testsPASS/0skip, synthetic smokePASS. Claude retains monitoring57119585. |
@@ -116,6 +116,8 @@ Collector pins exact accepted source/version and downloads small outputs only to
 - Parent owns commits. Git has no remote. Preserve unrelated user AGENTS.md changes and Fable untracked files. Base-gap and window-diagnostic agents completed; parent integrated and launched one diagnostic. No agent or controller should restart compute jobs automatically. Use existing resources/actual account limits, no self-imposed hour caps.
 
 ## Latest checkpoint
+
+**2026-10-13 11:42 UTC:** Diagnosed scheduler delivery failure from read-only app database/history/logs:139 active-writer failures today, revised prompt loaded, no delivered heartbeat since October12 20:09UTC. Computer Use denied Codex app access; user restart proposed, recovery unverified. Updated Claude so silent scheduler failure is not mistaken for intentional waiting. Interrupted parent ROI tests actually completed40PASS/0skip; latest REST training health11:38 shows both alive, epoch10 complete of12, original .9052 / plane .9044, backups v12. No new runtime or submission. Next verify restored heartbeat, then finish ROI source acceptance and launch qualified reader.
 
 **2026-10-13 11:26 UTC:** Reconciled new Claude07:30/07:38/08:20 entries, live session and REST training health. Two ImageNet controllers healthy with completed epoch9/backupsv11; Dread queued, no final K42 result yet. Accepted Astra’s independent native joint-crop recommendation; external SKM-TEA weights verified by prior provenance evidence, wrapper gold-tuned and exposure disclosed. Claimed Codex’s ROI lane and started one Sol implementation in a separate worktree. No additional runtime/submission; nothing required from the user. Next: review helper code/feasibility tests, freeze bounded32 native-reader qualification and run after mechanical acceptance.
 
