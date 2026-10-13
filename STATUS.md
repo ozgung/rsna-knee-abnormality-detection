@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-13 07:34 UTC (10:34 TRT)**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
+Updated **2026-10-13 07:37 UTC**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
 
 ## Current snapshot
 
@@ -22,13 +22,18 @@ Updated **2026-10-13 07:34 UTC (10:34 TRT)**. Read this snapshot, then [shared h
 
 ## Ready queue and ownership
 
+**October 13 authorization:** Codex actively owns an independent analyze → choose → implement/research → run → evaluate loop alongside Claude. It may use Astra for consequential direction and research and run complementary Colab/Kaggle/MPS training without waiting for a Claude assignment. Existing job ownership and scientific checks remain binding.
+
+**Scheduled task:** `continue-rsna-knee-experiments` saved configuration verified ACTIVE, every five minutes, same target chat. New [prompt](docs/rsna-campaign-scheduled-prompt.txt) requires useful independent progress while Claude runs, explicit run ownership and resource reconciliation. Receipt: `outputs/analysis/automation-top10-20261013/update-receipt.json`. Configuration readback passed; the next heartbeat has not yet demonstrated scheduler reload.
+
 Handoff identities: **Sol/Astra = Codex; Fable/Opus = Claude**. Two continuing collaborators; names change with the active model. Processed coworker-entry hashes are in ignored `outputs/analysis/handoff-processed-codex.json`; compare every entry, not just lines after our last message, because concurrent entries can arrive out of timestamp order. Delegated subagents are helpers, not additional handoff parties.
 
-**Cost and ownership:** Codex Plus/Sol high retains integration and targeted acceptance; Claude owns heavy implementation, research and compute workflows. The latest user request also authorizes Codex to assist using Astra, Colab and localMPS. Two scoped helpers completed decision/package audits; no additional compute launch. Claude's original secondary permission block was resolved by an explicit user allow rule; that run completed, so no pending approval or duplicate launch. Fold1's failed bulk verification receipt remains preserved alongside Claude's per-file verification and `claude-takeover/fold1-preservation-binding.json` (private dataset identity,12files,manifest/checkpoint binding). The A100 was released21:48 and refreshloop stopped.
+**Cost and ownership:** Codex Plus/Sol high leads its own complementary experiment lane plus integration; Claude continues its own implementation, analysis and training loop. Astra is authorized for consequential method decisions and research. Use concise scoped delegation; avoid duplicate work and unnecessary agent chains. The latest user request also authorizes Codex to assist using Astra, Colab and localMPS. Two scoped helpers completed decision/package audits; no additional compute launch. Claude's original secondary permission block was resolved by an explicit user allow rule; that run completed, so no pending approval or duplicate launch. Fold1's failed bulk verification receipt remains preserved alongside Claude's per-file verification and `claude-takeover/fold1-preservation-binding.json` (private dataset identity,12files,manifest/checkpoint binding). The A100 was released21:48 and refreshloop stopped.
 
 
 | Owner/task | State / concrete next action |
 | --- | --- |
+| Codex — independent next method | Astra research helper `independent_top10_method_astra` ACTIVE, assessing a controlled native ROI/compartment or alternative input method that complements Claude’s head/init runs. Output `outputs/analysis/independent-top10-method-20261013/astra-decision.md`; parent accepts and implements the smallest qualified feasibility step, then owns a separately identified run if warranted. |
 | Claude — raptor64 pilot | Three arms as above; caches complete. Rebuild the bundle with Codex’s tested initializer repair; post exact session/config/controller identity. Preserve matched ImageNet head comparison and label backbone-only Dread exposure explicitly. |
 | Claude — labels and stacking | Relabel pilot and output stacking closed after reported null/negative findings. Gold-membership bug remains a deferred repair; do not reuse that scorer for new labels. |
 | Codex — B0 integration | COMPLETE, commit `a857869`: five sourcefiles byte-exact to submitted builds; source/hash bindingPASS,20focused testsPASS/0skip, synthetic smokePASS. Claude retains monitoring57119585. |
@@ -111,6 +116,8 @@ Collector pins exact accepted source/version and downloads small outputs only to
 - Parent owns commits. Git has no remote. Preserve unrelated user AGENTS.md changes and Fable untracked files. Base-gap and window-diagnostic agents completed; parent integrated and launched one diagnostic. No agent or controller should restart compute jobs automatically. Use existing resources/actual account limits, no self-imposed hour caps.
 
 ## Latest checkpoint
+
+**2026-10-13 07:37 UTC:** Updated and read back the existing scheduled task prompt to require independent top-10 campaign work, Astra decision/research delegation and qualified parallel training. ACTIVE/cadence/thread and other settings unchanged; only prompt/update timestamp changed. Before-file backup and exact receipt preserved under ignored outputs. One independent Astra method helper started; no new runtime/training/submission allocated. Next: inspect its concrete pilot recommendation, claim implementation, and advance it alongside Claude’s current runs.
 
 **2026-10-13 07:34 UTC:** User challenged idle coordination. Codex took package acceptance and repaired the confirmed ZIP-member-name blocker in `agent-a3334099cc20effac` initializer/tests. Independent 124 discovered checks: 121 pass, 3 skip for unavailable local timm/safetensors and full synthetic training dependencies; no real CUDA exercise. Runtime/persistence audit confirms resume identity and fixed schedule, flags bulk-only terminal verification and explicit resume command requirement. A100 session independently verified; no duplicate allocation or training launch by Codex. Next: Claude rebuilds the bundle with recorded new hashes, resolves the arbitrary .92 gate, and posts launch evidence; Codex accepts that evidence and integrates reviewed code. Receipt and limits in [acceptance](docs/experiments/raptor64-codex-acceptance-20261013.md).
 
