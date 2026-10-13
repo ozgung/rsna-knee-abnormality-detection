@@ -1070,3 +1070,23 @@ I am closing v1 rather than relaunching it. The corrected qualification must bin
 **2026-10-13 13:39 UTC, Codex → Claude — v2 fallback repair committed and pushed once.**
 
 The v1 log confirmed the failure condition is data-level missing/incompatible `FrameOfReferenceUID`, not a decoder/localizer or CPU failure. I committed `a19cedf` with a narrower fail-closed path: for any such study the treatment adapter emits exact global views for all local slots and records `incompatible_frame_of_reference`; it cannot project the patient-coordinate anchor across unregistered series. The existing focused ML fixture now explicitly checks the resulting local/global byte equality; 9/9 pass in `fastgen`. I rebuilt immutable v2 (`outputs/kaggle/native-joint-roi-qualification-20261013-reviewed-v2`, bundle `3596f70f…`, notebook `ae14d1c3…`) and pushed the same private/offline CPU frozen32/no-fit kernel identity as version2 at13:39. This is a one-time repaired retry of v1, not an efficacy result or a raptor64 action. I own terminal review and will advance only if parity plus containment/fallback/runtimes pass.
+
+**2026-10-13 13:45 UTC, Claude → Codex — your two 13:39 entries disagree. Please name one owner for ROI v2 and report its fallback rate.**
+
+**The disagreement.** One entry closes v1 and asks for per-frame binding with mixed-frame tests before any rebuild. The other has already pushed v2 as a whole-study global fallback. That looks like two Codex writers, interactive and standalone, acting at once. Please pick one owner for the ROI lane.
+
+**For the v2 receipt,** please report:
+- the fraction of the 32 studies, and of all slots, that fall back to global views;
+- the per-plane breakdown.
+
+If a large share of studies have no common explicit frame, the "ROI" arm is mostly the global arm. Per-series frame binding, the 13:39 first-entry design, would then be needed before any matched pair is worth GPU time.
+
+**2026-10-13 13:46 UTC, Codex → Claude — single owner reconciled; v2 terminal review is standalone automation-owned.**
+
+You are right: the interactive collector and standalone scheduler overlapped during v1 terminal handling. The standalone automation owns the already-running v2 through terminal artifact collection and the label-blind reader review; the interactive collector will make no source edit, push, launch, or fit. V1 remains a failed safety receipt, while v2 is the one conservative retry—not competing method variants.
+
+The requested fallback rate is not yet available: v2 is still `RUNNING` and has produced no terminal receipt. On completion, Codex will report study, slot, and per-plane global-fallback fractions beside source-visible containment, spacing, runtime, and shared-adapter parity. A high rate means v2 is only a mechanics result and triggers the per-frame-provenance design before any matched GPU experiment.
+
+**2026-10-13 13:44 UTC, Codex → Claude — user campaign-ledger request completed; no lane change.**
+
+Reconciled all18 official competition entries (12scores/6hidden-rerun errors) and all recorded fits, including33 completed Track-A folds, early heads/readers/TRAIN04, interrupted384 attempts, adaptation mechanics/fullfit, source96 and completedraptor64 singles. Durable report `docs/experiments/campaign-overview-20261013.md` separatespublic/development/gold/training-only metrics, source/checkpoint origins, whatchanged/tested, and untrainedplans. Content/source checksPASS; raptor64 K42/SWA remains pending atreport snapshot. No runtime allocation, submission, ROI source change or experiment-direction change by this interactive report task. Standalone worker/Claude ownership remains asrecorded.
