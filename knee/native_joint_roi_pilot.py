@@ -17,7 +17,7 @@ SIDE_MM, SIZE = 100., 384
 WEIGHT_URL = 'https://huggingface.co/arjundd/skm-tea-models/blob/main/neurips2021/segmentation-models/V-Net_E1/model-raw.ckpt'
 
 
-def joint_view(series, geo, anchor, view_geometry, project):
+def joint_view(series, geo, anchor, view_geometry, project, frame_blocker=None):
     """Fail closed on unresolved source mapping; explicit global crop fallbacks.
 
     Source clipping/shrinking is forbidden: require the requested rounded100mm
@@ -27,6 +27,12 @@ def joint_view(series, geo, anchor, view_geometry, project):
     if any(str(x).startswith('error:') for x in anchor['why']):
         raise ValueError('Source swallowed localizer error')
     base={'reason': None, 'side_mm_requested': SIDE_MM, 'padding_pixels': 0}
+    # A point in patient coordinates is only portable across series that
+    # declare the same reference frame.  Treat an unresolved study-level
+    # frame as a recorded global-view fallback, never as permission to apply
+    # an unregistered cross-plane crop.
+    if frame_blocker is not None:
+        return None, {**base, 'reason': frame_blocker}
     if anchor['joint_lps'] is None:
         return None, {**base, 'reason': 'missing_anchor'}
     if geo is None:
@@ -67,11 +73,17 @@ def joint_view(series, geo, anchor, view_geometry, project):
 
 
 def qualify_frame_references(geometries, anchor):
-    """No cross-plane registration assumption when projecting a shared anchor."""
-    if anchor['joint_lps'] is None:return
+    """Return a fail-closed fallback reason for an unregistered shared anchor.
+
+    This is a per-study data condition, not a reader implementation fault.
+    The caller preserves the matched global view for every local treatment
+    slot, records the reason, and may not claim a cross-plane ROI.
+    """
+    if anchor['joint_lps'] is None:return None
     refs={g.get('frame_of_reference_uid') for g in geometries.values() if g is not None}
-    require(len(refs)==1 and None not in refs and '' not in refs,
-            'BLOCKER: shared anchor requires one explicit FrameOfReferenceUID')
+    if len(refs)==1 and None not in refs and '' not in refs:
+        return None
+    return 'incompatible_frame_of_reference'
 
 
 def read_pair(cache,uid,geometries,anchor):
@@ -85,12 +97,12 @@ def read_pair(cache,uid,geometries,anchor):
     import px_cache as PX
     import knee_anchor_bank_v2 as KB
     from training.input_provenance import view_geometry
-    qualify_frame_references(geometries,anchor)
+    frame_blocker=qualify_frame_references(geometries,anchor)
     study=json.loads(Path(PX.study_json(str(cache),uid)).read_bytes())
     centers={};receipts={}
     for s in study['series']:
         sid=s['SeriesInstanceUID']
-        centers[sid],receipts[sid]=joint_view(s,geometries.get(sid),anchor,view_geometry,KB.project)
+        centers[sid],receipts[sid]=joint_view(s,geometries.get(sid),anchor,view_geometry,KB.project,frame_blocker)
         gg=view_geometry(s['native_shape'][-2:],s['spacing_mm'][0],SIZE)
         gh,gw=gg.resized_shape;nh,nw=gg.native_shape
         receipts[sid].update(native_shape=list(gg.native_shape),spacing_mm=list(gg.spacing),

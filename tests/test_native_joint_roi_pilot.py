@@ -77,11 +77,11 @@ class JointTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'affine/spacing'):
             joint_view(s,g,a,self.view,self.project)
 
-    def test_explicit_frame_reference_required(self):
-        _,g,a=self.fixture();qualify_frame_references({'s':g},a)
+    def test_incompatible_frame_reference_is_recorded_global_fallback(self):
+        _,g,a=self.fixture();self.assertIsNone(qualify_frame_references({'s':g},a))
         for geos in ({'s':{**g,'frame_of_reference_uid':None}}, {'s':g,'other':{**g,'frame_of_reference_uid':'other'}}):
-            with self.assertRaisesRegex(ValueError,'FrameOfReferenceUID'):qualify_frame_references(geos,a)
-        qualify_frame_references({'s':None},{**a,'joint_lps':None})
+            self.assertEqual(qualify_frame_references(geos,a),'incompatible_frame_of_reference')
+        self.assertIsNone(qualify_frame_references({'s':None},{**a,'joint_lps':None}))
 
     def test_actual_pinned_source_slab_intensity_and_fallback_parity(self):
         import px_cache as PX
@@ -110,6 +110,9 @@ class JointTests(unittest.TestCase):
             self.assertTrue(torch.equal(fallback_global['px'],fallback['px']))
             c,t,_=paired_triplets(fallback_global,fallback);np.testing.assert_array_equal(c,t)
             self.assertEqual(rr['s']['reason'],'missing_anchor')
+            frame_global,frame_fallback,frame_receipts=read_pair(cache,'uid',{'s':{**g,'frame_of_reference_uid':None}},a)
+            self.assertTrue(torch.equal(frame_global['px'],frame_fallback['px']))
+            self.assertEqual(frame_receipts['s']['reason'],'incompatible_frame_of_reference')
             # Shared train/inference adapter is deterministic and preserves raw
             # source arrays. This is not real-DICOM reader qualification.
             again=read_pair(cache,'uid',{'s':g},a)
