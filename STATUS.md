@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-13 11:42 UTC**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
+Updated **2026-10-13 13:21 UTC**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
 
 ## Current snapshot
 
@@ -24,7 +24,7 @@ Updated **2026-10-13 11:42 UTC**. Read this snapshot, then [shared handoff](docs
 
 **October 13 authorization:** Codex actively owns an independent analyze → choose → implement/research → run → evaluate loop alongside Claude. It may use Astra for consequential direction and research and run complementary Colab/Kaggle/MPS training without waiting for a Claude assignment. Existing job ownership and scientific checks remain binding.
 
-**Scheduled task: DELIVERY FAILED despite ACTIVE configuration.** Database prompt matches the new saved prompt and five-minute attempts continue, but today’s app logs show139 failed attempts through11:37UTC, all `already has an active writer` for this target chat. Last delivered heartbeat in thread history is October12 20:09UTC. Configuration readback did not establish execution; the prior claim of active automation must not be interpreted as working delivery. Diagnostic: `outputs/analysis/automation-top10-20261013/delivery-diagnostic.json`. Computer Use blocks Codex app access, so supported UI repair requires user action. Proposed recovery: restart desktop app, then verify an actual delivered/completed heartbeat; if the conflict persists, use a standalone scheduled task reading STATUS/shared handoff. No scheduler database mutation or app/process termination performed.
+**Scheduled task: migrated to standalone local-project cron.** Existing `continue-rsna-knee-experiments` is ACTIVE/every5minutes; database independently confirms `kind=cron`, root repository cwd, local execution and no target chat. Original heartbeat’s active-writer conflict and subsequent thread/resume timeouts persisted after restart. No internal database mutation: saved task config imported by app. **First actual standalone run started13:21:31UTC**, thread `01a1356c-e61f-78a3-9c1c-82dcf838b6d1`, automation IN_PROGRESS; thread history confirms an active turn and agent output. Scheduling start is restored; completed useful work remains unverified. Receipt `outputs/analysis/automation-top10-20261013/standalone-update-receipt.json`; original heartbeat file preserved for rollback. The standalone Codex worker may advance the existing native ROI review/build/run lane using this STATUS and handoff; this interactive session is doing scheduler recovery bookkeeping only, not editing ROI source or launching its compute.
 
 Handoff identities: **Sol/Astra = Codex; Fable/Opus = Claude**. Two continuing collaborators; names change with the active model. Processed coworker-entry hashes are in ignored `outputs/analysis/handoff-processed-codex.json`; compare every entry, not just lines after our last message, because concurrent entries can arrive out of timestamp order. Delegated subagents are helpers, not additional handoff parties.
 
@@ -33,7 +33,7 @@ Handoff identities: **Sol/Astra = Codex; Fable/Opus = Claude**. Two continuing c
 
 | Owner/task | State / concrete next action |
 | --- | --- |
-| Codex — native joint-crop pilot | Implementation COMPLETE in isolated worktree; parent independently reproduced40 focused testsPASS/0skip. Immutable32-study build UNLAUNCHED. Next parent source/geometry review and one real reader qualification; local tests do not establish anatomy containment or real train/inference parity. No independent runtime allocated. Scheduler delivery failure must be repaired before relying on unattended continuation. |
+| Codex — native joint-crop pilot | Implementation COMPLETE in isolated worktree; parent independently reproduced40 focused testsPASS/0skip. Immutable32-study build UNLAUNCHED. Next parent source/geometry review and one real reader qualification; local tests do not establish anatomy containment or real train/inference parity. No independent runtime allocated. Standalone scheduled worker may take over parent acceptance; verify its first actual run before relying on unattended continuation. |
 | Claude — raptor64 pilot | in-orig / in-plane running epoch10 at last health, final around noon estimate; dr-orig queued serially. .92 evaluator gate removed per Claude; live v1 source frozen, later v2 bundle includes Codex repair. Preserve exact config and checkpoint identities; review final per-target K42/SWA evidence. |
 | Claude — labels and stacking | Relabel pilot and output stacking closed after reported null/negative findings. Gold-membership bug remains a deferred repair; do not reuse that scorer for new labels. |
 | Codex — B0 integration | COMPLETE, commit `a857869`: five sourcefiles byte-exact to submitted builds; source/hash bindingPASS,20focused testsPASS/0skip, synthetic smokePASS. Claude retains monitoring57119585. |
