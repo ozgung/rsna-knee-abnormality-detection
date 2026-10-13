@@ -1,20 +1,33 @@
 """Bundle project sources into a private, reproducible Kaggle notebook."""
 import argparse
+import base64
 import hashlib
 import json
 from pathlib import Path
 import subprocess
+import zlib
 
 
-def build(destination, slug, entry, *, internet=False, kernel_sources=(), weak_labels=True, gpu=True):
+def build(destination, slug, entry, *, internet=False, kernel_sources=(), weak_labels=True, gpu=True,
+          compress_sources=False):
     root = Path(__file__).resolve().parents[1]
     files = {str(p.relative_to(root)): p.read_text() for p in sorted((root / "knee").glob("*.py"))}
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
     digest = hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
+    source_loader = f"sources = {files!r}\n"
+    if compress_sources:
+        payload = base64.b64encode(zlib.compress(json.dumps(files, sort_keys=True).encode(), 9)).decode('ascii')
+        source_loader = (
+            "import base64, zlib, hashlib\n"
+            f"source_payload = {payload!r}\n"
+            "sources = json.loads(zlib.decompress(base64.b64decode(source_payload, validate=True)))\n"
+            f"if hashlib.sha256(json.dumps(sources, sort_keys=True).encode()).hexdigest() != {digest!r}:\n"
+            "    raise ValueError('Packaged source hash mismatch')\n"
+        )
     bootstrap = (
         "import os, sys, json\nfrom pathlib import Path\n"
         "project = Path('/kaggle/working/project')\n"
-        f"sources = {files!r}\n"
+        + source_loader +
         "for name, content in sources.items():\n"
         "    path = project / name\n    path.parent.mkdir(parents=True, exist_ok=True)\n    path.write_text(content)\n"
         "sys.path.insert(0, str(project))\n"

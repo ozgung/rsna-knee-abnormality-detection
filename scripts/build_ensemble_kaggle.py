@@ -94,7 +94,8 @@ def build_selected(baseline_artifacts, comparisons, destination, slug, *, assets
         entry += ("infer(root,encoder,head_paths[0],'/kaggle/working/submission.csv',"
                   "additional_head_paths=head_paths[1:],head_weights=selection['weights'])\n")
     digest = build(destination, slug, entry, internet=False,
-                   kernel_sources=["ozgung/knee-dino-train-20261008"], weak_labels=False)
+                   kernel_sources=["ozgung/knee-dino-train-20261008"], weak_labels=False,
+                   compress_sources=True)
     metadata_path = Path(destination, "kernel-metadata.json")
     metadata = json.loads(metadata_path.read_text())
     metadata["dataset_sources"] = [dataset_source]
