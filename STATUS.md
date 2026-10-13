@@ -1,8 +1,10 @@
 # Project status and session handoff
 
-Updated **2026-10-13 18:45 UTC**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
+Updated **2026-10-13 18:47 UTC**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: AGENTS.md; setup: README.md. [Previous recovery/history](docs/status-archive/status-before-20261012-recovery-terminal.md).
 
 ## Current snapshot
+
+- **R7 acceptance held on two code contracts:** fluid extraction error statuses can bypass the recovery cap; production compile fallback is not bound to the qualified runtime. Claude owns fixes and fresh qualification. R7-only cross-board 1e-3 prospective tolerance accepted; failed v3 preserved. [Decision and ownership](docs/claude-astra-handoff.md).
 
 - **Current work: active Goal in the continuing Codex session; priority is Claude’s R7 candidate acceptance.** Claude owns R7 corrected rehearsal/entry and dr-full launch. Newer local v3summary is FAIL at cross-board sentinel parity (up to2.6e-4; projection7.873h); acceptance is held pending independently qualified correction. Codex/Astra helper `r7_acceptance_astra` performs read-only critical code/provenance/runtime review before parent acceptance. Latest dr-orig K42 .9471 is exposed to Dread pretraining; ImageNet raptor64 K42 .90683 versus own44 .90588 has no significant gain; plane-head route closed and recovery dropped at user request. Native ROIv2 completed with100% all-global fallback (32studies/179series/384jointslots); no native-crop efficacy or fit is established. Do not duplicate these jobs.
 - **B0 submission 57119585 scored 0.940, COMPLETE**, per Claude 07:13; down 0.014 from our preserved best 0.954. This no-OAI candidate is qualified but does not improve the best entry. No duplicate submission. [B0 qualification](docs/experiments/b0-dread-swap-result-20261013.md).
