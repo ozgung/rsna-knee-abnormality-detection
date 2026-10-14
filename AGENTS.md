@@ -2,14 +2,25 @@
 
 ## Session handoff
 
-- Read `STATUS.md` first, then the relevant README sections and code. Treat files and executed checks as evidence; reconcile stale handoff claims before acting.
+- Read `STATUS.md` first: current snapshot, queue, and latest checkpoint; read other sections only when relevant. Then inspect the relevant README sections and code. Reconcile stale claims against files and checks before acting.
 - `STATUS.md` is the primary cross-session handoff and current task queue. Keep changing state there; keep setup in `README.md` and durable working rules here.
+- `docs/claude-astra-handoff.md` is the shared plan and message log between Claude and Astra. Read it after the STATUS snapshot, answer or act on its open items, and append a dated entry to its log when you accept, change or reject a proposal there.
 - Treat the STATUS plan as tentative. After meaningful results or changes to data, rules, time, or compute, reorder, revise, or drop tasks and record the reason in its working decisions. Verify deadlines before calendar planning and preserve time for offline rehearsals.
 - Follow the user's current request. For an open-ended request to continue, pick the first unblocked ready task in `STATUS.md`. Keep one implementation task active at a time.
 - Before substantial work, state the intended outcome and acceptance check. Continue through implementation, relevant verification, and handoff updates within the authorized scope.
 - Update `STATUS.md` at meaningful checkpoints and before ending any session that changes code, plans, environment, or project findings. Record the date, changes, exact checks/results, unresolved issues, and a concrete next action. A discussion with no project impact needs no update.
-- Keep the handoff compact: current snapshot, prioritized queue, blockers, key decisions, latest verification, and latest session note. Replace stale entries instead of accumulating chat transcripts. Link detailed artifacts when they exist.
+- Keep the handoff compact: current snapshot, ready queue, blockers, decisions, verification, and latest note. Move completed history and detailed receipts to linked artifacts; preserve active-job recovery details. Use normal readable prose, not concatenated words or repeated hashes.
 - Record long-running jobs with environment, job/session ID, command, log and checkpoint locations, and resume/stop instructions. Distinguish running, completed, failed, and unverified work.
+
+## Token efficiency
+
+- Complete the authorized task with the smallest sufficient context. Do not skip correctness checks, scientific safeguards, or required verification to save tokens.
+- Search with scoped `rg` queries, then read relevant ranges. Avoid whole-repository dumps and rereading unchanged files or instructions already in context. Expand reads when dependencies or uncertainty require it.
+- Keep tool output bounded: save verbose logs under ignored `outputs/`, return summaries, failures, and evidence paths. For structured results, extract needed fields; do not print entire notebooks, datasets, or logs.
+- Batch independent reads/checks. Reuse verified evidence for unchanged inputs; repeat checks only after relevant changes, failures, or new uncertainty. Back off unchanged job polling and prefer completion notifications when available.
+- Keep updates and final answers brief: outcome, checks, material limits, next action. Avoid repeating plans, instructions, or tool output. Simple edits do not need elaborate plans or separate review agents.
+- Default to one agent. When parallel work is explicitly requested, delegate only independent substantial tasks with concise context and result summaries; avoid duplicate investigations and routine review chains.
+- Load only relevant skills and tools. Keep durable instructions here, setup in README, current state in STATUS, and detailed evidence in linked artifacts; avoid duplicating them across files.
 
 ## Project and scope
 
