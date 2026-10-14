@@ -32,7 +32,8 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def build(destination, *, evidence_root, full_swa_epochs=None, iteration2_teacher_sha256=None, iteration3_teacher_sha256=None):
+def build(destination, *, evidence_root, full_swa_epochs=None, iteration2_teacher_sha256=None, iteration3_teacher_sha256=None,
+          iteration4_teacher_sha256=None):
     out = Path(destination); evidence = Path(evidence_root)
     if out.exists():
         raise ValueError('Fresh bundle directory required')
@@ -51,6 +52,10 @@ def build(destination, *, evidence_root, full_swa_epochs=None, iteration2_teache
         for arm in ('in-distil-w1', 'in-distil-flip'):
             receipt = builder.build(staging / f'raptor64-{arm}-pkg', evidence_root=evidence, arm=arm, teacher_sha256=iteration3_teacher_sha256)
             packages[arm] = {'manifest_sha256': receipt['manifest_sha256'], 'scientific_ast_equal': receipt['scientific_ast_equal'], 'teacher_sha256': iteration3_teacher_sha256}
+    if iteration4_teacher_sha256 is not None:
+        for arm in ('ax-crop', 'ax-full'):
+            receipt = builder.build(staging / f'raptor64-{arm}-pkg', evidence_root=evidence, arm=arm, teacher_sha256=iteration4_teacher_sha256)
+            packages[arm] = {'manifest_sha256': receipt['manifest_sha256'], 'scientific_ast_equal': receipt['scientific_ast_equal'], 'teacher_sha256': iteration4_teacher_sha256}
     if full_swa_epochs is not None:
         receipt = builder.build(staging / 'raptor64-dr-full-pkg', evidence_root=evidence, arm='dr-full', swa_epochs=list(full_swa_epochs))
         packages['dr-full'] = {'manifest_sha256': receipt['manifest_sha256'], 'scientific_ast_equal': receipt['scientific_ast_equal'],
@@ -84,6 +89,7 @@ def build(destination, *, evidence_root, full_swa_epochs=None, iteration2_teache
 if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__); p.add_argument('destination', type=Path); p.add_argument('--evidence-root', type=Path, required=True)
     p.add_argument('--iteration3-teacher-sha256', help='also build in-distil-w1 and in-distil-flip (teacher pinned)')
+    p.add_argument('--iteration4-teacher-sha256', help='also build ax-crop and ax-full (teacher pinned)')
     p.add_argument('--iteration2-teacher-sha256', help='also build in-mirror and in-distil (teacher pinned)')
     p.add_argument('--full-swa-epochs', type=int, nargs=3, help='also build the dr-full package with these pre-registered SWA epochs')
     print(json.dumps(build(**vars(p.parse_args())), indent=2))

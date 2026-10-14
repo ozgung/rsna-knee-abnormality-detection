@@ -29,13 +29,25 @@ VERSION = 'colab-raptor64-run-v1'
 ARMS = {'in-orig': ('imagenet', 'original'), 'in-plane': ('imagenet', 'plane'),
         'dr-orig': ('dread_v4', 'original'), 'dr-plane': ('dread_v4', 'plane'), 'na-orig': ('nartaa_oai', 'original'),
         'dr-full': ('dread_v4', 'original'), 'in-mirror': ('imagenet', 'original'), 'in-distil': ('imagenet', 'original'),
-        'in-distil-w1': ('imagenet', 'original'), 'in-distil-flip': ('imagenet', 'original')}
+        'in-distil-w1': ('imagenet', 'original'), 'in-distil-flip': ('imagenet', 'original'),
+        'ax-crop': ('imagenet', 'original'), 'ax-full': ('imagenet', 'original')}
 FULL_ARMS = frozenset({'dr-full'})
+AXIAL_ARMS = frozenset({'ax-crop', 'ax-full'})   # iteration 4: 12 axial slices -> all 10 windows (train, selection, export)
+AXIAL_K = 10
 EPOCHS = 12
 FINAL_EPOCH = EPOCHS - 1
 DEVELOPMENT = 870
 EXPORT_K = 42
 PREFIX = 'raptor64'
+
+
+def arm_windows(arm):
+    """(train k, selection k_eval, export k) for the arm."""
+    return (AXIAL_K, AXIAL_K, AXIAL_K) if arm in AXIAL_ARMS else (8, 16, EXPORT_K)
+
+
+def comparison_endpoint(arm):
+    return 'K10 primary (selection K10; axial windows)' if arm in AXIAL_ARMS else 'K42 primary (selection K16)'
 
 
 def sha(path):
@@ -121,8 +133,9 @@ def validate(c):
             (policy['workers'] != 2 and not policy.get('worker_choice_name'))):
         raise ValueError('Frozen worker choice differs')
     f = policy['frozen']; full = arm in FULL_ARMS
+    kt, ke, kx = arm_windows(arm)
     if (f['epochs'], f['k'], f['k_eval'], f['res'], f['fold'], f['folds'], f['time_budget_h'], policy.get('export_k')) != (
-            EPOCHS, 8, 16, 384, -1 if full else 0, 0 if full else 5, 0, EXPORT_K) or (policy.get('mode') == 'full') != full:
+            EPOCHS, kt, ke, 384, -1 if full else 0, 0 if full else 5, 0, kx) or (policy.get('mode') == 'full') != full:
         raise ValueError('Frozen training recipe differs')
     if c['persister_sha256'] != PERSISTER_SHA or sha(c['persister']) != PERSISTER_SHA:
         raise ValueError('Authoritative persister source differs')
@@ -161,7 +174,7 @@ def environment(c):
     return env
 
 
-PROBE = '''import json,platform,random,sys,torch,timm,numpy
+PROBE = '''import json,os,platform,random,sys,torch,timm,numpy
 from knee import raptor64_training as s
 s.strict_cuda(torch)
 v,m,ids=s.staged_corpus()
@@ -171,27 +184,30 @@ b=tk.build_backbone(s.ARCH,pretrained=False);i=s.initialize_backbone(b,"train_kn
 b.set_grad_checkpointing(True)
 model=tk.RaptorClassifier(b,F_dim=b.num_features).cuda();model.win_chunk=8
 state={k:t.detach().clone() for k,t in model.state_dict().items()}
-rows=[0,1,2,3];id2row={str(u):j for j,u in enumerate(ids)};lab={str(ids[j]):numpy.zeros(12,numpy.float32) for j in rows}
+kt=int(os.environ["RAPTOR64_PROBE_K"]);ke=int(os.environ["RAPTOR64_PROBE_K_EVAL"])
+rows=list(range(16));id2row={str(u):j for j,u in enumerate(ids)};lab={str(ids[j]):numpy.zeros(12,numpy.float32) for j in rows}
 py=random.getstate();npst=numpy.random.get_state();cpu=torch.get_rng_state();cuda=torch.cuda.get_rng_state_all()
-ds=tk.StudyWindows("",[str(ids[j]) for j in rows],id2row,lab,384,8,train=True,norm="imagenet")
+ds=tk.StudyWindows("",[str(ids[j]) for j in rows],id2row,lab,384,kt,train=True,norm="imagenet")
 x,y=tk.collate([ds[j] for j in range(4)])
 torch.cuda.reset_peak_memory_stats();model.train()
 with torch.autocast("cuda",dtype=torch.float16):out=model(x.to("cuda"))
 loss=torch.nn.functional.binary_cross_entropy_with_logits(out.float(),y[:,:12].cuda());loss.backward()
 finite=bool(torch.isfinite(out).all()) and all(bool(torch.isfinite(p.grad).all()) for p in model.parameters() if p.grad is not None)
 train_peak=torch.cuda.max_memory_allocated()
-model.eval();ev=tk.StudyWindows("",[str(ids[0])],id2row,lab,384,42,train=False,norm="imagenet")
+model.eval();ev=tk.StudyWindows("",[str(ids[0])],id2row,lab,384,ke,train=False,norm="imagenet")
 xe,_=tk.collate([ev[0]])
 with torch.no_grad(),torch.autocast("cuda",dtype=torch.float16):oe=model(xe.to("cuda"))
 model.load_state_dict(state);random.setstate(py);numpy.random.set_state(npst);torch.set_rng_state(cpu);torch.cuda.set_rng_state_all(cuda)
 print(json.dumps({"python":platform.python_version(),"torch":torch.__version__,"timm":timm.__version__,"numpy":numpy.__version__,"cuda":torch.version.cuda,
  "gpu":torch.cuda.get_device_name(0),"threads":torch.get_num_threads(),"studies":len(ids),"initializer":i,"device":"cuda",
  "probe":{"train_batch_shape":list(x.shape),"eval_windows":int(xe.shape[1]),"finite":finite and bool(torch.isfinite(oe).all()),
- "train_peak_cuda_bytes_bs4_k8":train_peak,"head":type(model).__name__,"synthetic":False,"rows":"first four corpus rows; no labels"}}))
+ "train_peak_cuda_bytes_bs4_k8":train_peak,"head":type(model).__name__,"synthetic":False,"rows":"first four dataset items of the first 16 corpus rows; no labels"}}))
 '''
 
 
 def runtime_probe(c, env):
+    kt, _, kx = arm_windows(c['arm'])
+    env = {**env, 'RAPTOR64_PROBE_K': str(kt), 'RAPTOR64_PROBE_K_EVAL': str(kx)}
     p = subprocess.run([sys.executable, '-c', PROBE], cwd=c['package_root'], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     private_diagnostic(Path(c['workdir']) / f'{PREFIX}-runtime-stdout.log', p.stdout)
     private_diagnostic(Path(c['workdir']) / f'{PREFIX}-runtime-stderr.log', p.stderr)
@@ -201,7 +217,8 @@ def runtime_probe(c, env):
     init = result.get('initializer', {})
     if (result.get('device') != 'cuda' or result.get('threads') != 1 or result.get('studies') != 4345 or result.get('timm') != '1.0.26' or
             init.get('missing') != 0 or init.get('unexpected') != 0 or init.get('init') != ARMS[c['arm']][0] or
-            result.get('probe', {}).get('finite') is not True or result['probe'].get('eval_windows') != EXPORT_K):
+            result.get('probe', {}).get('finite') is not True or result['probe'].get('eval_windows') != kx or
+            result['probe'].get('train_batch_shape', [None, None])[1] != kt):
         raise ValueError('Runtime environment/initializer/forward probe differs')
     return result
 
@@ -238,7 +255,7 @@ def stream(process, label, diagnostic_path):
 
 
 def primary_complete(work, fold=0, development=DEVELOPMENT, experiment_split=None, cache_content=None, arm=None):
-    """Complete twelve-epoch, top-3 SWA, K42 export of the fixed 870 development studies."""
+    """Complete twelve-epoch, top-3 SWA, K42 (axial arms: K10) export of the fixed 870 development studies."""
     if fold != 0:
         raise ValueError('Raptor64 is fold-0 only')
     record = json.loads((Path(work) / 'run_fold0.json').read_bytes())
@@ -251,9 +268,10 @@ def primary_complete(work, fold=0, development=DEVELOPMENT, experiment_split=Non
         raise ValueError('Export arm differs')
     if record.get('mode') == 'full' or (arm is not None and arm in FULL_ARMS):
         return full_complete(work, record, meta, experiment_split, cache_content, arm)
+    policy_arm = (record.get('raptor64_policy') or {}).get('arm')
     if (record.get('fold') != 0 or record.get('epochs_requested') != EPOCHS or record.get('epochs_completed') != EPOCHS or
             record.get('stopped_by_time_budget') or record.get('checkpoint_kind') != 'swa_topk' or
-            record.get('comparison_endpoint') != 'K42 primary (selection K16)' or record.get('export', {}).get('k_eval') != EXPORT_K or
+            record.get('comparison_endpoint') != comparison_endpoint(policy_arm) or record.get('export', {}).get('k_eval') != arm_windows(policy_arm)[2] or
             record['export'].get('n_val') != development or record['export'].get('n_gold') != 0 or
             len(record.get('selected_epochs', [])) != 3 or len(set(record['selected_epochs'])) != 3 or
             record.get('history') != meta.get('hist') or meta.get('partial') or [h['ep'] for h in meta.get('hist', [])] != list(range(EPOCHS))):

@@ -308,7 +308,7 @@ class RunnerTests(unittest.TestCase):
     def test_runtime_probe_result_checks(self):
         good = {'device': 'cuda', 'threads': 1, 'studies': 4345, 'timm': '1.0.26',
                 'initializer': {'missing': 0, 'unexpected': 0, 'init': 'imagenet'},
-                'probe': {'finite': True, 'eval_windows': 42}}
+                'probe': {'finite': True, 'eval_windows': 42, 'train_batch_shape': [4, 8, 3, 384, 384]}}
         def run_with(value):
             completed = subprocess.CompletedProcess([], 0, 'noise\n' + json.dumps(value) + '\n', '')
             with patch.object(runner.subprocess, 'run', return_value=completed):
@@ -316,8 +316,8 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(run_with(good), good)
         bad = [{**good, 'device': 'cpu'}, {**good, 'threads': 4}, {**good, 'studies': 4344}, {**good, 'timm': '1.0.25'},
                {**good, 'initializer': {**good['initializer'], 'missing': 1}}, {**good, 'initializer': {**good['initializer'], 'unexpected': 2}},
-               {**good, 'initializer': {**good['initializer'], 'init': 'dread_v4'}}, {**good, 'probe': {'finite': False, 'eval_windows': 42}},
-               {**good, 'probe': {'finite': True, 'eval_windows': 16}}]
+               {**good, 'initializer': {**good['initializer'], 'init': 'dread_v4'}}, {**good, 'probe': {**good['probe'], 'finite': False}},
+               {**good, 'probe': {**good['probe'], 'eval_windows': 16}}, {**good, 'probe': {**good['probe'], 'train_batch_shape': [4, 10, 3, 384, 384]}}]
         for value in bad:
             with self.subTest(value=value), self.assertRaises(ValueError):
                 run_with(value)

@@ -167,7 +167,7 @@ class FlipDistilTests(unittest.TestCase):
             self.assertTrue(torch.equal(ev[0][0], er[0][0])); self.assertEqual(tuple(ev[0][1].shape), (12,))
 
     def test_it3_policy_weights(self):
-        self.assertEqual(guard.DISTIL_WEIGHTS, {'in-distil': 0.5, 'in-distil-w1': 1.0, 'in-distil-flip': 0.5})
+        self.assertEqual(guard.DISTIL_WEIGHTS, {'in-distil': 0.5, 'in-distil-w1': 1.0, 'in-distil-flip': 0.5, 'ax-crop': 0.5, 'ax-full': 0.5})
         self.assertEqual((guard.VARIANTS['in-distil-w1'], guard.VARIANTS['in-distil-flip']), ('distil', 'distil_flip'))
         for arm in ('in-distil-w1', 'in-distil-flip'):
             self.assertLessEqual(len(f'knee-raptor64-{arm}-fold0-final-20261014'), 50)
@@ -232,6 +232,189 @@ class BuilderTests(unittest.TestCase):
             self.assertNotIn('mirror_tta_csv', (tmp / 'fl/tracka_entry.py').read_text())
             strip = lambda p: {k: v for k, v in p.items() if k not in ('recipe', 'arm', 'teacher', 'flip', 'variant', 'head_definition', 'initializer')}
             self.assertEqual(strip(w1), strip(fl))
+
+
+def axial_phantom(anterior_top=True, seed=0):
+    """Synthetic 64-slot volume: non-axial slots constant 7; axial slots = air, a wide posterior soft-tissue mass and a
+    narrow anterior (patella-like) blob plus per-slice texture; vertically mirrored when anterior_top is False."""
+    import numpy as np
+    rng = np.random.default_rng(seed)
+    v = np.full((64, 336, 336), 7, np.uint8)
+    for s in range(52, 64):
+        img = np.zeros((336, 336), np.uint8)
+        img[150:300, 40:296] = 120; img[60:110, 140:196] = 200
+        img = np.where(img > 0, np.clip(img.astype(int) + rng.integers(-20, 20, img.shape) + (s - 52), 1, 255), 0).astype(np.uint8)
+        v[s] = img if anterior_top else img[::-1]
+    return v
+
+
+def axial_slots(selected, frames):
+    from knee import raptor64_cache as cache
+    return ([{'plane': p, 'selected': True, 'fluid_sensitive': 0, 'frames': 20, 'count': c} for p, _, c in cache.SLOTS[:4]] +
+            [{'plane': 'Axial', 'selected': selected, 'fluid_sensitive': 0 if selected else None, 'frames': frames, 'count': 12}])
+
+
+@unittest.skipUnless(HAVE, 'NumPy/PyTorch and the pinned historical trainer required')
+class AxialArmTests(unittest.TestCase):
+    """it4 ax-crop / ax-full: axial slots only, anterior crop, all 10 windows, no-axial exclusion, label-preserving AP flip."""
+    CROP = {'anterior': 0.55, 'central': 0.65}
+
+    def test_orientation_rule_and_crop_geometry(self):
+        import numpy as np
+        top, bottom = axial_phantom(True), axial_phantom(False)
+        self.assertEqual(guard.axial_anterior_side(top[52:64]), 'top')
+        self.assertEqual(guard.axial_anterior_side(bottom[52:64]), 'bottom')
+        self.assertEqual(guard.axial_anterior_side(np.zeros((12, 336, 336), np.uint8)), 'top')   # undecidable -> storage order
+        self.assertEqual(guard.axial_crop_box(336, 336, self.CROP), (0, 185, 59, 277))
+        crop, full = guard.AXIAL_SPECS['ax-crop'], guard.AXIAL_SPECS['ax-full']
+        a = guard.axial_block(top, crop)
+        self.assertEqual(a.shape, (12, 185, 218)); self.assertTrue(np.array_equal(a, top[52:64, 0:185, 59:277]))
+        self.assertTrue(np.array_equal(guard.axial_block(bottom, crop), bottom[52:64, 0:185, 59:277]), 'storage order; the heuristic is audit-only')
+        self.assertTrue(np.array_equal(guard.axial_block(top, crop, flip=True), a[:, ::-1]))
+        f = guard.axial_block(top, full)
+        self.assertEqual(f.shape, (12, 336, 336)); self.assertTrue(np.array_equal(f, top[52:64]))
+        self.assertTrue(np.array_equal(guard.axial_block(bottom, full), bottom[52:64]))
+        self.assertTrue(np.array_equal(guard.axial_block(top, full, flip=True), top[52:64, ::-1]))
+        self.assertFalse((guard.axial_block(axial_phantom(True), full) == 7).any(), 'only axial slots are read')
+
+    def datasets(self, arm):
+        import numpy as np
+        ids = ['a', 'b', 'c']; id2row = {u: i for i, u in enumerate(ids)}
+        vols = np.stack([axial_phantom(True, 0), axial_phantom(False, 1), axial_phantom(True, 2)]); masks = np.ones((3, 64), np.uint8)
+        vols[2, 52:64] = 0; masks[2, 52:64] = 0           # study c: no axial series -> all-masked axial block
+        labels = {u: np.linspace(0, 1, 12).astype(np.float32) * (i + 1) / 3 for i, u in enumerate(ids)}
+        probs = np.random.default_rng(3).uniform(0, 1, (3, 12)).astype(np.float32)
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        path = Path(tmp.name) / 't.npz'; np.savez(path, ids=np.asarray(ids), probs=probs)
+        policy = {'variant': 'axial', 'axial': guard.AXIAL_SPECS[arm], 'teacher': {'sha256': smoke.file_sha(path), 'weight': 0.5}}
+        SW, _, _ = base_tests.historical_classes()
+        stack = [patch.dict(os.environ, {'RAPTOR64_TEACHER': str(path)}), patch.object(guard, '_CORPUS', ('v', 'm', np.asarray(ids))),
+                 patch.object(guard, '_CACHE_IDENTITY', {'fixture': False}), patch.object(guard, 'recipe', return_value=policy),
+                 patch.object(guard, '_AXIAL', {'a': True, 'b': True, 'c': False})]
+        for s in stack:
+            s.start(); self.addCleanup(s.stop)
+        AX = guard.recipe_variant(SW, 'x')
+        tr = AX('', ids, id2row, labels, 32, 10, train=True, aug=False, norm='imagenet'); tr.vols, tr.masks = vols, masks
+        ev = AX('', ids, id2row, labels, 32, 10, train=False, norm='imagenet'); ev.vols, ev.masks = vols, masks
+        return tr, ev, vols, labels, probs
+
+    def reference(self, block):
+        import torch
+        from torch.nn import functional as F
+        mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1); std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+        tiles = []
+        for c in range(1, 11):
+            tri = torch.from_numpy(block[c - 1:c + 2].astype('float32') / 255.0)
+            tiles.append((F.interpolate(tri[None], size=(32, 32), mode='bilinear', align_corners=False)[0] - mean) / std)
+        return torch.stack(tiles)
+
+    def test_axial_slots_ten_windows_exclusion_and_label_preserving_flip(self):
+        import numpy as np
+        import torch
+        self.assertEqual(guard.eval_centers(np.ones(12), 12, 10), list(range(1, 11)))
+        for arm in ('ax-crop', 'ax-full'):
+            with self.subTest(arm=arm):
+                tr, ev, vols, labels, probs = self.datasets(arm)
+                spec = guard.AXIAL_SPECS[arm]
+                self.assertEqual(tr.ids, ['a', 'b'], 'training excludes the study without axial content')
+                self.assertEqual(ev.ids, ['a', 'b', 'c'], 'evaluation keeps every development study')
+                for i, u in enumerate(['a', 'b']):
+                    x, y = ev[i]
+                    self.assertEqual(tuple(x.shape), (10, 3, 32, 32)); self.assertEqual(tuple(y.shape), (12,))
+                    self.assertTrue(torch.allclose(x, self.reference(guard.axial_block(vols[i], spec)), atol=1e-6), 'windows = axial slots 52-63 only')
+                    if arm == 'ax-crop':
+                        self.assertTrue(torch.allclose(x, self.reference(vols[i, 52:64, 0:185, 59:277]), atol=1e-6), 'anterior 55% x central 65%')
+                    with patch('random.random', return_value=0.99), patch('random.shuffle', lambda seq: None):
+                        xn, yn = tr[i]                       # no flip; identity shuffle -> every centre once, in order
+                    with patch('random.random', return_value=0.0), patch('random.shuffle', lambda seq: None):
+                        xf, yf = tr[i]                       # AP flip
+                    self.assertTrue(torch.equal(xn, x), 'training uses all 10 windows')
+                    self.assertTrue(torch.allclose(xf, self.reference(guard.axial_block(vols[i], spec, flip=True)), atol=1e-6))
+                    self.assertTrue(torch.allclose(xf, x.flip(-2), atol=1e-5))
+                    for yy in (yn, yf):
+                        self.assertEqual(tuple(yy.shape), (24,))
+                        self.assertTrue(np.array_equal(yy[:12].numpy(), labels[u]), 'labels changed under AP flip')
+                        self.assertTrue(np.array_equal(yy[12:].numpy(), probs[i]), 'teacher targets changed under AP flip')
+                xc, yc = ev[2]                               # no-axial study still predicted (blend falls back to in-distil)
+                self.assertEqual(tuple(xc.shape), (10, 3, 32, 32)); self.assertEqual(tuple(yc.shape), (12,))
+
+    def test_shuffled_training_windows_are_a_permutation_of_all_centres(self):
+        import torch
+        tr, ev, _, _, _ = self.datasets('ax-crop')
+        x_eval = ev[0][0]
+        random.seed(7)
+        with patch('random.random', return_value=0.99):
+            x, _ = tr[0]
+        matches = sorted(int(torch.argmin(((x_eval - w) ** 2).flatten(1).sum(1))) for w in x)
+        self.assertEqual(matches, list(range(10)))
+
+    def test_axial_presence_from_slot_metadata(self):
+        manifest = {'entries': [{'StudyInstanceUID': 'a', 'slots': axial_slots(True, 30)}, {'StudyInstanceUID': 'b', 'slots': axial_slots(False, 0)},
+                                {'StudyInstanceUID': 'c', 'slots': axial_slots(True, 0)}]}
+        self.assertEqual(guard.axial_presence(manifest), {'a': True, 'b': False, 'c': False})
+        bad = {'entries': [{'StudyInstanceUID': 'a', 'slots': axial_slots(True, 30)[:4] + [{'plane': 'Coronal', 'selected': True, 'frames': 3, 'count': 12}]}]}
+        with self.assertRaises(ValueError):
+            guard.axial_presence(bad)
+
+    def test_it4_policy_pins(self):
+        from knee import raptor64_cache as cache
+        self.assertEqual(sum(c for _, _, c in cache.SLOTS[:4]), 52); self.assertEqual(cache.SLOTS[4], ('Axial', -1, 12))
+        self.assertEqual((guard.AXIAL_SLOTS, guard.AXIAL_WINDOWS, guard.AXIAL_INDEX), ((52, 64), 10, 4))
+        common = {'slots': [52, 64], 'windows': 10, 'ap_flip_p': 0.5, 'orientation': 'storage-order-anterior-top-v1 (centroid heuristic audited and rejected)',
+                  'train_exclusion': 'studies with no axial content (axial slot not selected or zero frames)',
+                  'eval': 'all 870 predicted; studies without axial content fall back to in-distil alone in the blend'}
+        self.assertEqual(guard.AXIAL_SPECS, {'ax-crop': {**common, 'crop': {'anterior': 0.55, 'central': 0.65}}, 'ax-full': {**common, 'crop': None}})
+        self.assertEqual((guard.VARIANTS['ax-crop'], guard.VARIANTS['ax-full']), ('axial', 'axial'))
+        self.assertEqual((guard.DISTIL_WEIGHTS['ax-crop'], guard.DISTIL_WEIGHTS['ax-full']), (0.5, 0.5))
+        self.assertEqual(guard.ARMS['ax-crop'], ('imagenet', 'original')); self.assertEqual(guard.ARMS['ax-full'], ('imagenet', 'original'))
+        self.assertEqual(guard.FROZEN_AXIAL, {**guard.FROZEN, 'k': 10, 'k_eval': 10})
+        self.assertEqual((guard.frozen_for('ax-crop'), guard.export_k_for('ax-full')), (guard.FROZEN_AXIAL, 10))
+        self.assertEqual((guard.frozen_for('in-distil'), guard.export_k_for('in-distil'), guard.frozen_for('dr-full')), (guard.FROZEN, 42, guard.FROZEN_FULL))
+        spec = importlib.util.spec_from_file_location('r64run_ax', ROOT / 'scripts/colab_raptor64_run.py')
+        runner = importlib.util.module_from_spec(spec); spec.loader.exec_module(runner)
+        self.assertEqual((runner.arm_windows('ax-crop'), runner.arm_windows('in-distil')), ((10, 10, 10), (8, 16, 42)))
+        self.assertEqual(runner.comparison_endpoint('ax-full'), 'K10 primary (selection K10; axial windows)')
+        for arm in ('ax-crop', 'ax-full'):
+            self.assertLessEqual(len(f'knee-raptor64-{arm}-fold0-final-20261014'), 50)
+            policy = {'version': 1, 'arm': arm, 'init': 'imagenet', 'head': 'original', 'frozen': guard.FROZEN_AXIAL, 'export_k': 10,
+                      'experiment_split': guard.SPLITS[0], 'experiment_split_sha256': smoke.digest(smoke.canonical(guard.SPLITS[0])),
+                      'variant': 'axial', 'axial': guard.AXIAL_SPECS[arm], 'teacher': {'weight': 0.5, 'sha256': 'a' * 64, 'source': 'dread_v4_full_k42'}}
+            guard.validate_policy(policy)
+            for bad in ({'frozen': guard.FROZEN}, {'export_k': 42}, {'axial': {**guard.AXIAL_SPECS[arm], 'ap_flip_p': 0.0}},
+                        {'axial': guard.AXIAL_SPECS['ax-full' if arm == 'ax-crop' else 'ax-crop']}, {'teacher': {**policy['teacher'], 'weight': 1.0}}):
+                with self.subTest(arm=arm, bad=bad), self.assertRaises(ValueError):
+                    guard.validate_policy({**policy, **bad})
+
+
+@unittest.skipUnless(HAVE and BUNDLE_V1.is_file(), 'pinned evidence and bundle v1 required')
+class AxialBuilderTests(unittest.TestCase):
+    def test_axial_packages(self):
+        import ast
+        spec = importlib.util.spec_from_file_location('b64ax', ROOT / 'scripts/build_raptor64_training.py')
+        builder = importlib.util.module_from_spec(spec); spec.loader.exec_module(builder)
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            with self.assertRaises(ValueError):
+                builder.build(tmp / 'none', evidence_root=EVIDENCE, arm='ax-crop')
+            policies = {}
+            for arm in ('ax-crop', 'ax-full'):
+                r = builder.build(tmp / arm, evidence_root=EVIDENCE, arm=arm, teacher_sha256='a' * 64)
+                self.assertTrue(r['scientific_ast_equal'])
+                trainer = (tmp / arm / 'train_knee_patched.py').read_text(); entry = (tmp / arm / 'tracka_entry.py').read_text()
+                self.assertIn(builder.VARIANT_HOOK.strip(), trainer); self.assertIn('lossf = raptor64.loss_variant(lossf, __file__)', trainer)
+                self.assertIn('k_eval = raptor64.AXIAL_WINDOWS', entry); self.assertNotIn('k_eval = raptor64.EXPORT_K', entry)
+                self.assertIn('"comparison_endpoint": "K10 primary (selection K10; axial windows)"', entry); self.assertNotIn('mirror_tta_csv', entry)
+                tree = ast.parse(entry)
+                defaults = ast.literal_eval(next(n.value for n in tree.body if isinstance(n, ast.Assign) and any(getattr(t, 'id', None) == 'PARAM_DEFAULTS' for t in n.targets)))
+                self.assertEqual((defaults['K'], defaults['K_EVAL'], defaults['EPOCHS']), ('10', '10', '12'))
+                policies[arm] = guard.recipe(tmp / arm / 'train_knee_patched.py')
+                self.assertEqual((policies[arm]['variant'], policies[arm]['axial'], policies[arm]['frozen'], policies[arm]['export_k']),
+                                 ('axial', guard.AXIAL_SPECS[arm], guard.FROZEN_AXIAL, 10))
+                self.assertEqual(policies[arm]['teacher']['weight'], 0.5)
+            strip = lambda p: {k: v for k, v in p.items() if k not in ('recipe', 'arm', 'axial')}
+            self.assertEqual(strip(policies['ax-crop']), strip(policies['ax-full']), 'the crop is the only factor between the arms')
+            self.assertEqual({k: v for k, v in policies['ax-crop']['axial'].items() if k != 'crop'},
+                             {k: v for k, v in policies['ax-full']['axial'].items() if k != 'crop'})
 
 
 if __name__ == '__main__':

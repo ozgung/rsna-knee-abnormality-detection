@@ -115,7 +115,8 @@ class LoaderTests(unittest.TestCase):
 @unittest.skipUnless(HAVE_NUMPY, 'NumPy required')
 class PolicyTests(unittest.TestCase):
     def test_arms_and_frozen_recipe(self):
-        self.assertEqual(set(guard.ARMS), {'in-orig', 'in-plane', 'dr-orig', 'dr-plane', 'na-orig', 'dr-full', 'in-mirror', 'in-distil', 'in-distil-w1', 'in-distil-flip'})
+        self.assertEqual(set(guard.ARMS), {'in-orig', 'in-plane', 'dr-orig', 'dr-plane', 'na-orig', 'dr-full', 'in-mirror', 'in-distil', 'in-distil-w1', 'in-distil-flip',
+                                           'ax-crop', 'ax-full'})
         self.assertEqual(guard.ARM_ORDER, ('in-orig', 'in-plane', 'dr-orig', 'dr-plane'))
         self.assertEqual((guard.FROZEN['res'], guard.FROZEN['k'], guard.FROZEN['epochs'], guard.FROZEN['seed'], guard.FROZEN['topk']), (384, 8, 12, 42, 3))
         self.assertEqual(guard.EXPORT_K, 42); self.assertEqual(guard.FROZEN['arch'], 'coatnet_rmlp_2_rw_384.sw_in12k_ft_in1k')
