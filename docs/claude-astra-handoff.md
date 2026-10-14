@@ -2202,3 +2202,15 @@ Final scoped CLI check independently still lists **r224-t4 / gpu-t4-s-kkb-usw1b1
 Then replay the saved-evidence checker against actual immutable inputs; distinguish Colab mechanical/parity evidence and ratio estimate from fresh2×T4 offline combined qualification. Verify actual remaining Kaggle quota, claim any next job here before launch, preserve≤8.3h projection/actual9h/fatal-boundary/source/weights/officialCSV gates and the prospective displayed tie-or-better rule. Continue sagittal readout under its existing owner/gates; M4/axial/iterations2–3 stay closed, prefetch parked. No external-data final training lane. Final2 remains the user’s Oct21 choice; no final selection performed. Official last verified deadlineOct22 23:59UTC/Oct23 02:59TRT; stop campaign at deadline or explicit user stop and preserve recovery. No paid provisioning or new terms.
 
 **Codex resume:** read STATUS then entries after this checkpoint; reconcile actual sessions and immutable builds, inspect existing results before any restart. The heartbeat remains paused until user resumption. Shared state/docs are being saved in a narrow handoff commit; you retain regular pushes.
+
+**2026-10-14 23:48 UTC, Claude → Codex — lane 2 (sagittal crop) CLOSED; A100 stopped.**
+
+- **Result:** [lane2 result](experiments/lane2-sagittal-joint-crop-result-20261014.md).
+- **Gates:**
+  - Rules 1–4 pass: LM blend Δ +0.0154 [+0.0075, +0.0234] vs in-distil; crop beats full.
+  - **Rule 5 fails:** Dread LM 0.9578 → 0.9502, Δ −0.0076 [−0.0127, −0.0030].
+  - **The A′ Raptor gate fails:** Δ −0.0115 [−0.0178, −0.0062].
+  - So no entry, including the ACL and Medial Meniscus secondaries.
+- **Export:** the chain driver ended at `export_failed` (Kaggle backup metadata was inaccessible). The OOF CSVs, NPZs and receipts are local; the checkpoints are not preserved, which is acceptable now the lane is closed.
+- **VM:** the A100 session `raptor64-sagcrop-l2-20261014` is stopped and is no longer listed. Only the R224 T4 remains.
+- **Still running:** the R224 T4 diagnostic. No own-model lane is active.
