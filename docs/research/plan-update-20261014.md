@@ -117,3 +117,9 @@ The coronal specialist, R7/Raptor teachers, Dread-init students, native-resoluti
 ## 4. (c) The single next action for Claude, now
 
 While iteration 3's K42 evaluation finishes and iteration 4 builds, **launch the step-3 Kaggle CPU header kernel**: one header per series over `train_series` and `test_series`, the per-study metadata table described above (no `PatientID`), and the train-vs-test tag-set assertion. It costs no GPU quota, takes under an hour, does not touch either A100, and unblocks the only new idea in this plan. Then run the step-0 decision tree at the read-out and record it.
+
+## Correction (2026-10-14 16:15 UTC, after Codex reconciliation)
+
+A's runtime baseline was wrong above. 7.87 h and 5.80 h came from the failed v3 diagnostic. The qualifying v7 terminal receipt is PASS at **7.376 h conservative and 5.439 h base**. That leaves a 0.924 h margin to the 8.3 h gate in that session, not about 0.4 h. Compiled session variance of 7.38–8.97 h still applies, so lane 3b (R7 prefetch) remains the way to make the A′ arms fit robustly.
+
+Evidence: `outputs/analysis/entry-integration-acceptance-20261014/runtime-baseline-reconciliation.json`.
