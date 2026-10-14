@@ -1,0 +1,31 @@
+# Same-series extent ROI qualification v2 — October 14, 2026
+
+Protocol `same-series-sagittal-extent-matched24-v2`. This separate prospective correction preserves v1's failed anatomical containment evidence and all 32 original frozen studies. It is a reader qualification, with no classifier, fitting, outcome values, efficacy estimate or per-study exclusions. Machine advancement remains false and anatomy remains `UNVERIFIED`, even if mechanics pass.
+
+## Frozen crop contract
+
+Only the originating aligned sagittal native series supplies support. The pinned `AnchorBank.segment(series, geometry, n_slices=7)` preprocessing and SKM-TEA weights run on the CPU/private/offline qualification host. No candidate centroid, study record, slab prior, cross-series averaging or transfer is used. Its four channels mean only source p0 patellar tissue and source p1:4 joint tissues; finer class names are unverified. P0 is optional.
+
+Threshold probabilities strictly above 0.5. Accept each class at each sampled native depth only when at least 40 thresholded pixels exist. Accepted joint channels 1:4 must have at least 250 aggregate **union** pixels across sampled depths and at least two channels must have accepted support. Overlapping classes cannot inflate joint mass. Build the envelope from accepted support across all four channels and sampled depths, centered on the envelope midpoint. Save raw binary masks, accepted flags, class counts, exact union mass and native depths. Border fallback uses accepted support; raw border fragments below 40 pixels are recorded without changing this frozen gate.
+
+Request a square physical field at least 100 mm and at most 140 mm, with at least 10 mm fixed margin on each edge. Select the smallest whole millimetre ceiling that supplies all four margins after source dimension and center rounding. The rounded rectangle must fit wholly in the source field and the pinned source geometry must reproduce it exactly. No clipping, shifting or shrinking is permitted. Accepted foreground on a source border, insufficient/partial joint support, cap exceedance, non-fitting crop/margins, missing geometry, unaligned geometry or unsupported plane gives exact global fallback with an explicit reason. Unknown statuses, resource/programming failures, malformed probabilities, shape/depth/origin/spacing contracts fail the job rather than masquerading as anatomical fallback.
+
+## Reader and evidence
+
+The new [shared adapter](../../knee/same_series_extent_roi.py) keeps pinned intensity normalization, slab pooling, letterboxing and matched24 allocation: 12 unchanged all-series global context triplets plus 12 round-robin eligible sagittal supplements, control global and treatment extent ROI. No eligible sagittal series duplicates the original 12 global triplets. Every slot remains valid and missing planes do not create synthetic zero views. The source selector is restored in a `finally` block on failure.
+
+Repeat the same adapter and compare arrays, plans, receipts, view masks and all segmentation arrays. Hash native bytes and localizer state before/after. Save compressed per-class masks/depths and native contour overlays at every sampled depth, all source-series overview images, and paired panels containing every selected triplet's constituent native slab support. These are private artifacts; identifiers, images and masks remain ignored.
+
+The [builder](../../scripts/build_same_series_extent_roi.py) binds the published source closure, exact v1/v2 helper bytes, weights, frozen membership, official schema and series bytes, source revision, Python codec ABI, pinned codecs, vendor MONAI and Kaggle environment image. It requires a fresh ignored output directory and a distinct kernel slug under 50 characters. Notebook compilation/source auditing does not execute public pixel/segmenter code locally.
+
+## Acceptance and limitations
+
+Parent owns integration, immutable build acceptance, one fresh private CPU/offline frozen32 run, and independent mechanics/anatomy review. Complete selected-native-depth review must find **zero observed truncation or uncertainty**, and fallback must be at most 30% of supplemental slots before advancement is considered. Continue reviewing the complete sample even after a failed case. This does not permit a 2% known truncation rate. Whole-corpus coverage, fallback frequency and predictive performance remain unknown. No fit is authorized by a synthetic pass.
+
+Synthetic acceptance and exact check results are recorded below after verification. No public pixel/segmenter code, model execution, image downloads, remote launches, classifier fit or submission occurs in this implementation task.
+
+## Local verification checkpoint
+
+October 14, 2026: final v2 focused suite **21 tests PASS, zero skips** using the root Python 3.12 ML environment, `KNEE_EVIDENCE_ROOT` pointing to the root's audited private fixture, and `PYTHONPATH=/private/tmp/own-rehearsal-test-deps/cv2` for the installed OpenCV binary. This is synthetic rendering plus static source binding only. Earlier combined v1/v2 suites passed 35 tests before the final two boundary tests were added; v1 source remained unchanged. Dependency-free `python3.12 -m knee.smoke` passed on synthetic CPU data with no torch forward or training. Source files compile, links resolve, and trailing-whitespace checks pass. The original v1 adapter/builder/test bytes equal base revision `5eb8882`.
+
+Parent independently reproduced the combined v1/v2 suite: **37 tests PASS, zero skips**, including the audited source-only fixture and synthetic contour/mask rendering. Dependency-free smoke passed; v1 reader/builder/tests are unchanged. The full repository suite is not required for these isolated new modules; no backend/real-pixel qualification, anatomical acceptance, whole-corpus inference, remote job or classifier fit was exercised. Parent's concrete next action is review these four files, freeze one distinct immutable v2 build, then run and audit the fresh frozen32 qualification before any fit. Local implementation receipt: `outputs/analysis/same-series-extent-roi-20261014/implementation-receipt.json` (ignored).
