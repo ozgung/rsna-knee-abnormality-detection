@@ -36,6 +36,12 @@ This small explicit interchange contract is pending owner handover, not a claime
 
 Only `ax-crop` → `PF OA` and `sag-crop` → `Lateral Meniscus`, optionally `ACL`/`Medial Meniscus`, are admitted. The primary target comes first and is mandatory; target sets are disjoint and every admitted target has fixed weight `0.3`. No fusion function, rank population or tie policy is supplied by this harness. All unmodified CSV tokens and every unavailable component's affected target tokens must equal the base strings exactly. The visible CSV must equal the corresponding combined rows, including formatting.
 
+### October 14 20:29 A′ host-column addendum
+
+The axial lane is closed after its preregistered failure; its schema support is historical, not permission to admit it. The live preparation packet declares only sagittal Lateral Meniscus. Prefetch is parked after its CPU-side ratio failed P2; no pin promotion is authorized.
+
+For `candidate: A_prime` and `name: sag-crop`, the primary gate additionally requires `raptor_column_blend` with `reference: raptor_fold0_column`, `target: Lateral Meniscus`, `rank_weight: 0.3`, `predictions_sha256`, and a **95% CI lower bound** `ci_lower >= 0.0017`. The evaluation artifact must reference `raptor_column_predictions`, whose actual artifact SHA matches `predictions_sha256`. A positive in-distil interval cannot substitute for this host-column evidence. The five original gates, Dread transfer screen and separate B1′ screen remain. This checks a bound declared result; owner scientific/rank replay remains required and the checker still never qualifies an entry. [Prospective addendum](lane2-sagittal-joint-crop-protocol-20261014.md).
+
 ### Component receipt artifacts
 
 `handover` is a JSON object with `schema_version: 1`, matching `arm`, `mode: full_data`, `input_kind: images`, exact `supported_targets`, a `tensor_digest`, and `gate_sha256`. It references `source`, `reader_config`, `weights`, `dataset_manifest`, `initializer_provenance`, `swa_registration`, `evaluation_inputs`, `arithmetic_contract`, `worker_interface`, `repeat_policy`. These artifacts are mandatory even though their owner-defined semantics still need acceptance. Cache-to-image reader equivalence must be supplied by the owner in the arithmetic/reader handover; this checker does not derive it from the training cache.
@@ -85,3 +91,6 @@ Focused tests cover tamper and during-check mutation, wrong header/order/coverag
 Helper verification: `python3.12 -m unittest discover -s tests -p test_combined_rehearsal.py -v`: **30 tests PASS / 0 skips**. `python3.12 -m knee.smoke`: **PASS**, synthetic CPU path, `torch_forward: false`, no training. Real base verification in this helper suite is mocked to test dispatch/rejection; it is not an additional real v7 verifier run. The parent owns the separately checked archived receipt.
 
 Next: parent accepts this narrow preparation layer, reconciles actual lane exports to a frozen packet, and supplies the workers, arithmetic/projection replay and scientifically verified handover before any combined rehearsal or entry promotion. Parent owns shared STATUS/handoff updates, integration and launches; this helper edits only its four assigned new files.
+
+
+Parent October 14 20:36 acceptance of the host-column addendum: **35 synthetic tests PASS / 0 skips**, including missing/wrong host, prediction binding, threshold boundary and unchanged B1′ screen. Actual lane2 readout, inference worker and host-column scientific replay remain pending.

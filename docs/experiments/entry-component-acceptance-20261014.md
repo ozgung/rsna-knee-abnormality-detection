@@ -14,7 +14,7 @@ Receipt: `outputs/kaggle/public-r7-recovery-rehearsal-20261013-result-v7/s6-reco
 
 | Component | Potential modified targets | Frozen condition |
 | --- | --- | --- |
-| Axial `ax-crop` | `PF OA` only | All five lane-1 gates, full-data export and source/weight qualification |
+| Axial `ax-crop` | `PF OA` only | **Closed October 14:** failed gates 1, 4 and 5; no component admission or control promotion |
 | Sagittal `sag-crop` | `Lateral Meniscus`; optionally `ACL` and `Medial Meniscus` | Primary passes all five lane-2 gates; each optional target also passes its own positive-CI and transfer gate |
 
 These names and their order were read from the official local sample-submission header. Every accepted target uses the pre-registered 0.3 component rank weight; no fold-0 or gold weight fitting. The lane-3 integration screen asks for a **primary fixed-blend target Δ CI lower bound ≥ +0.0017 for A′**, or **≥ +0.0072 for B1′**. Use the Dread-transfer blend evidence when available, as recorded by Claude; this is a prospective prioritization heuristic, not a demonstrated gain on A or B1. Preserve the original five gates and all exposure limitations.
@@ -36,3 +36,8 @@ Prioritize A′ as Claude's plan states; lane 1 precedes lane 2 if measured comb
 Claude adopted the rule before a candidate score: an eligible A′ replaces A only after every component gate passes, the official submission is COMPLETE with a valid output, and its displayed score is at least A's. A tie passes; a displayed deficit rejects. The same rule applies to B1′ versus B1. Rank/medal probabilities in the selection analysis are simulations conditional on its assumptions, not verified future-rank forecasts. No final-selection action was performed by this preparation.
 
 Next: receive an actually qualified lane handover, inspect its source/evaluation binding, implement only its accepted target fusion, and run the combined acceptance sequence. The independent native extent-ROI qualification remains a separate reader lane; it is not an entry component yet.
+
+
+## October 14 20:29 prospective sagittal addendum
+
+Claude closed the axial candidate and parked prefetch after its CPU-side ratio failed P2 (1.52 against1.3); neither may enter from the earlier proposal. The sagittal arm remains the sole live candidate. Before its readout, Claude additionally required A′'s fixed0.3 sagittal blend into the **Raptor fold-0 Lateral Meniscus column** to have a95%CI lower bound≥+.0017. Positive in-distil improvement is insufficient. Preserve all five original gates, the existing Dread/entry screens and B1′'s separate threshold; this is an extra A′ gate. Bind the actual Raptor prediction artifact, metric/split/label population and bootstrap evidence, then independently replay it before accepting any arm. [Addendum](lane2-sagittal-joint-crop-protocol-20261014.md); [closed axial result](raptor64-axial-pf-it4-result-20261014.md).

@@ -116,6 +116,17 @@ class PacketFixture:
         self.handover["gate_sha256"] = self.sha("gates")
         self.put_json("handover", self.handover)
 
+    def add_raptor_column_gate(self):
+        self.put("raptor_column", b"synthetic Raptor fold0 predictions\n")
+        evaluation = json.loads((self.root / "evaluation.artifact").read_text())
+        evaluation["raptor_column_predictions"] = "raptor_column"
+        self.put_json("evaluation", evaluation)
+        self.gate["raptor_column_blend"] = {
+            "reference": "raptor_fold0_column", "target": "Lateral Meniscus",
+            "rank_weight": .3, "predictions_sha256": self.sha("raptor_column"),
+            "ci_lower": .0017,
+        }
+
     def add_prefetch(self):
         paired = {"input_kind": "images", "assets_sha256": self.state, "assignment_sha256": self.state,
                   "compiled_control_sha256": self.state, "device_identity_sha256": self.state,
@@ -284,6 +295,7 @@ class CombinedRehearsalTests(unittest.TestCase):
         self.f.handover.update(arm="sag-crop", supported_targets=targets)
         self.f.put_json("missing", {"arm": "sag-crop", "plane": "sagittal", "unavailable_reason": "missing_plane",
                                     "output": "preserve_base_strings", "other_errors": "fatal"})
+        self.f.add_raptor_column_gate()
         self.f.rebind_gates(dict.fromkeys(targets, self.f.gate))
         self.f.save()
         self.assertFalse(check_packet(self.f.path)["entry_qualified"])
@@ -293,6 +305,51 @@ class CombinedRehearsalTests(unittest.TestCase):
         self.rejected("PRIMARY_DELTA_GATE")
         self.f.component["targets"] = ["ACL"]
         self.rejected("PRIMARY_TARGET_ADMISSION")
+
+    def sagittal_packet(self):
+        self.f.component.update(name="sag-crop", targets=["Lateral Meniscus"])
+        self.f.handover.update(arm="sag-crop", supported_targets=["Lateral Meniscus"])
+        self.f.put_json("missing", {"arm": "sag-crop", "plane": "sagittal", "unavailable_reason": "missing_plane",
+                                   "output": "preserve_base_strings", "other_errors": "fatal"})
+        self.f.add_raptor_column_gate()
+        self.f.rebind_gates({"Lateral Meniscus": self.f.gate})
+        self.f.save()
+
+    def test_a_prime_raptor_column_gate_at_boundary_stays_preparation(self):
+        self.sagittal_packet()
+        result = check_packet(self.f.path)
+        self.assertEqual(result["status"], "PREPARATION_ONLY")
+        self.assertFalse(result["scientific_qualified"])
+
+    def test_a_prime_cannot_substitute_indistil_ci_for_host_column(self):
+        self.sagittal_packet()
+        for host in (None, dict(self.f.gate["raptor_column_blend"], reference="in-distil")):
+            gate = dict(self.f.gate, raptor_column_blend=host)
+            self.f.rebind_gates({"Lateral Meniscus": gate})
+            self.rejected("RAPTOR_COLUMN_REFERENCE_REQUIRED")
+
+    def test_a_prime_raptor_column_ci_below_boundary_is_rejected(self):
+        self.sagittal_packet()
+        gate = dict(self.f.gate, raptor_column_blend=dict(self.f.gate["raptor_column_blend"], ci_lower=.001699))
+        self.f.rebind_gates({"Lateral Meniscus": gate})
+        self.rejected("RAPTOR_COLUMN_A_PRIME_GATE")
+
+    def test_a_prime_raptor_column_predictions_must_be_bound(self):
+        self.sagittal_packet()
+        gate = dict(self.f.gate, raptor_column_blend=dict(self.f.gate["raptor_column_blend"], predictions_sha256="c" * 64))
+        self.f.rebind_gates({"Lateral Meniscus": gate})
+        self.rejected("RAPTOR_COLUMN_PREDICTION_BINDING")
+
+    def test_b1_prime_retains_its_screen_without_a_prime_host_gate(self):
+        self.sagittal_packet()
+        self.f.packet["candidate"] = "B1_prime"
+        gate = dict(self.f.gate, transfer_ci_lower=.0072)
+        gate.pop("raptor_column_blend")
+        self.f.rebind_gates({"Lateral Meniscus": gate})
+        self.f.save()
+        self.assertEqual(check_packet(self.f.path)["status"], "PREPARATION_ONLY")
+        self.f.rebind_gates({"Lateral Meniscus": dict(gate, transfer_ci_lower=.007199)})
+        self.rejected("ENTRY_INTEGRATION_SCREEN")
 
     def test_missing_evaluation_mask_artifact_is_rejected(self):
         evaluation = json.loads((self.f.root / "evaluation.artifact").read_text())

@@ -191,6 +191,17 @@ def component_evidence(component, artifacts, ids, candidate):
             full = number(g.get("full_blend_auc"), "FULL_AUC")
             require(0 <= full < crop <= 1, "CROP_CONTROL_GATE")
             require(number(g.get("transfer_ci_lower"), "INTEGRATION_CI") >= screen, "ENTRY_INTEGRATION_SCREEN")
+            if candidate == "A_prime" and name == "sag-crop":
+                host = g.get("raptor_column_blend")
+                require(isinstance(host, dict)
+                        and host.get("reference") == "raptor_fold0_column"
+                        and host.get("target") == target
+                        and host.get("rank_weight") == .3, "RAPTOR_COLUMN_REFERENCE_REQUIRED")
+                reference = evaluation.get("raptor_column_predictions")
+                require(host.get("predictions_sha256") == artifacts.sha(reference),
+                        "RAPTOR_COLUMN_PREDICTION_BINDING")
+                require(number(host.get("ci_lower"), "RAPTOR_COLUMN_CI") >= .0017,
+                        "RAPTOR_COLUMN_A_PRIME_GATE")
     policy = artifacts.json(component.get("missing_plane_policy"))
     require(policy == {"arm": name, "plane": PLANES[name], "unavailable_reason": "missing_plane",
                        "output": "preserve_base_strings", "other_errors": "fatal"}, "MISSING_PLANE_POLICY")
