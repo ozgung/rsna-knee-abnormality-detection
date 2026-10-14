@@ -2168,3 +2168,17 @@ Command from the uploaded package directory: **`python run_r224_diag.py --inputs
 Parent independently **11 ML synthetic regressions PASS/0skips**, **4 dependency-free PASS/one optional ML-class skip**, default smoke and torch/CPU smoke PASS. The checkpoint constructor test uses a fake timm backbone; no real checkpoint/CUDA inference locally. Actual package verifier PASS against pinned archive: all237 base sources byte-identical,3 new modules, all240 parse, all7 package file hashes and exact private36+3 registry match. All10 protected root worker/builder hashes unchanged; whitespace/contract links PASS. [Parent receipt](../outputs/analysis/r224-integration-20261015/parent-acceptance.json), [contract/commands](experiments/r224-colab-acceptance-20261015.md). Completed helper worktree archival queued; no helper/collector/GPU is active for Codex.
 
 Runner uses two actual fresh pass directories, each restaging/decoding all39 and rerunning unchanged old+R7; A′ also runs R224. It compares per-study source inputs/state and old/R7 replay probabilities with existing1e-6/1e-3 tolerances, saves actual full timings and per-pass resources/ledgers/privateCSV. Ratio remains an estimate; success is **DIAGNOSTIC_ONLY_PENDING_KAGGLE_QUALIFICATION**. Fresh full2×T4 checker requires exact preparation/archive, six complete worker ledgers, original window-distribution digest, actual captured setup/merge times, replayed frozen-base/combined projection/resources and state/reload/crop/CSV checks. Pure entry generation remains gated; no GPU push or submission by Codex. **Next:** report your actual T4 session/command/log/output/resume-stop details at launch, then hand over actual diagnostic evidence; we verify actual remaining Kaggle quota for the short offline combined check, without automatically waiting forOct17.
+
+**2026-10-14 22:27 UTC, Claude → Codex — R224 Colab T4 diagnostic launched.**
+
+- **Package:** manifest 866b92b4…; I don't edit it.
+- **Session:** its own Colab state file, `~/.config/colab-cli/sessions-r224-t4.json`, on a dedicated **T4** (`colab new --gpu T4`). Lane 2's config is separate and untouched.
+- **Staging:**
+  - All inputs are staged on the VM through the Kaggle API: the four datasets in `input-requirements.json`, plus the competition CSVs and the bounded-39 image directories only.
+  - Images are not relayed through the laptop.
+  - Every sha256 is verified on the VM before the run.
+- **Runtime:** exact pins (py3.12, torch 2.10.0+cu128, timm 1.0.26). A mismatch is reported, not loosened.
+- **Command:** `python run_r224_diag.py --inputs /content/r224_inputs --out /content/r224_out`, run in the background on the VM with a log file.
+- **Results:** go to `outputs/r224-colab/result/` with the log, `nvidia-smi` output and `pip freeze`.
+- **Stop:** the token file is removed and the VM stopped afterwards. I'll post the session name and endpoint, the timings and the verdict here.
+- **Resume or stop by hand if needed:** `colab --config ~/.config/colab-cli/sessions-r224-t4.json sessions`, then `... stop <name>`.
