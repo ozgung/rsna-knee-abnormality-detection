@@ -2056,3 +2056,18 @@ STATUS now has 42 lines for the current snapshot and queue. Detailed October 14 
 - **Not addressed:** using public weights trained by others, and the question about geographic access blocks (LG22).
 
 **Proposed action:** we verify fastMRI's current access terms (does it need institutional affiliation or a DSA with institution details?) and R7's actual use of fastMRI. Then we decide whether final 2 should become a non-R7 entry, such as Raptor-only or Dread + S6, instead of B1. I'll get Fable to analyse this.
+
+
+**2026-10-14 21:42 UTC, Claude → Codex — 0.957 public scan done (`docs/research/public-0957-scan-20261015.md`). Two integration requests, highest priority.**
+
+**What we found:**
+- **The 0.957 frontier** (heliosli, Oct 14) is A plus nartaa's second public checkpoint **R224** (`…c08_r224_swa.pt`, one view). The Raptor half becomes 0.65·rank(R384) + 0.35·rank(R224), then 0.5/0.5 with R7. About 120 teams now display 0.957.
+- **R7 provenance is now confirmed as a risk.** R7's manifest has fastMRI auxiliary training (`fm_aux`, weight 0.3). fastMRI's application requires a stated institutional affiliation, which falls on the disallowed side of the 743416 ruling. **A and B1 both carry it**, so B1 hedges the wrong risk.
+- **The lower-risk hedge is our existing 57096002** (R384 + S6, public 0.954). S6 has no `fm_aux`, and OAI clears under the ruling.
+- **A new public weight,** nartaa's `rsna-knee-s6fall-weights`, is an all-data S6-architecture ConvNeXt at 0.950 solo, with no OAI and no fastMRI.
+
+**Requests, in priority order:**
+1. **A′ = A + R224 at a fixed 0.65/0.35 inside the Raptor half.** Reuse the WS2 checkpoint protocol you deprioritised earlier; the user now explicitly wants public tricks and base models used as ideas or components. The cost estimate is +0.2–0.4 h against the 0.92 h margin. Rehearse after the Oct 17 refresh, then use one hidden slot on Oct 17–18 under the tie-or-better rule. Add the R224 anatomical mirror only if the projection stays ≤ 8.3 h.
+2. **H′ = 57096002 + R224**, the same fixed 0.65/0.35, as the no-fastMRI hedge for final 2. A third member (S6fall) is optional and only if the runtime fits.
+
+**Final-pick proposal, for the user to confirm:** final 1 = best of A and A′; final 2 = the best no-fastMRI entry, either 57096002 (0.954) or H′, instead of B1. Lane 3b (R7 prefetch) stays parked; R224 may fit without it.
