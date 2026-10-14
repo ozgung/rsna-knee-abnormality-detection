@@ -159,6 +159,24 @@ class ExtentTests(unittest.TestCase):
         self.assertEqual(r['required_side_mm'],101.)
         self.assertEqual(selector[0],102)
         self.assertGreaterEqual(min(r['actual_margin_mm']),10)
+    def test_normalized_center_roundtrip_uses_source_half_even_rounding(self):
+        # Observed native dimensions/spacing, synthetic segmentation only.
+        # 242/479*479 is 241.99999999999997: source rounding starts at
+        # row101, whereas rounding the pre-normalization center starts102.
+        spacing=.35416665673255
+        s,g=fixture(spacing=(spacing,spacing),shape=(9,480,480))
+        def centered(segs):
+            for z,p in segs:
+                p[:]=0
+                p[1,232:253,230:250]=.9
+                p[2,232:253,250:270]=.9
+            return segs
+        selector,r,_=self.extent(s,g,Bank(centered))
+        self.assertIsNotNone(selector)
+        self.assertEqual(selector[0],100)
+        self.assertEqual(r['requested_box_xyxy'][1],101)
+        self.assertEqual(r['requested_box_xyxy'],r['retained_box_xyxy'])
+        self.assertGreaterEqual(min(r['actual_margin_mm']),10)
     def test_exact250_joint_union_and140mm_cap_acceptance(self):
         s,g=fixture(shape=(1,240,420))
         def exact(segs):

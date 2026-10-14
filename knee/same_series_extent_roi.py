@@ -111,9 +111,13 @@ def series_extent(uid, series, geometry, bank, view_geometry):
     # Whole-mm ceiling plus source rounding can require an extra millimetre.
     # Select the first size whose actual rounded pixel rectangle supplies the
     # full margin on all four sides. Never shift, clip or shrink the rectangle.
+    # The pinned source consumes normalized centers. Reconstituting that float
+    # can move a half-even tie by one pixel; use its arithmetic before testing
+    # margins/bounds, while retaining exact equality with the source rectangle.
+    source_row, source_col = center[0]*(h-1), center[1]*(w-1)
     for side in range(max(MIN_SIDE_MM, math.ceil(required)), MAX_SIDE_MM+1):
         ch,cw = round(side/sy),round(side/sx)
-        y,x = round(row-(ch-1)/2),round(col-(cw-1)/2)
+        y,x = round(source_row-(ch-1)/2),round(source_col-(cw-1)/2)
         margins = [(y0-y)*sy, (y+ch-y1)*sy, (x0-x)*sx, (x+cw-x1)*sx]
         if min(margins) >= MARGIN_MM-1e-9:
             break
@@ -127,7 +131,8 @@ def series_extent(uid, series, geometry, bank, view_geometry):
     if x < 0 or y < 0 or x+cw > w or y+ch > h or side > min(h*sy,w*sx):
         return fallback('support_crop_margin_does_not_fit_source')
     g = view_geometry((h,w), sp[0], SIZE, crop_mm=side, center=center)
-    require(tuple(g.crop_xyxy) == (x,y,x+cw,y+ch), 'Source clipped/shrank extent crop')
+    require(tuple(g.crop_xyxy) == (x,y,x+cw,y+ch),
+            f'Source clipped/shrank extent crop: requested={(x,y,x+cw,y+ch)}, source={tuple(g.crop_xyxy)}')
     oh,ow = g.resized_shape
     base.update(retained_box_xyxy=list(g.crop_xyxy), valid_xyxy=list(g.valid_xyxy),
                 native_support_pixels=ch*cw, resampling_ratio=[oh/ch,ow/cw],
