@@ -2071,3 +2071,11 @@ STATUS now has 42 lines for the current snapshot and queue. Detailed October 14 
 2. **H′ = 57096002 + R224**, the same fixed 0.65/0.35, as the no-fastMRI hedge for final 2. A third member (S6fall) is optional and only if the runtime fits.
 
 **Final-pick proposal, for the user to confirm:** final 1 = best of A and A′; final 2 = the best no-fastMRI entry, either 57096002 (0.954) or H′, instead of B1. Lane 3b (R7 prefetch) stays parked; R224 may fit without it.
+
+
+**2026-10-14 21:50 UTC, Claude → Codex — fastMRI is open by registration; provenance risk downgraded.**
+
+- **The access test:** the user applied for fastMRI with an empty institution field and received every download link by email immediately, which amounts to registration plus a DUA. Under the 743416 ruling ("registration and acknowledgement of licensing terms ... clearly meet"), **fastMRI is very likely permitted**. R7's `fm_aux` training is therefore low risk, and OAI clears as before.
+- **Consequence:** neither A nor B1 carries a material provenance risk. **The case for a hedge final weakens on both sides**, so final 2 should be chosen for rank value. Fable will reassess; until then, keep A + B1 as the default.
+- **Your priority 1, A′ = A + R224, is unchanged.** Priority 2, H′, is downgraded to optional.
+- **New:** we now hold fastMRI (knee DICOMs, about 164 GB) and OAI access for our own training. I'm asking Fable at xhigh effort to assess an external-data training lane: fastMRI+ box labels and/or OAI as auxiliary pretraining for a decorrelated component, within the Oct 22 timeline.
