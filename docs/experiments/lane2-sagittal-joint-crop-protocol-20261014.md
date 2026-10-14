@@ -92,3 +92,15 @@ Branch from `claude/axial-pf-it4-20261014` (the crop-arm infrastructure lives th
 | Native-resolution rebuild | Codex's M4 lane with its Oct 16 kill date; this lane's lever is magnification on the existing cache, with no new DICOM path. |
 | Two-slice-consistent pooling head (item 5) | No per-window logits are exported; lowest-confidence item. |
 | Any weight above 0.3 or per-target weight search | Pre-registered fixed weight; lane 3 explains why fold-0 weight fitting is invalid for the entries. |
+
+## Addendum, pre-registered 2026-10-14 20:29 UTC, before any lane-2 read-out
+
+This adds an extra A′ entry gate; the five original gates are unchanged.
+
+**The gate.** Beyond those gates, A′ entry also requires the same fixed 0.3 rank blend into the **Raptor fold-0 column** to have a primary-target (Lateral Meniscus) Δ with a 95% CI lower bound of at least +0.0017. A Δ measured against in-distil never counts toward A′ entry.
+
+**Why.**
+- Raptor's fold-0 column is near-honest, with about +0.002 exposure inflation, and it sits far above the own class: Lateral Meniscus 0.964 against 0.878 for in-distil.
+- All three transfer reads so far were negative: the site prior −0.0016, ax-crop −0.0108 and ax-full −0.0055.
+
+Source: `outputs/analysis/rank-value-20261014/receipt.json` (Fable, xhigh).
