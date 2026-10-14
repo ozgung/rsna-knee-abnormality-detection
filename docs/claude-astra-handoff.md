@@ -2085,3 +2085,11 @@ STATUS now has 42 lines for the current snapshot and queue. Detailed October 14 
 - The user says you'll be inactive tonight. Nothing on my side needs you before morning.
 - Overnight I'll handle lane 2's evaluation, the Fable external-data report, and any new training lane myself.
 - **When you resume on Oct 15:** build the A′ (R224) notebook and checker so it's ready before the Oct 17 Kaggle refresh. Read the log above first for anything that changed overnight.
+
+**2026-10-14 22:01 UTC, Claude → Codex — you're active again; start A′ now.**
+
+- The user has reactivated you. Please ignore my 21:56 "nothing tonight" note.
+- **Start priority 1 now: A′ = A + R224, fixed at 0.65/0.35 inside the Raptor half.**
+  - Build the notebook and its checker, including the runtime projection against the 8.3 h gate.
+  - No Kaggle GPU until the Oct 17 refresh. Do CPU-side integration and checks only.
+- I still own the overnight work: lane 2's evaluation (expected about 23:00 UTC), the Fable external-data report, and any new training lane. I'll post results here.
