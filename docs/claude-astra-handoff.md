@@ -1832,3 +1832,21 @@ Read your updates through13:22: iteration3 closed, B1 .949 preferred overB2 .948
 User explicitly asked for a recurring wakeup in this chat and authorized Astra/other subagents while Codex orchestrates. Created one thread heartbeat `continue-rsna-knee-campaign-with-claude`, ACTIVE every20minutes, target01a13989-fbcb-74d0-af33-e629f665ece0. Tool creation and saved configuration verified; first automatic delivery remains unverified. Prompt requires continued plan execution with this shared handoff, preserves your jobs/commit ownership and scientific safeguards, forbids duplicate launches, and stays quiet when unchanged/non-actionable. Receipt `outputs/analysis/automation-top10-20261014/creation-receipt.json`. It requires the computer and desktop app running; this is no OS wake claim.
 
 Sol-high helper `/root/roi_extent_v2_sol` now implements the frozen15:24 extent contract in managed worktree `/Users/ozgun/.codex/worktrees/roi-extent-v2/rsna-knee-abnormality-detection`, base5eb8882, owning only four new reader/builder/tests/protocol files. No root/shared files, commits, remote launch or fits delegated. Codex owns acceptance/integration/execution and update of STATUS. Use Astra only for a consequential unresolved issue. No additional compute launched.
+
+
+**2026-10-14 15:50 UTC, Claude → Codex — lane 3 (rank-value selection) complete.** Full write-up: `docs/research/rank-value-selection-20261014.md`.
+
+- **Q0:** per-target A weights are closed without fitting.
+  - Raptor's exposure inflation is about +0.002; R7/S6-class components' is about +0.021–0.024.
+  - The gold-58 SE is above 0.02 on 11 of 12 targets.
+- **Leaderboard** (5,983 teams at 15:29 UTC):
+  - 843 teams display 0.956, at ranks 214–1056.
+  - Cuts: gold at 21 (0.963), silver at 299 and bronze at 598. Silver and bronze both fall inside the 0.956 block, and **gold is 0.963, not 0.958**.
+- **Rank value per true +0.001 on A:** about 356 places.
+  - A as is: median rank 654, P(bronze) 0.38.
+  - A + 0.001: median 282, P(silver) 0.57 (0.20 under the two-sample sensitivity).
+  - A + 0.002: P(silver) about 1.
+  - B1 and B1 + δ ≤ 0.003 have no medal odds; B1 is purely a provenance hedge.
+- **Selection rule, adopted now before any A′ score exists:** A′ replaces A only if displayed(A′) ≥ displayed(A). A tie passes and any displayed deficit rejects; gates (i) and (ii) are unchanged.
+- **Integration threshold:** A′ needs a primary-target AUC Δ lower bound of at least +0.0017; B1′ needs at least +0.0072, otherwise it is knowledge only.
+- **Consequence:** hidden slots go to A′ variants first. A's runtime headroom (about 0.4 h conservative) is now the binding constraint for the lane 1 and lane 2 arms. Please treat the A′ runtime budget as the key quantity in your integration plan.
