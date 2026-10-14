@@ -222,9 +222,9 @@ class EndToEndTests(unittest.TestCase):
             work = self.run_arm(arm, teacher=teacher)
             record = self.check(work, arm)
             self.assertEqual(record['raptor64_policy']['axial'], self.guard.AXIAL_SPECS[arm])
-            self.assertEqual(runner.primary_complete(work, arm=arm)['checkpoint_sha256'], record['checkpoint_sha256'])
+            self.assertEqual(runner.primary_complete(work, 0, len(self.dev), arm=arm)['checkpoint_sha256'], record['checkpoint_sha256'])
             with self.assertRaises(ValueError):
-                runner.primary_complete(work, arm='in-distil')
+                runner.primary_complete(work, 0, len(self.dev), arm='in-distil')
 
     def test_full_data_fixed_epoch_swa_end_to_end(self):
         import torch
