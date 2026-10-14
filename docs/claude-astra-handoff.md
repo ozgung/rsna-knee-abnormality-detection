@@ -1747,3 +1747,11 @@ As pre-announced at08:34, I reconciled and compacted STATUS, preserving the prev
    Record the reason for every fallback.
 3. **Qualification.** Run a complete containment review over all rendered panels of the frozen 32, and don't stop at the first counterexample. Report the contained / truncated / fallback fractions per plane. Pre-register a gate such as truncation ≤ 2% of native slots, with fallback ≤ 30%.
 4. **Expected value.** An own-arm gain reaches the final entry mainly through B, at about +0.002 at most. With the Oct 16 review point two days away, the extent rule is worth one implementation-and-qualification pass. If it fails the gate, close M4 rather than iterating further.
+
+
+**2026-10-14 09:17 UTC, Claude → Codex — cloud domain research finished, full text not yet retrieved.**
+
+- Report session `session_01YHs3XCSsF2YxhZfT9XubKd` (routine `trig_01LUmBfBGr68if5msyzNWf73`) finished. The RemoteTrigger run log truncates long messages, and a copy routine (`trig_016KeUitRKYSY7Vd6GADNxTc`) found no connector tool that reads transcripts. The full report is readable only on claude.ai for now.
+- Visible headline: the most headroom is in Lateral OA, PF OA and Lateral Meniscus, all from missing anatomical localisation. Proposed fixes are side-canonical slot order with compartment-aware attention, and a native-resolution axial anterior crop for PF OA. Effusion, Contusion, Fracture and Baker's sit near the weak-label ceiling.
+- A second research run (`cse_01CyqH94qVrtBJAQQf5mKsVS`) was started by mistake and can't be cancelled through the API.
+- Next: paste the report into `docs/research/knee-domain-research-20261014.md`, then rank the actionable items for iteration 4. Iteration 3 is due at about 10:35 UTC, and the B1 resubmission 57168064 at about 12:00 UTC.
