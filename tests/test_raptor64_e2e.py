@@ -141,6 +141,7 @@ class EndToEndTests(unittest.TestCase):
                    patch.object(guard, 'DREAD_PIN', dread_pin), patch.object(guard, 'strict_cuda', lambda torch_mod=None: 'cpu'),
                    patch.object(guard, '_CORPUS', corpus), patch.object(guard, '_META', self.loader.slice_metadata_table(self.manifest)),
                    patch.object(guard, '_CACHE_IDENTITY', identity), patch('torch.cuda.get_device_name', return_value='cpu-fixture'),
+                   patch.object(guard, '_AXIAL', guard.axial_presence(self.manifest)),
                    patch.object(timm, 'create_model', lambda *a, **k: Tiny())]
         for p in patches:
             p.start()
@@ -150,7 +151,9 @@ class EndToEndTests(unittest.TestCase):
             entry_spec = importlib.util.spec_from_file_location('tracka_entry_r64', package / 'tracka_entry.py')
             entry = importlib.util.module_from_spec(entry_spec); sys.modules['tracka_entry_r64'] = entry; entry_spec.loader.exec_module(entry)
             c = entry.cfg(); p = entry.prepare(c); cmd = entry.train_cmd(c, p, 0)
-            self.assertEqual(cmd[cmd.index('--k_eval') + 1], '16'); self.assertEqual(cmd[cmd.index('--epochs') + 1], '12')
+            frozen = guard.frozen_for(arm)
+            self.assertEqual(cmd[cmd.index('--k_eval') + 1], str(frozen['k_eval'])); self.assertEqual(cmd[cmd.index('--k') + 1], str(frozen['k']))
+            self.assertEqual(cmd[cmd.index('--epochs') + 1], '12')
             self.assertEqual(cmd[cmd.index('--folds') + 1], '0' if swa_epochs else '5')
             os.chdir(work); sys.modules.pop('train_knee_patched', None); sys.path.insert(0, str(work))
             import train_knee_patched as tk
@@ -171,9 +174,11 @@ class EndToEndTests(unittest.TestCase):
     def check(self, work, arm):
         import pandas as pd
         record = json.loads((work / 'run_fold0.json').read_text()); meta = json.loads((work / 'raptor_ft_fold0.json').read_text())
-        self.assertEqual(record['export']['k_eval'], 42); self.assertEqual(record['export']['n_val'], len(self.dev)); self.assertEqual(record['export']['n_gold'], 0)
+        axial = arm in self.guard.AXIAL_SPECS
+        self.assertEqual(record['export']['k_eval'], 10 if axial else 42); self.assertEqual(record['export']['n_val'], len(self.dev)); self.assertEqual(record['export']['n_gold'], 0)
         self.assertEqual(record['checkpoint_kind'], 'swa_topk'); self.assertEqual(len(record['selected_epochs']), 3)
-        self.assertEqual(record['comparison_endpoint'], 'K42 primary (selection K16)'); self.assertEqual(record['raptor64_policy']['arm'], arm)
+        self.assertEqual(record['comparison_endpoint'], 'K10 primary (selection K10; axial windows)' if axial else 'K42 primary (selection K16)')
+        self.assertEqual(record['raptor64_policy']['arm'], arm)
         self.assertEqual([h['ep'] for h in meta['hist']], list(range(12))); self.assertFalse(meta['partial'])
         oof = pd.read_csv(work / 'oof_fold0.csv'); self.assertEqual(oof['StudyInstanceUID'].tolist(), self.dev)
         self.assertTrue(((oof[self.guard.LAB] >= 0) & (oof[self.guard.LAB] <= 1)).all().all())
@@ -206,6 +211,20 @@ class EndToEndTests(unittest.TestCase):
             record = self.check(self.run_arm(arm, teacher=teacher), arm)
             self.assertEqual(record['raptor64_policy']['teacher']['weight'], weight)
             self.assertEqual('flip' in record['raptor64_policy'], arm == 'in-distil-flip')
+
+    def test_it4_axial_arms_end_to_end(self):
+        import numpy as np
+        spec = importlib.util.spec_from_file_location('r64run_ax_e2e', ROOT / 'scripts/colab_raptor64_run.py')
+        runner = importlib.util.module_from_spec(spec); spec.loader.exec_module(runner)
+        teacher = self.root / 'teacher4.npz'
+        np.savez(teacher, ids=np.asarray(self.ids), probs=np.random.default_rng(4).uniform(0, 1, (len(self.ids), 12)).astype(np.float32))
+        for arm in ('ax-crop', 'ax-full'):
+            work = self.run_arm(arm, teacher=teacher)
+            record = self.check(work, arm)
+            self.assertEqual(record['raptor64_policy']['axial'], self.guard.AXIAL_SPECS[arm])
+            self.assertEqual(runner.primary_complete(work, arm=arm)['checkpoint_sha256'], record['checkpoint_sha256'])
+            with self.assertRaises(ValueError):
+                runner.primary_complete(work, arm='in-distil')
 
     def test_full_data_fixed_epoch_swa_end_to_end(self):
         import torch

@@ -66,6 +66,11 @@ class ConfigTests(unittest.TestCase):
                 runner.validate(dict(d1, workdir=d0['workdir']))
             with self.assertRaises(ValueError):
                 runner.validate(dict(d0, controller_lock=d1['controller_lock']))
+            for arm in ('ax-crop', 'ax-full'):
+                builder.build(content / f'raptor64-{arm}-pkg', evidence_root=EVIDENCE, arm=arm, teacher_sha256='a' * 64)
+                runner.validate(vm.make_config(arm, content, vm_session_id='raptor64-axial-it4-20261014'))
+            with self.assertRaises(ValueError):   # an axial package cannot run under a non-axial arm config
+                runner.validate(dict(d0, package_root=str(content / 'raptor64-ax-crop-pkg')))
             mixed = dict(configs['in-plane'], package_root=configs['dr-orig']['package_root'],
                          package_manifest_sha256=configs['dr-orig']['package_manifest_sha256'])
             with self.assertRaises(ValueError):

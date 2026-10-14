@@ -25,8 +25,8 @@ import subprocess
 import sys
 
 ROOT = Path('/content')
-ARMS = ('in-orig', 'in-plane', 'dr-orig', 'dr-plane', 'dr-full', 'in-mirror', 'in-distil', 'in-distil-w1', 'in-distil-flip')
-INIT = {'in-orig': 'imagenet', 'in-plane': 'imagenet', 'dr-orig': 'dread_v4', 'dr-plane': 'dread_v4', 'dr-full': 'dread_v4', 'in-mirror': 'imagenet', 'in-distil': 'imagenet', 'in-distil-w1': 'imagenet', 'in-distil-flip': 'imagenet'}
+ARMS = ('in-orig', 'in-plane', 'dr-orig', 'dr-plane', 'dr-full', 'in-mirror', 'in-distil', 'in-distil-w1', 'in-distil-flip', 'ax-crop', 'ax-full')
+INIT = {'in-orig': 'imagenet', 'in-plane': 'imagenet', 'dr-orig': 'dread_v4', 'dr-plane': 'dread_v4', 'dr-full': 'dread_v4', 'in-mirror': 'imagenet', 'in-distil': 'imagenet', 'in-distil-w1': 'imagenet', 'in-distil-flip': 'imagenet', 'ax-crop': 'imagenet', 'ax-full': 'imagenet'}
 DATE = '20261013'
 PACKAGES = ['timm==1.0.26', 'kaggle==2.2.4', 'safetensors', 'pydicom', 'opencv-python-headless', 'pyarrow']
 PERSISTER_SHA = '8923bd872500b87f85be78aefd9fc799a6f88942e94503045b5e01ea66c118df'

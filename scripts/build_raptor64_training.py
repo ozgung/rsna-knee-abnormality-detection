@@ -97,8 +97,9 @@ def adapt_trainer(original, full=False, variant=None):
 
 def adapt_entry(original, arm, workers, full=False, variant=None):
     text = original
+    frozen = guard.frozen_for(arm); axial = variant == 'axial'
     defaults = {'FOLD_A': '0', 'FOLD_B': '', 'TIME_BUDGET_H': '0', 'RES': '384', 'ARCH': guard.ARCH, 'BS': '4', 'WORKERS': str(workers),
-                'EPOCHS': str(guard.EPOCHS), 'CKPT': 'pinned-descriptor', 'K': '8', 'K_EVAL': '16',
+                'EPOCHS': str(guard.EPOCHS), 'CKPT': 'pinned-descriptor', 'K': str(frozen['k']), 'K_EVAL': str(frozen['k_eval']),
                 'WORKDIR': f'/content/raptor64-{arm}-fold0', 'ASSET_DIR': f'/content/raptor64-{arm}-pkg', 'RAPTOR_INPUT': '/content/input',
                 'GRAD_CKPT': '1', 'WIN_CHUNK': '8', 'ACCUM': '2'}
     tree = ast.parse(text)
@@ -128,7 +129,7 @@ def adapt_entry(original, arm, workers, full=False, variant=None):
     text = replace_once(text, '"time_budget_note": "10.0 h = 12 h Kaggle session minus checkpoint/export margin"',
         '"time_budget_note": "No assistant cap; checkpoint against caller-supplied actual platform deadline only"')
     text = replace_once(text, '    k_eval = int(c["SMOKE_K_EVAL"] if smoke else c["K_EVAL"])',
-        '    raptor64.export_guard(work, k, ckpt_path, kind, sel_epochs, partial)\n    k_eval = raptor64.EXPORT_K')
+        '    raptor64.export_guard(work, k, ckpt_path, kind, sel_epochs, partial)\n    k_eval = raptor64.' + ('AXIAL_WINDOWS' if axial else 'EXPORT_K'))
     text = replace_once(text, '    dev = "cuda" if torch.cuda.is_available() else "cpu"', '    dev = raptor64.strict_cuda(torch)')
     text = replace_once(text, '    truth = pd.read_parquet(tk._find("train_labels_v1.parquet"))',
         '    raptor64.verify_export_inputs(tk._find(c["LABELS_FILE"]), tk._find("train_labels_v1.parquet"), work / "folds_v0.json", work / "excluded_ids.json", val_ids, k, __file__)\n'
@@ -138,12 +139,13 @@ def adapt_entry(original, arm, workers, full=False, variant=None):
         '    checkpoint_before = sha256(ckpt_path)\n    pv, tv = predict(val_ids)\n'
         '    if sha256(ckpt_path) != checkpoint_before: raise ValueError("Frozen checkpoint mutated during export")')
     text = replace_once(text, '"caveat": "val AUC is selection-biased (the same fold chose the epochs); gold-58 is the only clean number and is noisy (+-0.03).",',
-        '"caveat": "Exposed report-selected development (top-3 by K16 report-masked AUC); no gold scored; dread_v4 init additionally exposed (Dread trained on all non-gold studies).",\n'
+        '"caveat": "Exposed report-selected development (top-3 by ' + ('K10' if axial else 'K16') + ' report-masked AUC); no gold scored; dread_v4 init additionally exposed (Dread trained on all non-gold studies).",\n'
         '        "raptor64_identity": json.load(open(work / "initial-state-record.json")),\n'
         '        "raptor64_policy": raptor64.recipe(work / "train_knee_patched.py"),\n'
         '        "raptor64_experiment_split": raptor64.runtime_split(work / "folds_v0.json", work / "excluded_ids.json", work / "train_knee_patched.py")[0],\n'
-        '        "raptor64_cache_content_sha256": os.environ["RAPTOR64_CONTENT_SHA256"],\n'
-        '        "comparison_endpoint": "K42 primary (selection K16)",')
+        '        "raptor64_cache_content_sha256": os.environ["RAPTOR64_CONTENT_SHA256"],\n' +
+        ('        "comparison_endpoint": "K10 primary (selection K10; axial windows)",' if axial else
+         '        "comparison_endpoint": "K42 primary (selection K16)",'))
     if variant == 'mirror':
         text = replace_once(text, '    df.to_csv(work / f"oof_fold{k}.csv", index=False)\n',
                             '    df.to_csv(work / f"oof_fold{k}.csv", index=False)\n'
@@ -174,7 +176,7 @@ def build(destination, *, evidence_root, arm, workers=2, worker_choice_name=None
     if full != (swa_epochs is not None):
         raise ValueError('Pre-registered SWA epochs are required for, and only for, the full-data arm')
     variant = guard.VARIANTS.get(arm)
-    if (variant in ('distil', 'distil_flip')) != (teacher_sha256 is not None):
+    if (variant in ('distil', 'distil_flip', 'axial')) != (teacher_sha256 is not None):
         raise ValueError('A pinned teacher SHA is required for, and only for, the distil arm')
     trainer = adapt_trainer(train, full, variant); runner = adapt_entry(entry, arm, workers, full, variant)
     sources = {name: (ROOT / name).read_text() for name in FILES}
@@ -186,10 +188,11 @@ def build(destination, *, evidence_root, arm, workers=2, worker_choice_name=None
               **({'variant': variant} if variant else {}),
               **({'mirror': {'p': guard.MIRROR_P, 'perm': guard.SIDE_PERM, 'masked': [guard.MCL_INDEX], 'tta_export': True}} if variant == 'mirror' else {}),
               **({'flip': guard.FLIP_SPEC} if variant == 'distil_flip' else {}),
+              **({'axial': guard.AXIAL_SPECS[arm]} if variant == 'axial' else {}),
               **({'teacher': {'source': 'dread_v4_full_k42', 'sha256': teacher_sha256, 'weight': guard.DISTIL_WEIGHTS[arm],
                               'loss': f'report BCE(pos_weight) + {guard.DISTIL_WEIGHTS[arm]} x plain BCE toward teacher probabilities on all 12 targets',
-                              'exposure': 'second-order: the teacher saw fold-0 development studies'}} if variant in ('distil', 'distil_flip') else {}),
-              'workers': workers, 'worker_choice_name': worker_choice_name, 'frozen': guard.FROZEN_FULL if full else guard.FROZEN, 'export_k': guard.EXPORT_K,
+                              'exposure': 'second-order: the teacher saw fold-0 development studies'}} if variant in ('distil', 'distil_flip', 'axial') else {}),
+              'workers': workers, 'worker_choice_name': worker_choice_name, 'frozen': guard.frozen_for(arm), 'export_k': guard.export_k_for(arm),
               'experiment_split': split, 'experiment_split_sha256': smoke.digest(smoke.canonical(split)),
               'input_contract': {'cache': 'raptor64-v4-336-sharded-v1', 'slots': [18, 14, 12, 8, 12], 'span': [0.06, 0.94],
                                  'storage': 336, 'model_input': 384, 'resize': 'StudyWindows bilinear (align_corners=False), as public eval_windows'},
@@ -198,7 +201,8 @@ def build(destination, *, evidence_root, arm, workers=2, worker_choice_name=None
                                   f'plane-aware: Embedding(6,{guard.CODE_DIM}) of plane*2+FS and Linear(1,{guard.DEPTH_DIM}) of normalized series depth, '
                                   'concatenated to LayerNorm(h) before att and clsW'),
               'selection': ('pre-registered fixed SWA epochs (no held-out set); historical top-3 rule applied to an epoch indicator' if full else
-                            'per-epoch K16 report-masked macro AUC on the 870 fold-0 development (own224/source96 protocol); top-3 SWA'),
+                            ('per-epoch K10 (all axial windows) report-masked macro AUC on the 870 fold-0 development; top-3 SWA' if variant == 'axial' else
+                             'per-epoch K16 report-masked macro AUC on the 870 fold-0 development (own224/source96 protocol); top-3 SWA')),
               'worker_rng_resume': 'Main RNG only; persistent worker RNG/prefetch not restored; no bit-identical continuation claim',
               'runtime_required': ['RAPTOR64_STAGE_ROOT', 'RAPTOR64_MANIFEST_SHA256', 'RAPTOR64_CONTENT_SHA256', 'RAPTOR64_STAGE_RECEIPT_SHA256',
                                    'RAPTOR64_INITIALIZER_DESCRIPTOR', 'RAPTOR64_INITIALIZER_DESCRIPTOR_SHA256'],

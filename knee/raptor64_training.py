@@ -40,11 +40,13 @@ HEADS = ('original', 'plane')
 ARMS = {'in-orig': ('imagenet', 'original'), 'in-plane': ('imagenet', 'plane'),
         'dr-orig': ('dread_v4', 'original'), 'dr-plane': ('dread_v4', 'plane'), 'na-orig': ('nartaa_oai', 'original'),
         'dr-full': ('dread_v4', 'original'), 'in-mirror': ('imagenet', 'original'), 'in-distil': ('imagenet', 'original'),
-        'in-distil-w1': ('imagenet', 'original'), 'in-distil-flip': ('imagenet', 'original')}
+        'in-distil-w1': ('imagenet', 'original'), 'in-distil-flip': ('imagenet', 'original'),
+        'ax-crop': ('imagenet', 'original'), 'ax-full': ('imagenet', 'original')}
 # Original-methods iteration 2: single-factor recipe variants against in-orig (everything else frozen).
-VARIANTS = {'in-mirror': 'mirror', 'in-distil': 'distil', 'in-distil-w1': 'distil', 'in-distil-flip': 'distil_flip'}
+VARIANTS = {'in-mirror': 'mirror', 'in-distil': 'distil', 'in-distil-w1': 'distil', 'in-distil-flip': 'distil_flip',
+            'ax-crop': 'axial', 'ax-full': 'axial'}
 # Iteration 3 (single factors against in-distil): teacher weight per arm; label-preserving flip spec.
-DISTIL_WEIGHTS = {'in-distil': 0.5, 'in-distil-w1': 1.0, 'in-distil-flip': 0.5}
+DISTIL_WEIGHTS = {'in-distil': 0.5, 'in-distil-w1': 1.0, 'in-distil-flip': 0.5, 'ax-crop': 0.5, 'ax-full': 0.5}
 FLIP_SPEC = {'p': 0.5, 'perm': list(range(12)), 'masked': [], 'tta_export': False}
 MIRROR_P = 0.5
 DISTIL_WEIGHT = 0.5
@@ -63,6 +65,22 @@ FROZEN = {'arch': ARCH, 'res': 384, 'k': 8, 'k_eval': 16, 'epochs': EPOCHS, 'bs'
           'fp16': True, 'xla': False, 'smoke': False, 'roi': False, 'freeze_blocks': 0, 'limit': 0,
           'folds': 5, 'fold': 0, 'time_budget_h': 0., 'ckpt': 'pinned-descriptor', 'bb_lr': 3e-5, 'head_lr': 1e-3, 'wd': .02}
 FROZEN_FULL = {**FROZEN, 'folds': 0, 'fold': -1}
+# Iteration 4 (axial patellofemoral arm; single factor ax-crop vs ax-full = the crop). Both arms read only the 12 axial
+# slots, so every 3-slice window over them is used: 10 windows in training, selection and export.
+AXIAL_SLOTS = (52, 64)
+AXIAL_WINDOWS = 10
+AXIAL_INDEX = 4                          # fifth v4 slot ('Axial', -1, 12)
+# Orientation: knee.raptor_input.prepare_study -> public build_study keeps DICOM storage order (IOP only sorts slices).
+# The protocol's centroid heuristic (axial_anterior_side) was audited by eye before training and rejected: it called
+# 60/4,345 studies anterior-bottom and 20/20 inspected were in fact anterior-top. Storage order (anterior at the top
+# row) is used; the p=0.5 AP flip covers rare exceptions.
+ORIENTATION_RULE = 'storage-order-anterior-top-v1 (centroid heuristic audited and rejected)'
+_AXIAL_COMMON = {'slots': list(AXIAL_SLOTS), 'windows': AXIAL_WINDOWS, 'ap_flip_p': 0.5, 'orientation': ORIENTATION_RULE,
+                 'train_exclusion': 'studies with no axial content (axial slot not selected or zero frames)',
+                 'eval': 'all 870 predicted; studies without axial content fall back to in-distil alone in the blend'}
+AXIAL_SPECS = {'ax-crop': {**_AXIAL_COMMON, 'crop': {'anterior': 0.55, 'central': 0.65}},
+               'ax-full': {**_AXIAL_COMMON, 'crop': None}}
+FROZEN_AXIAL = {**FROZEN, 'k': AXIAL_WINDOWS, 'k_eval': AXIAL_WINDOWS}
 FULL_SPLIT = {'fold': None, 'eligible': 4345, 'training': 4345, 'development': 0,
               'ordered_eligible_sha256': SPLITS[0]['ordered_eligible_sha256'],
               'ordered_training_sha256': SPLITS[0]['ordered_eligible_sha256'],
@@ -74,6 +92,15 @@ ENV = 'RAPTOR64_'
 _CORPUS = None
 _META = None
 _CACHE_IDENTITY = None
+_AXIAL = None
+
+
+def frozen_for(arm):
+    return FROZEN_FULL if arm in FULL_ARMS else FROZEN_AXIAL if arm in AXIAL_SPECS else FROZEN
+
+
+def export_k_for(arm):
+    return AXIAL_WINDOWS if arm in AXIAL_SPECS else EXPORT_K
 
 
 def arm_slug(arm):
@@ -84,7 +111,7 @@ def arm_slug(arm):
 
 # ----------------------------------------------------------------------------- staged corpus
 def staged_corpus(*, allow_fixture=False):
-    global _CORPUS, _META, _CACHE_IDENTITY
+    global _CORPUS, _META, _CACHE_IDENTITY, _AXIAL
     if _CORPUS is not None:
         if _CACHE_IDENTITY.get('fixture') and not allow_fixture:
             raise ValueError('Fixture corpus cannot train production')
@@ -100,6 +127,7 @@ def staged_corpus(*, allow_fixture=False):
     vols, masks, ids = loader.open_corpus(manifest, expected_manifest_sha256=expected, allow_fixture=allow_fixture)
     _CORPUS = (vols, masks, ids)
     _META = loader.slice_metadata_table(manifest)
+    _AXIAL = axial_presence(manifest)
     _CACHE_IDENTITY = {'content_sha256': content, 'membership': manifest['membership'], 'fixture': manifest['fixture'],
                        'sources': [{k: v for k, v in s.items() if k != 'root'} for s in manifest['sources']],
                        'manifest_sha256_observed': expected}
@@ -133,7 +161,7 @@ def validate_policy(policy):
     split = FULL_SPLIT if full else SPLITS[0]
     if (policy.get('version') != 1 or arm not in ARMS or (policy.get('init'), policy.get('head')) != ARMS[arm] or
             policy.get('mode', 'fold0') != ('full' if full else 'fold0') or
-            policy.get('frozen') != (FROZEN_FULL if full else FROZEN) or policy.get('export_k') != EXPORT_K or policy.get('experiment_split') != split or
+            policy.get('frozen') != frozen_for(arm) or policy.get('export_k') != export_k_for(arm) or policy.get('experiment_split') != split or
             policy.get('experiment_split_sha256') != smoke.digest(smoke.canonical(split))):
         raise ValueError('Pinned Raptor64 policy differs')
     variant = VARIANTS.get(arm)
@@ -143,7 +171,9 @@ def validate_policy(policy):
         raise ValueError('Mirror recipe differs from the pre-registered one')
     if variant == 'distil_flip' and policy.get('flip') != FLIP_SPEC:
         raise ValueError('Label-preserving flip recipe differs from the pre-registered one')
-    if variant in ('distil', 'distil_flip'):
+    if variant == 'axial' and policy.get('axial') != AXIAL_SPECS[arm]:
+        raise ValueError('Axial recipe differs from the pre-registered one')
+    if variant in ('distil', 'distil_flip', 'axial'):
         teacher = policy.get('teacher') or {}
         if teacher.get('weight') != DISTIL_WEIGHTS[arm] or not loader._hash(teacher.get('sha256')) or teacher.get('source') != 'dread_v4_full_k42':
             raise ValueError('Distillation teacher pin differs from the pre-registered one')
@@ -457,7 +487,8 @@ def verify_export_inputs(labels, truth, folds, excluded, development_ids, fold, 
 
 def entry_guard(c, script):
     policy = recipe(script)
-    expected = {'ARCH': ARCH, 'RES': '384', 'EPOCHS': str(EPOCHS), 'CKPT': 'pinned-descriptor', 'BS': '4', 'K': '8', 'K_EVAL': '16',
+    expected = {'ARCH': ARCH, 'RES': '384', 'EPOCHS': str(EPOCHS), 'CKPT': 'pinned-descriptor', 'BS': '4',
+                'K': str(policy['frozen']['k']), 'K_EVAL': str(policy['frozen']['k_eval']),
                 'SEED': '42', 'TOPK': '3', 'GRAD_CKPT': '1', 'WIN_CHUNK': '8', 'ACCUM': '2', 'LABELS_FILE': 'labels_v1_blend.parquet',
                 'TIME_BUDGET_H': '0', 'FOLD_A': '0', 'FOLD_B': '', 'BB_LR': '3e-5', 'HEAD_LR': '1e-3', 'WD': '0.02', 'WORKERS': str(policy['workers'])}
     if c['SMOKE'] or any(str(c.get(k)) != v for k, v in expected.items()):
@@ -537,9 +568,9 @@ def recipe_variant(StudyWindows, script):
             value = self.base[row]
             return mirror_volume(value) if self.owner._mirror_now else value
 
-    if variant in ('distil', 'distil_flip'):
+    if variant in ('distil', 'distil_flip', 'axial'):
         teacher = load_teacher(policy)
-        Base = StudyWindows
+        Base = axial_variant(StudyWindows, policy) if variant == 'axial' else StudyWindows
         if variant == 'distil_flip':
             class FlipStudyWindows(StudyWindows):
                 """Label-preserving anatomical mirror (p from the policy): image only; labels, masks, teacher unchanged."""
@@ -650,3 +681,110 @@ def mirror_tta_csv(tk, model, val_ids, id2row, res, k_eval, dev, workers, plain,
         for u, row in zip(val_ids, tta):
             w.writerow([u, *row.tolist(), 'val'])
     return tta
+
+
+# ----------------------------------------------------------------------------- iteration-4 axial PF arm
+def axial_presence(manifest):
+    """StudyInstanceUID -> True when the axial slot holds a selected series with frames (else an all-masked block)."""
+    out = {}
+    for e in manifest['entries']:
+        s = e['slots'][AXIAL_INDEX]
+        if s['plane'] != 'Axial' or s['count'] != AXIAL_SLOTS[1] - AXIAL_SLOTS[0]:
+            raise ValueError('Axial slot metadata differs from the v4 slot plan')
+        out[str(e['StudyInstanceUID'])] = bool(s['selected'] and s['frames'] > 0)
+    return out
+
+
+def axial_present(uid):
+    if _AXIAL is None:
+        staged_corpus()
+    return _AXIAL[str(uid)]
+
+
+def axial_anterior_side(block):
+    """Audit-only centroid heuristic from the it4 protocol (NOT used for training; see ORIENTATION_RULE).
+
+    Tissue = mean over non-empty axial slices above 20% of its 99th percentile. The bulky posterior soft-tissue mass
+    (popliteal fossa, gastrocnemius/hamstrings) pulls the tissue centroid towards the posterior edge, so the anterior
+    side is the vertical tissue edge farther from the centroid. Returns 'top' or 'bottom'; 'top' when undecidable."""
+    import numpy as np
+    b = np.asarray(block)
+    valid = b.reshape(b.shape[0], -1).max(1) > 0
+    if not valid.any():
+        return 'top'
+    img = b[valid].astype(np.float32).mean(0)
+    hi = float(np.percentile(img, 99))
+    if hi <= 0:
+        return 'top'
+    rows = (img > 0.2 * hi).sum(1).astype(np.float64)
+    if rows.sum() == 0:
+        return 'top'
+    r = np.nonzero(rows)[0]; r0, r1 = int(r.min()), int(r.max())
+    c = float((rows * np.arange(len(rows))).sum() / rows.sum())
+    return 'top' if (c - r0) >= (r1 - c) else 'bottom'
+
+
+def axial_crop_box(height, width, crop):
+    """(y0, y1, x0, x1) of the anterior `crop['anterior']` x central `crop['central']` box with anterior at the top."""
+    h = int(round(height * crop['anterior'])); w = int(round(width * crop['central'])); x0 = (width - w) // 2
+    return 0, h, x0, x0 + w
+
+
+def axial_block(volume, spec, flip=False):
+    """Axial slots of a 64-slot volume in storage order (anterior at the top), cropped per spec, optionally AP-flipped."""
+    import numpy as np
+    a, b = AXIAL_SLOTS
+    block = np.asarray(volume[a:b])
+    if spec['crop'] is not None:
+        y0, y1, x0, x1 = axial_crop_box(block.shape[1], block.shape[2], spec['crop'])
+        block = block[:, y0:y1, x0:x1]
+    if flip:
+        block = block[:, ::-1]
+    return np.ascontiguousarray(block)
+
+
+def axial_variant(StudyWindows, policy):
+    """Axial-only dataset: 12 axial slices, all 10 3-slice windows, training excludes studies without axial content;
+    p=0.5 AP flip of the (canonical, cropped) image in training only. Labels, teacher targets and masks are unchanged."""
+    import random
+    spec = policy['axial']
+    depth = AXIAL_SLOTS[1] - AXIAL_SLOTS[0]
+
+    class _AxialView:
+        def __init__(self, base, owner, image):
+            self.base, self.owner, self.image = base, owner, image
+            self.shape = (base.shape[0], depth) + (tuple(base.shape[2:]) if image else ())
+
+        def __getitem__(self, row):
+            value = self.base[row]
+            if not self.image:
+                return value[AXIAL_SLOTS[0]:AXIAL_SLOTS[1]]
+            return axial_block(value, spec, bool(self.owner._flip_now))
+
+    class AxialStudyWindows(StudyWindows):
+        force_flip = False   # tests/diagnostics only; evaluation is unflipped
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            if self.roi:
+                raise ValueError('ROI windows are not supported by the axial arm')
+            if self.train:
+                self.ids = [u for u in self.ids if axial_present(u)]
+
+        def _centers(self, valid, count):
+            # Training uses every centre once (shuffled) when the block has >= count centres; the historical
+            # pool-with-replacement sampler would repeat some and drop others. Evaluation is the historical rule.
+            lo, hi = int(valid.min()), int(valid.max())
+            cs = [c for c in range(lo + 1, hi) if c - 1 >= lo and c + 1 <= hi]
+            if not self.train or len(cs) < count:
+                return super()._centers(valid, count)
+            random.shuffle(cs)
+            return cs[:count]
+
+        def __getitem__(self, i):
+            self._ensure()
+            if not isinstance(self.vols, _AxialView):
+                self.vols, self.masks = _AxialView(self.vols, self, True), _AxialView(self.masks, self, False)
+            self._flip_now = (random.random() < spec['ap_flip_p']) if self.train else bool(self.force_flip)
+            return super().__getitem__(i)
+    return AxialStudyWindows
