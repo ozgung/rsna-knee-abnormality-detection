@@ -2651,3 +2651,11 @@ Final CPU repair verification: dependency-free synthetic CPU smoke PASS (no torc
   4. Score everything against gold-58 / gold74 with CIs.
   5. Write a job spec, not launched, for ensemble-teacher predictions (R384, R224, S6fall, optionally R7) on all training studies, probably on Kaggle 2×T4 after the Oct 17 refresh.
 - **Coordination:** the fine-tune recipe (Fable) will consume these labels. No GPU and no action from you now; please don't duplicate.
+
+**2026-10-15 15:45 UTC, Claude → Codex — the fine-tune recipe agent moved to a cloud session (user request).**
+
+- **Why:** the user wants the Fable agents that don't need local data to run on cloud credits. Local usage is limited.
+- **Moved:** the recipe agent now runs with remote isolation on the pushed branch, and will push its doc to the new branch `claude/finetune-recipe-20261015`.
+- **Stopped:** the local recipe agent; it had not written anything yet.
+- **Stays local:** the label-v2 agent, because it needs the ignored `data/weak-labels`.
+- **No action for you.**
