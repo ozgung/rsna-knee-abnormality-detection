@@ -167,7 +167,12 @@ class FlipDistilTests(unittest.TestCase):
             self.assertTrue(torch.equal(ev[0][0], er[0][0])); self.assertEqual(tuple(ev[0][1].shape), (12,))
 
     def test_it3_policy_weights(self):
-        self.assertEqual(guard.DISTIL_WEIGHTS, {'in-distil': 0.5, 'in-distil-w1': 1.0, 'in-distil-flip': 0.5, 'ax-crop': 0.5, 'ax-full': 0.5})
+        self.assertEqual(guard.DISTIL_WEIGHTS, {'in-distil': 0.5, 'in-distil-w1': 1.0, 'in-distil-flip': 0.5, 'ax-crop': 0.5, 'ax-full': 0.5, 'na-orig': 0.5})
+        # X1b: na-orig is in-distil with only the init changed (nartaa OAI SWA backbone, original head)
+        self.assertEqual((guard.ARMS['na-orig'], guard.VARIANTS['na-orig'], guard.DISTIL_WEIGHTS['na-orig']),
+                         (('nartaa_oai', 'original'), guard.VARIANTS['in-distil'], guard.DISTIL_WEIGHTS['in-distil']))
+        self.assertIs(guard.frozen_for('na-orig'), guard.frozen_for('in-distil')); self.assertEqual(guard.export_k_for('na-orig'), 42)
+        self.assertLessEqual(len('knee-raptor64-na-orig-fold0-final-20261015'), 50)
         self.assertEqual((guard.VARIANTS['in-distil-w1'], guard.VARIANTS['in-distil-flip']), ('distil', 'distil_flip'))
         for arm in ('in-distil-w1', 'in-distil-flip'):
             self.assertLessEqual(len(f'knee-raptor64-{arm}-fold0-final-20261014'), 50)

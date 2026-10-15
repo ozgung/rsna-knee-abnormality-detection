@@ -28,7 +28,8 @@ IMAGENET_PIN = {'repo': 'timm/' + ARCH, 'revision': '2c31d82376cc244c907c0643329
 DREAD_PIN = {'dataset': 'dreaddevelopment/raptor-knee-widedense', 'file': 'raptor_ft_coatnet_v4_full.pt',
              'sha256': cache.V4_CHECKPOINT_SHA256, 'size': 292829402, 'licence': 'CC0-1.0',
              'exposure': 'Dread trained on all non-gold studies; fold-0 OOF is exposed'}
-# Optional, not launched without coordinator confirmation: nartaa's OAI-pretrained SWA Raptor (OAI rules unresolved).
+# nartaa's OAI-pretrained SWA Raptor (backbone tensors only). na-orig (X1b, finetune-recipe-20261015) is the in-distil
+# recipe with only the init changed; authorised by the user on 2026-10-15.
 NARTAA_PIN = {'dataset': 'nartaa/rsna-knee-publication-swa-weights-20261007', 'file': 'raptor_ft_alldata_t16_blendjev_oai_d96_r384_swa.pt',
               'sha256': '7e5315dad125b99fc65b340b3de41de628e9be51ff5835355dd61c86472244ef', 'size': 292840787,
               'licence': 'per dataset card (verify before use)',
@@ -44,9 +45,9 @@ ARMS = {'in-orig': ('imagenet', 'original'), 'in-plane': ('imagenet', 'plane'),
         'ax-crop': ('imagenet', 'original'), 'ax-full': ('imagenet', 'original')}
 # Original-methods iteration 2: single-factor recipe variants against in-orig (everything else frozen).
 VARIANTS = {'in-mirror': 'mirror', 'in-distil': 'distil', 'in-distil-w1': 'distil', 'in-distil-flip': 'distil_flip',
-            'ax-crop': 'axial', 'ax-full': 'axial'}
+            'ax-crop': 'axial', 'ax-full': 'axial', 'na-orig': 'distil'}
 # Iteration 3 (single factors against in-distil): teacher weight per arm; label-preserving flip spec.
-DISTIL_WEIGHTS = {'in-distil': 0.5, 'in-distil-w1': 1.0, 'in-distil-flip': 0.5, 'ax-crop': 0.5, 'ax-full': 0.5}
+DISTIL_WEIGHTS = {'in-distil': 0.5, 'in-distil-w1': 1.0, 'in-distil-flip': 0.5, 'ax-crop': 0.5, 'ax-full': 0.5, 'na-orig': 0.5}
 FLIP_SPEC = {'p': 0.5, 'perm': list(range(12)), 'masked': [], 'tta_export': False}
 MIRROR_P = 0.5
 DISTIL_WEIGHT = 0.5

@@ -19,7 +19,7 @@ from knee.public_adaptation_fit import metric_report, paired_bootstrap
 ENDPOINT_SHA = '1c7a0d0928e625551a47ab10082fcb9a5837cd1c3eefd4adc2fac0d921aa27c9'
 CONTROL_SHA = '2e5d807b4cdb202e63f95e036c8dbc30d7f5d89eb933eae350693127d9232c42'
 CONTROL_MACRO = 0.9058770197220801
-ARMS = ('in-orig', 'in-plane', 'dr-orig', 'dr-plane', 'dr-full', 'in-mirror', 'in-mirror-tta', 'in-distil', 'in-distil-w1', 'in-distil-flip')
+ARMS = ('in-orig', 'in-plane', 'dr-orig', 'dr-plane', 'dr-full', 'in-mirror', 'in-mirror-tta', 'in-distil', 'in-distil-w1', 'in-distil-flip', 'na-orig')
 CONTRASTS = [('in-plane', 'in-orig', 'clean plane-aware head test (ImageNet init)'),
              ('dr-plane', 'dr-orig', 'plane-aware head under Dread init (exposed)'),
              ('dr-orig', 'in-orig', 'Dread v4 init vs ImageNet init (exposed; not a clean init comparison)'),
@@ -28,7 +28,9 @@ CONTRASTS = [('in-plane', 'in-orig', 'clean plane-aware head test (ImageNet init
              ('in-distil', 'in-orig', 'M2 distillation toward Dread v4 (near-clean: second-order teacher exposure)'),
              ('in-distil-w1', 'in-distil', 'it3: distillation weight 0.5 -> 1.0 (single factor)'),
              ('in-distil-flip', 'in-distil', 'it3: label-preserving anatomical flip p 0.5 (single factor)'),
-             ('in-distil-w1', 'in-orig', 'it3 w1 vs in-orig'), ('in-distil-flip', 'in-orig', 'it3 flip vs in-orig')]
+             ('in-distil-w1', 'in-orig', 'it3 w1 vs in-orig'), ('in-distil-flip', 'in-orig', 'it3 flip vs in-orig'),
+             ('na-orig', 'in-distil', 'X1b: nartaa OAI init vs ImageNet init under the in-distil loss (exposed; single factor)'),
+             ('na-orig', 'dr-orig', 'X1b: nartaa init + in-distil loss vs Dread init, no teacher (exposed; two factors)')]
 SECONDARY = ['Lateral Meniscus', 'Lateral OA', 'PF OA', 'Medial OA', 'Medial Meniscus']
 
 
