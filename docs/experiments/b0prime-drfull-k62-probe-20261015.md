@@ -1,6 +1,6 @@
 # B0′: dr-full checkpoint swap at B0 K62
 
-Prepared October 15, 2026, 16:15 UTC, in response to Claude's 15:33 handoff. **Rehearsal preparation only; no new GPU execution, qualified entry or score.** Claude owns launch, collection and submission; Codex owns integration and targeted acceptance.
+Prepared October 15, 2026, 16:15 UTC, in response to Claude's 15:33 handoff. **Rehearsal now RUNNING under Claude; no completed GPU qualification, entry or score.** Claude owns launch, collection and submission; Codex owns integration and targeted acceptance.
 
 The hypothesis is that our dr-full fine-tune improves the fixed B0 ensemble when it replaces Dread v4_full. The official saved submissions CSV confirms B0 submission **57119585 COMPLETE / 0.940**. B0′ changes the checkpoint while retaining B0's K62 windows, source/reader, no TTA, CUDA fp16, S6, 70:30 percentile-rank blend and capped recovery. It does not use B3's K42 window count or R7. dr-full was trained on all 4,345 eligible studies; this is an exposed-development leaderboard swap probe, not independent held-out validation. A displayed score difference tests this fixed ensemble intervention and remains subject to rounding and leaderboard noise.
 
@@ -34,7 +34,7 @@ Targeted checks ran **28 tests: 24 passed, four optional reader tests skipped** 
 
 ## Owner commands and recovery
 
-After reconciling actual quota/jobs, Claude may claim this **one** rehearsal:
+Claude claimed/launched this **one** rehearsal at 16:18 after reconciling quota/jobs. The recorded command below is already executed; do not repeat it:
 
 ```bash
 kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/b0prime-drfull-k62-qual-20261015-r2
@@ -53,3 +53,5 @@ The output root retains `s6-recovery-entry/`. Preserve root/worker receipts, ass
 ```
 
 No entry packet exists yet. A successful build removes private evaluation references and all rehearsal wrappers; inference remains image-only. Claude owns entry launch, visible raw-output/blend acceptance and any already-authorized competitive submission. A′ 57229227 is separately still PENDING at 16:01:55 UTC; its result continues to control the suspended v3 rescue lane.
+
+**16:19 UTC execution update:** Claude reconciled quota 8.89 h/no other owned running kernels and claimed/launched r2 at 16:18. Parent independently sees RUNNING and exact accepted code/payload/settings/normalized dataset refs. [Accepted source proof](../../outputs/analysis/b0prime-20261015/accepted-source-verification.json). Pull/status do not expose exact server version or attachment versions; owner push receipt is pending, requested dr-full v1 is bound by the sealed metadata and runtime checkpoint SHA/bytes. Parent integration 7c00222 matches sealed source hashes. No qualification/result/entry yet; collection remains Claude-owned.
