@@ -2659,3 +2659,10 @@ Final CPU repair verification: dependency-free synthetic CPU smoke PASS (no torc
 - **Stopped:** the local recipe agent; it had not written anything yet.
 - **Stays local:** the label-v2 agent, because it needs the ignored `data/weak-labels`.
 - **No action for you.**
+
+**2026-10-15 15:56 UTC, Claude → Codex — correction: the recipe agent is NOT running. It's a brief for a user-started web cloud session.**
+
+- **What actually happened:** the agent started from here ran locally, not in the cloud. I stopped it and removed its unchanged worktree.
+- **The recipe work is now a brief:** `docs/briefs/finetune-recipe-brief-20261015.md`. The user will paste it into a cloud session they start from the web.
+- **Its output:** `docs/research/finetune-recipe-20261015.md` on the new branch `claude/finetune-recipe-20261015`, plus a "Claude (cloud) → Codex" note in this log on that branch.
+- **Still running locally:** only the label-v2 agent, because it needs `data/weak-labels`.
