@@ -73,3 +73,17 @@ The result path above is a future example, not an existing qualified result. The
 - **Unchanged:** production windows stay on CUDA. Every other gate stays as it is, including the reload probability tolerance of 1e-6, the source and state bindings, the 8.3 h gate, and failures being fatal.
 - **Rebuild:** binding version `ws2-a-prime-r224-v2` into a new immutable `outputs/r224-colab/package-v2/`. Package v1 is preserved.
 - **Rerun:** run the v2 package on a fresh T4 with Python 3.12.13 and a fresh output directory. This rerun is a new run, not a resume of run 1.
+
+## Resumed v2 qualification — 2026-10-15 08:46 UTC
+
+Claude committed the prospective tolerance repair as df958e4. Parent independently passed12 focused installed-ML regressions/zero skips and exact static verification of both `outputs/r224-colab/package-v2/` and fresh `outputs/kaggle/ws2-r224-v2-qual-20261015/`. Their notebook bytes, inference payload, binding and all source hashes match; only the requested metadataID differs. Parent preserved237 archived sources/3 new modules. [Build receipt](../../outputs/analysis/r224-integration-20261015/kaggle-v2-preparation.json).
+
+Claude owns the fresh Colab v2b execution and the parallel binding Kaggle qualification. The earlier v2 VM was reclaimed during staging without inference results. Parent independently lists the new Colab T4 allocation; actual staging/inference receipts remain pending.
+
+Kaggle accepted qualification version1 at08:36 under **`ozgung/a-prime-r224-rehearsal`**, derived from the title. Use that actual slug; the requested localID does not resolve. Parent independently confirmed RUNNING and pulled exact accepted source/settings: code cell/payload match the frozen build, private/offline2×T4/pinned Docker/competition match. API dataset-ref normalization does not replace runtime asset hash checks. [Accepted-source proof](../../outputs/analysis/r224-integration-20261015/accepted-kernel-v1-verification.json). Fix title/id consistency after this frozen qualification is consumed, before a future build; do not mutate it now.
+
+Actual GPU quota at08:34:10.82h remaining/49.18h used/60h total. Recheck before another launch. The CLI’s refreshAt field has no explicit timezone; do not infer local time. [Quota receipt](../../outputs/analysis/r224-integration-20261015/quota-resume-20261015.json).
+
+The current full checker uses `--rehearsal-build outputs/kaggle/ws2-r224-v2-qual-20261015` and future collected result `outputs/kaggle/ws2-r224-v2-qual-20261015-result/ws2-a-prime`, with the same pinned archive arguments above. A supplementary ignored auditor `outputs/analysis/r224-integration-20261015/audit_kaggle_v2.py` adds all39 native-versus-baseline source hashes and finite/nonnegative/plausible crop-statistics checks without modifying the running code. Only its syntax has been checked; actual terminal execution is pending. No entry qualifies from preparation/flags or Colab ratio alone.
+
+Parent’s completed v1 partial audit passed441 assertions: all240 saved runtime files exact, four completed39-row old/R7 ledgers, source/environment/state consistency and zero preserved-arm probability delta across A/A′. V1 remains FAILED with R224 completed0; no combined ratio, efficacy or qualification. Saved input hashes were audited; raw images were not locally replayed. [Partial audit](../../outputs/analysis/r224-integration-20261015/colab-v1-partial-audit.json).
