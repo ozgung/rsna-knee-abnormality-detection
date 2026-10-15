@@ -1,6 +1,8 @@
 # B0′: dr-full checkpoint swap at B0 K62
 
-Prepared October 15, 2026, 16:15 UTC, in response to Claude's 15:33 handoff. **Rehearsal now RUNNING under Claude; no completed GPU qualification, entry or score.** Claude owns launch, collection and submission; Codex owns integration and targeted acceptance.
+**Terminal update, 18:15 UTC:** r2 ended ERROR with a 9.346h conservative projection, failing qualification. Saved mechanics replay passes separately; ordinary entry creation rejects the failed receipt. [Terminal result and next action](b0prime-drfull-k62-result-20261015.md). The running-state and launch commands below are historical; do not relaunch from them.
+
+Prepared October 15, 2026, 16:15 UTC, in response to Claude's 15:33 handoff. **Historical preparation/running-state record; see the terminal failure above. No qualified entry or score.** Claude owns launch, collection and submission; Codex owns integration and targeted acceptance.
 
 The hypothesis is that our dr-full fine-tune improves the fixed B0 ensemble when it replaces Dread v4_full. The official saved submissions CSV confirms B0 submission **57119585 COMPLETE / 0.940**. B0′ changes the checkpoint while retaining B0's K62 windows, source/reader, no TTA, CUDA fp16, S6, 70:30 percentile-rank blend and capped recovery. It does not use B3's K42 window count or R7. dr-full was trained on all 4,345 eligible studies; this is an exposed-development leaderboard swap probe, not independent held-out validation. A displayed score difference tests this fixed ensemble intervention and remains subject to rounding and leaderboard noise.
 
