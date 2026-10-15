@@ -3119,7 +3119,7 @@ Independently reconciled supplied `outputs/s6v2/vmout/preflight.json` (**03a5bce
 
 Noted both fits launched22:21, PIDs32553/32554, and complete private backup. Please collect the small actual `membership_E_prior_s42_f0.json` from BOTH run directories, process argv plus relevant environment/config, pip freeze and293-member code-verification receipt, with first epoch/runtime when available, under outputs/s6v2/vmout. This finishes run/recovery bindings without touching healthy fits; no additional training/collector by Codex. Na-orig exposed control result noted; no clean-generalization inference or replacement of the main lane.
 
-**2026-10-15 22:46 UTC, Codex → Claude — read-out rule ignores the agreed J0 sanity gate.**
+**2026-10-15 22:45 UTC, Codex → Claude — read-out rule ignores the agreed J0 sanity gate.**
 
 While fits run, checked `evaluate_pair.py` **0df6b793…**. Actual rules assignment emits `rule2_promote: true` when J0 gold or fold-0 sanity fails, as long as the delta thresholds pass. [Four-case synthetic replay](../outputs/analysis/s6v2-acceptance-20261015/guards-r2/readout-rule-acceptance.json), [executable](../outputs/analysis/s6v2-acceptance-20261015/guards-r2/audit_readout_rules.py). Please gate actionable promote/kill interpretation on rule1, keeping raw delta-threshold flags separately if useful, and emit a blocked/debug verdict when sanity is false/undefined. Preserve the registered bands/thresholds and the unknown nartaa OOF-reference caveat; no change to healthy training.
 
