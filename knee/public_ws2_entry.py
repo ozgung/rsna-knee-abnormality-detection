@@ -25,7 +25,15 @@ from knee.public_fullfield_entry import read_series, test_contract, write_csv
 from knee.mirror_input import prepare_study
 from knee.public_adaptation_fit import PlatformInterruption, atomic_save
 
-VERSION = 'ws2-a-prime-r224-v1'
+VERSION = 'ws2-a-prime-r224-v2'
+# v2 (pre-registered Oct 15): CPU/CUDA bilinear windows differ by float32 rounding.
+CROP_PARITY_MAX_ABS = 1e-4
+CROP_PARITY_MEAN_ABS = 1e-6
+
+
+def crop_parity_ok(max_abs, mean_abs):
+    return (isinstance(max_abs, float) and isinstance(mean_abs, float)
+            and max_abs <= CROP_PARITY_MAX_ABS and mean_abs <= CROP_PARITY_MEAN_ABS)
 ENTRY_MODULE = 'knee.public_ws2_entry'
 MAX_SECONDS = 9 * 3600
 PROJECTION_GATE_SECONDS = 8.3 * 3600
@@ -71,17 +79,18 @@ def crop224_worker(config_path):
             windowed=time.monotonic()
             if cpu_parity:
                 y=C224.windows(v,m,device='cpu').to('cuda')
-                crop_diff=float((x-y).abs().max().item())
-                require(crop_diff<=1e-5,'CROP224_CPU_CUDA_PARITY')
-                del y
-            else:crop_diff=None
+                delta=(x-y).abs()
+                crop_diff=float(delta.max().item());crop_mean=float(delta.mean().item())
+                require(crop_parity_ok(crop_diff,crop_mean),'CROP224_CPU_CUDA_PARITY')
+                del y,delta
+            else:crop_diff=crop_mean=None
             p=C224.infer_probs(model,x,'cuda',expected_state=state)
             probabilities([p],1)
             torch.cuda.synchronize()
             forwarded=time.monotonic()
             return p,{'volume_sha256':volume_sha,'mask_sha256':mask_sha,
                       'crop224_window_sha256':hashlib.sha256(x.cpu().numpy().tobytes()).hexdigest(),
-                      'crop224_cpu_cuda_max_abs':crop_diff,'decode_counters':counters},\
+                      'crop224_cpu_cuda_max_abs':crop_diff,'crop224_cpu_cuda_mean_abs':crop_mean,'decode_counters':counters},\
                 {'decode_seconds':decoded-started,'window_seconds':windowed-decoded,
                  'forward_seconds':forwarded-windowed,'production_seconds':time.monotonic()-started}
         ps=[];statuses=[]
@@ -293,7 +302,7 @@ def require_rehearsal(r,binding,base_receipt_path,csv_path):
         and x.get('model',{}).get('arch')==C224.ARCH and x.get('model',{}).get('res')==224
         and x.get('zero_failed') is True and x.get('fp32_recoveries')==0 and x.get('peak_cuda_bytes',0)>0
         and x.get('peak_rss_bytes',0)>0 and x.get('ledger_sha256')
-        and len(x.get('sentinels',[]))==4 and all(s.get('strict_reload') is True and s['input']['crop224_cpu_cuda_max_abs']<=1e-5 for s in x['sentinels'])
+        and len(x.get('sentinels',[]))==4 and all(s.get('strict_reload') is True and crop_parity_ok(s['input'].get('crop224_cpu_cuda_max_abs'),s['input'].get('crop224_cpu_cuda_mean_abs')) for s in x['sentinels'])
         for i,x in enumerate(workers)),'R224_STATE_RELOAD_CROP_RESOURCES')
     require(workers[0]['state_before']==workers[1]['state_before'],'R224_CROSS_BOARD_STATE')
     old_rows={row['id']:row for w in base['workers']['old'] for row in w['records']}

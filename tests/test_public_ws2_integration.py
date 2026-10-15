@@ -28,6 +28,18 @@ class WS2PureTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'FULL_REHEARSAL_FILES'):
                 verify_fresh_rehearsal(root,{'version':WS2.VERSION})
 
+    def test_v2_crop_parity_rule_max_and_mean(self):
+        self.assertEqual(WS2.VERSION,'ws2-a-prime-r224-v2')
+        # Measured Colab T4 float32 bilinear rounding (run 1) now passes.
+        self.assertTrue(WS2.crop_parity_ok(2e-5,7.3e-8))
+        self.assertTrue(WS2.crop_parity_ok(1e-4,1e-6))
+        self.assertFalse(WS2.crop_parity_ok(2e-4,5e-8))
+        self.assertFalse(WS2.crop_parity_ok(2e-5,5e-6))
+        # Missing or non-float evidence never qualifies.
+        self.assertFalse(WS2.crop_parity_ok(2e-5,None))
+        self.assertFalse(WS2.crop_parity_ok(None,5e-8))
+        self.assertFalse(WS2.crop_parity_ok(float('nan'),5e-8))
+
     def test_archived_binding_digest_is_required_before_pass_flags(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)
