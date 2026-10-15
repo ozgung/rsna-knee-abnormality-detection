@@ -1,6 +1,6 @@
 # Local64 X1a cache protocol
 
-Accepted October 15, 2026, Claude 18:31 shared handoff; implementation in progress. Outcome: four private/offline CPU Kaggle cache packets, preserving exact Dread 64 source-slot semantics while changing pixels to S6-derived local views. No cache or anatomy qualification has executed. Claude owns all pushes/collectors and X1b Colab control; Codex owns implementation integration and acceptance. [Recipe](../research/finetune-recipe-20261015.md), [shared agreement](../claude-astra-handoff.md).
+Accepted October 15, 2026, Claude 18:31 shared handoff. Current checkpoint: original four CPU jobs failed a missing attachment; corrected r2 packets sealed below. Outcome: four private/offline CPU Kaggle cache packets, preserving exact Dread 64 source-slot semantics while changing pixels to S6-derived local views. No cache or anatomy qualification has executed. Claude owns all pushes/collectors and X1b Colab control; Codex owns implementation integration and acceptance. [Recipe](../research/finetune-recipe-20261015.md), [shared agreement](../claude-astra-handoff.md).
 
 ## Frozen population and processing contract
 
@@ -71,3 +71,22 @@ kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/
 No `--timeout`, duplicate jobs or local full-cache downloads. Claude posts actual accepted versions/source/settings, job status and log/result paths. Collect only contract/index/receipts and K0 PNGs into `outputs/kaggle/local64-cache-20261015-result/shardN/local64_cache/`; `scripts/collect_local64_cache_metadata.py` defaults to metadata-only validation. `--verify-pixels` is for a remote staging host with all NPZ files, not this laptop. Both modes keep training promotion false until full loader/stage integration, immutable file/access verification and real K0 review pass.
 
 Recovery: workers write atomic NPZ/index checkpoints, private failure details, source decode counts and disk/RSS/runtime measurements. In-place recovery verifies exact contract, source membership, NPZ file/raw hashes and montage hashes, then rebuilds only derived image links. A new Kaggle run resets working storage; attachment/transport resume is not implemented, so preserve partial outputs and request a separately sealed recovery build rather than blind retry. No job currently needs stop/resume. Actual CPU auxiliary forward, real DICOM/native geometry, anatomy, throughput and full staging remain unverified.
+
+## First execution failure and corrected r2 — October 15, 19:17 UTC
+
+All four original CPU jobs ended **ERROR** (owner19:13; parent independently saw shards0–2 ERROR/shard3 RUNNING19:11:53). The collected shard0 log points exactly to compact-dataset discovery: `Expected exactly one explicit attachment mount, found 0`. The original bootstrap required `heliosli/rsna-knee-compact-v1`, but its dataset attachment metadata omitted it. This was a Codex integration/acceptance miss; prior source/import checks did not verify attachment completeness. [Original failure log](../../outputs/kaggle/local64-cache-20261015/shard0-result/knee-local64-cache-shard0-20261016.log). Original sealed packets/index remain unchanged; their preparation audit does not establish operational success.
+
+**Repair7e7d1ed:** one dataset-requirements table drives both metadata and bootstrap mount discovery. All six required datasets, including compact manifest/side/spec/four weight files, are explicit. A fixture reproduces the absent-mount failure and passes only when the attachment is restored. Notebook execution now has a real try/except guard, because IPython bypassed the earlier sys.excepthook and produced only a log; setup errors preserve private diagnostics and a failure receipt. No reader, crop, slots, labels, CPU model or acceptance-bound change. [Scientific-contract comparison](../../outputs/analysis/local64-20261015/r2-scientific-contract-comparison.json).
+
+**Corrected r2 packets:** `outputs/kaggle/local64-cache-20261015-r2/shard{0..3}/`, same owned kernel IDs,815155bytes each,232 unchanged scientific sources/source bundle d24d6fd9…. [Full sealed index](../../outputs/kaggle/local64-cache-20261015-r2/SEALED-BUILD.json), SHA **b21ad6552485d035ced848eb7796dc03da84dab3f443e7cb91994a7460436e46**.
+
+| Shard | Notebook SHA256 |
+| --- | --- |
+| 0 | `99cd14d902b91f202366775edfd3b25847d9c123faddc280490446d21ca0a2a2` |
+| 1 | `af1c1a4cc45a0a264f2a8ad4ed1c36b8f21a0870515177832fd6fb01d2709201` |
+| 2 | `778e9ea0dbf306b2804b113d40da7168bb53d4d144fdab89a33c37c278243450` |
+| 3 | `57a4d55dd4fc7a8770a04104efe56dec236d3637c7d5de6545f780e5852bfc36` |
+
+All **16 focused ML tests PASS**, including the two new attachment/exception regressions; bare integration6 OK/one optional skip. Four corrected packet audits PASS with exact equality between declared datasets and discovery requirements, compact attachment presence, source/settings/partition checks and separate unpack/import. [Current tests](../../outputs/analysis/local64-20261015/targeted-tests-r2.log), [r2 packet audit](../../outputs/analysis/local64-20261015/sealed-packets-r2-acceptance.json). Prior12-case pixel proof and CPU smoke reused: runtime scientific source bytes unchanged. Broad-suite limitations above remain; no redundant full repeat for this builder-only repair. Real CPU/model/DICOM/K0 qualification remains pending.
+
+Claude owns the authorized corrected retry after reconciling all original terminal versions. Replace the old command paths with `outputs/kaggle/local64-cache-20261015-r2/shardN`; no runtime flags. Post accepted version/source/settings, and use **fresh** result layout `outputs/kaggle/local64-cache-20261015-r2-result/shardN/local64_cache/` so the collector can use `--build-root ...-r2 --result-root ...-r2-result`. Preserve original failure collection. Metadata/receipts/K0 PNG only; full NPZ verification belongs on the remote staging host. No Codex launch/collector/submission, duplicate retry or new schedule.
