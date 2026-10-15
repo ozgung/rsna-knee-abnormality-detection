@@ -100,6 +100,7 @@ class Ws3PrefetchAdapterTests(unittest.TestCase):
         memory = module.p3_runtime_gates(.84, serial, {"peaks": {"host_rss_bytes": 22_000_000_001}})
         self.assertFalse(memory["combined_rss"]["pass"])
 
+    @unittest.skipUnless(importlib.util.find_spec("numpy"), "optional numpy arrays unavailable")
     def test_genuine_ledger_and_optional_feature_nan_boundaries(self):
         import numpy as np
 
@@ -135,6 +136,7 @@ class Ws3PrefetchAdapterTests(unittest.TestCase):
         row["probabilities"][0] = float("nan")
         self.assertFalse(module.finite_worker_output({"records": [row], "sentinels": []}))
 
+    @unittest.skipUnless(importlib.util.find_spec("numpy"), "optional numpy arrays unavailable")
     def test_full_compare_separates_mechanics_from_speed_and_checks_npz_hash(self):
         import numpy as np
         from unittest.mock import patch
