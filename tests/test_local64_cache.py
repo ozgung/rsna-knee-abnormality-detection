@@ -251,7 +251,7 @@ class Local64ContractTests(unittest.TestCase):
                 @staticmethod
                 def _make_reader():
                     def order(path):
-                        return [str(p) for p in sorted(Path(path).glob("*.dcm"))], None
+                        return [(str(p), 1.0) for p in sorted(Path(path).glob("*.dcm"))], 1.0
                     return order, None, None
 
             planned = [({"SeriesInstanceUID": sid}, 18), *((None, count) for _, _, count in cache.SLOTS[1:])]

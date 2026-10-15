@@ -238,7 +238,7 @@ sys.path[:0]=[str(project),str(code)]
 from knee.fresh_reader_setup import dataset_root,notebook_root
 from knee.public_training_smoke import require_file,file_sha
 from knee import local64_cache as cache
-from knee.local64_runtime import run
+from knee.local64_runtime import run,make_runtime_config
 from knee import public_training_smoke as smoke
 from knee.public_s6_qualification import verify_assets
 from knee import source96_cache as membership_cache
@@ -281,10 +281,10 @@ from knee.reference import load_definitions
 public,decoder=load_definitions(module,'',manifest)
 if decoder is not None:raise ValueError('Unexpected embedded decoder')
 shard=CONTRACT['shard_index'];members=cache.make_shards(ids,4)[shard]
-cfg={{'data_root':str(competition),'code':str(code),'out':'/kaggle/working/local64_cache',
- 'shard_index':shard,'shard_count':4,'training_ids':ids,'gold_ids':gold if shard==0 else [],
- 'contract':CONTRACT,'dread_module':module,'dread_manifest':manifest,'frozen32_uid_sha256':frozen_hashes,
- 'anatomy_path':str(anatomy_root/'anatomy.pt'),'side_model_path':str(compact/'side_cls.pt')}}
+cfg=make_runtime_config(contract=CONTRACT,training_ids=ids,all_gold_ids=gold,
+ data_root=str(competition),code=str(code),out='/kaggle/working/local64_cache',
+ dread_module=module,dread_manifest=manifest,anatomy_path=str(anatomy_root/'anatomy.pt'),
+ side_model_path=str(compact/'side_cls.pt'))
 receipt=run(cfg)
 print(json.dumps({{'event':'local64_done','status':receipt['status'],'studies':receipt['completed_studies'],'k0':'UNKNOWN'}}))
 '''

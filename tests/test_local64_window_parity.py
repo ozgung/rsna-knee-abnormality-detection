@@ -18,6 +18,54 @@ HAVE_ML = all(importlib.util.find_spec(m) is not None for m in ('numpy', 'torch'
 @unittest.skipUnless(HAVE_ML and TRAINER.is_file() and READER.is_file(),
                      'Pinned historical source fixtures and NumPy/PyTorch required')
 class Local64WindowParityTests(unittest.TestCase):
+    @unittest.skipUnless(importlib.util.find_spec('pydicom') is not None and
+                         importlib.util.find_spec('cv2') is not None, 'pydicom/OpenCV required')
+    def test_actual_pinned_dread_reader_decodes_series_root_and_returns_path_spacing_pairs(self):
+        import numpy as np
+        from pydicom.dataset import FileDataset, FileMetaDataset
+        from pydicom.uid import ExplicitVRLittleEndian, MRImageStorage
+        from knee import reference, raptor64_cache, local64_cache as cache, local64_runtime as runtime
+        from knee.raptor_input import prepare_study
+        module, _, manifest = reference.audit_source(READER.read_text(), profile='raptor',
+            checkpoint_sha256=raptor64_cache.V4_CHECKPOINT_SHA256, raptor_windows=42)
+        public = raptor64_cache.load_public(module, manifest)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); uid = '2.25.1'; records = []
+            for n, (plane, fluid, _count) in enumerate(cache.SLOTS):
+                sid = '2.25.' + str(10+n)
+                records.append(dict(SeriesInstanceUID=sid, Anatomical_Plane=plane,
+                                    Fluid_Sensitive=str(max(fluid, 0))))
+                folder = root / 'train_series' / uid / sid; folder.mkdir(parents=True)
+                for frame in range(2):
+                    sop = f'2.25.{1000+n*10+frame}'
+                    meta = FileMetaDataset(); meta.TransferSyntaxUID = ExplicitVRLittleEndian
+                    meta.MediaStorageSOPClassUID = MRImageStorage; meta.MediaStorageSOPInstanceUID = sop
+                    path = folder / f'{frame}.dcm'
+                    d = FileDataset(str(path), {}, file_meta=meta, preamble=bytes(128))
+                    d.SOPClassUID = MRImageStorage; d.SOPInstanceUID = sop
+                    d.StudyInstanceUID = uid; d.SeriesInstanceUID = sid; d.FrameOfReferenceUID = '2.25.999'
+                    d.Modality = 'MR'; d.InstanceNumber = frame + 1
+                    orientations = {'Sagittal': [0,1,0,0,0,1], 'Coronal': [1,0,0,0,0,1], 'Axial': [1,0,0,0,1,0]}
+                    positions = {'Sagittal': [frame,0,0], 'Coronal': [0,-frame,0], 'Axial': [0,0,frame]}
+                    d.ImageOrientationPatient = orientations[plane]; d.ImagePositionPatient = positions[plane]
+                    d.PixelSpacing = [1.,1.]; d.SliceThickness = 1.
+                    d.Rows = 32; d.Columns = 32; d.SamplesPerPixel = 1
+                    d.PhotometricInterpretation = 'MONOCHROME2'; d.BitsAllocated = 16
+                    d.BitsStored = 16; d.HighBit = 15; d.PixelRepresentation = 0
+                    d.PixelData = (np.arange(1024,dtype=np.uint16).reshape(32,32)+frame).tobytes()
+                    d.save_as(path, enforce_file_format=True)
+                paths = runtime._dread_ordered_paths(public, folder)
+                self.assertEqual(len(paths), 2)
+                self.assertTrue(all(Path(p).is_file() and Path(p).parent == folder for p in paths))
+            # Reproduces r2's false-empty content error at the wrong directory level.
+            with self.assertRaisesRegex(ValueError, 'no usable image content'):
+                prepare_study(public, uid, {uid:records}, str(root), cache_pixels=True)
+            volume, mask, counts = runtime._dread_source_inputs(public, uid, {uid:records}, root)
+            self.assertEqual(volume.shape, (64,336,336))
+            self.assertTrue(mask.all())
+            self.assertGreater(counts['headers'], 0)
+            self.assertGreater(counts['decoded_unique_slices'], 0)
+
     def test_npz_352_matches_pinned_training_and_public_384_windows(self):
         import numpy as np
         import torch

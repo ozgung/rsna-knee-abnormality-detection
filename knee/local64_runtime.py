@@ -229,9 +229,7 @@ def _render_slots(uid, data_root, work, dataset, public, metadata, *, code, mont
     volume = np.zeros((cache.DEPTH, cache.STORAGE, cache.STORAGE), dtype=np.uint8)
     # Keep Dread's original availability semantics. Local crop darkness is not
     # a missing source frame and must not change the sampling mask.
-    from knee.raptor_input import prepare_study
-    _source_volume, mask, source_counts = prepare_study(
-        public, uid, {uid: raw_records}, str(data_root), cache_pixels=True)
+    _source_volume, mask, source_counts = _dread_source_inputs(public, uid, {uid: raw_records}, data_root)
     del _source_volume
     slots = []
     rendered_meta = {}
@@ -251,7 +249,6 @@ def _render_slots(uid, data_root, work, dataset, public, metadata, *, code, mont
         gp = Path(work) / "geometry" / (hashlib.sha256((uid + "/" + sid).encode()).hexdigest()[:24] + ".json")
         if gp.is_file(): geo_by_id[sid] = json.loads(gp.read_bytes())
     frame_reason = cache.frame_reference_fallback(geo_by_id, selected_ids, anchor)
-    order, _pixel, _resize = public._make_reader()
     series_by_uid = {row["SeriesInstanceUID"]: row for row in raw_records}
     anchor_counts = Counter()
     for slot_index, ((row, count), (plane, fluid, expected_count)) in enumerate(zip(planned, cache.SLOTS)):
@@ -273,7 +270,7 @@ def _render_slots(uid, data_root, work, dataset, public, metadata, *, code, mont
         if raw_row is None or raw_row.get("Anatomical_Plane") != plane:
             raise ValueError("Selected Dread series metadata differs")
         raw_path = Path(data_root) / "train_series" / uid / sid
-        raw_files, _spacing = order(str(raw_path))
+        raw_files = _dread_ordered_paths(public, raw_path)
         native_names = native["files"]
         mapping = cache.map_dread_files_to_native(raw_files, native_names)
         native_path = Path(native["path"])
@@ -471,6 +468,62 @@ def _index_rows(root, doc, contract_sha, ordinals, ids):
     return seen
 
 
+def validate_runtime_population(cfg):
+    """Verify the same full identity contract for every shard, staging gold only on zero."""
+    shard_index = cfg["shard_index"]
+    if not 0 <= shard_index < 4 or cfg["shard_count"] != 4:
+        raise ValueError("local64 uses exactly four training shards")
+    ids = cfg["training_ids"]
+    all_gold = cfg.get("all_gold_ids", [])
+    if len(all_gold) != cache.GOLD_COUNT or len(set(all_gold)) != cache.GOLD_COUNT or set(all_gold) & set(ids):
+        raise ValueError("Full gold identity list must be complete and disjoint")
+    gold_ids = cfg.get("gold_ids", [])
+    if len(ids) != cache.TRAIN_COUNT or len(gold_ids) not in (0, cache.GOLD_COUNT):
+        raise ValueError("Runtime membership differs from pinned training/gold counts")
+    contract = cfg["contract"]
+    frozen_hashes = cfg.get("frozen32_uid_sha256", [])
+    if (not isinstance(frozen_hashes, list) or len(frozen_hashes) != 32 or len(set(frozen_hashes)) != 32 or
+            frozen_hashes != contract.get("frozen32", {}).get("uid_sha256")):
+        raise ValueError("Frozen32 visual membership hash list differs from the cache contract")
+    if (contract.get("version") != cache.VERSION or
+            smoke.digest(smoke.canonical(ids)) != contract.get("training_membership_sha256") or
+            smoke.digest(smoke.canonical(all_gold)) != contract.get("gold_membership_sha256")):
+        raise ValueError("Runtime membership does not match the immutable cache contract")
+    members = cache.make_shards(ids, 4)[shard_index]
+    expected_part = contract.get("partitions", [])[shard_index]
+    if (expected_part.get("studies") != len(members) or
+            expected_part.get("ordinals_sha256") != smoke.digest(smoke.canonical(members)) or
+            expected_part.get("ordered_ids_sha256") != smoke.digest(smoke.canonical([ids[n] for n in members]))):
+        raise ValueError("Runtime shard partition differs from the immutable contract")
+    if gold_ids != (all_gold if shard_index == 0 else []):
+        raise ValueError("Only shard zero may cache the complete scoring-only gold population")
+    return ids, gold_ids, shard_index, members
+
+
+def make_runtime_config(*, contract, training_ids, all_gold_ids, **paths):
+    """One producer for bootstrap/run identity fields; no model or image I/O."""
+    shard = contract["shard_index"]
+    cfg = dict(paths, contract=contract, training_ids=list(training_ids), all_gold_ids=list(all_gold_ids),
+               gold_ids=list(all_gold_ids) if shard == 0 else [], shard_index=shard, shard_count=4,
+               frozen32_uid_sha256=contract["frozen32"]["uid_sha256"])
+    validate_runtime_population(cfg)
+    return cfg
+
+
+def _dread_source_inputs(public, uid, records, data_root):
+    from knee.raptor_input import prepare_study
+    return prepare_study(public, uid, records, str(Path(data_root) / "train_series"), cache_pixels=True)
+
+
+def _dread_ordered_paths(public, series_root):
+    """Pinned Dread order returns (filename, pixel-spacing) pairs, never bare paths."""
+    order, _pixel, _resize = public._make_reader()
+    rows, _median_spacing = order(str(series_root))
+    if any(not isinstance(row, (tuple, list)) or len(row) != 2 or not isinstance(row[0], str) for row in rows):
+        raise ValueError("Pinned Dread ordered-frame API differs")
+    return [row[0] for row in rows]
+
+
 def run(config):
     """Build one CPU training shard and, on shard0, an isolated 58-study gold cache."""
     import numpy as np
@@ -482,29 +535,9 @@ def run(config):
         raise ValueError("Explicit CPU-only cache runtime received a CUDA-visible device")
     torch.set_num_threads(1); cv2.setNumThreads(1)
     raw_root = Path(cfg["data_root"]); code = Path(cfg["code"]); out = Path(cfg["out"])
-    shard_index = cfg["shard_index"]
-    if not 0 <= shard_index < 4 or cfg["shard_count"] != 4:
-        raise ValueError("local64 uses exactly four training shards")
-    ids = cfg["training_ids"]
-    gold_ids = cfg.get("gold_ids", []) if shard_index == 0 else []
-    if len(ids) != cache.TRAIN_COUNT or len(gold_ids) not in (0, cache.GOLD_COUNT):
-        raise ValueError("Runtime membership differs from pinned training/gold counts")
+    ids, gold_ids, shard_index, members = validate_runtime_population(cfg)
     contract = cfg["contract"]
-    frozen_hashes = cfg.get("frozen32_uid_sha256", [])
-    if (not isinstance(frozen_hashes, list) or len(frozen_hashes) != 32 or len(set(frozen_hashes)) != 32 or
-            frozen_hashes != contract.get("frozen32", {}).get("uid_sha256")):
-        raise ValueError("Frozen32 visual membership hash list differs from the cache contract")
-    if (contract.get("version") != cache.VERSION or
-            smoke.digest(smoke.canonical(ids)) != contract.get("training_membership_sha256") or
-            smoke.digest(smoke.canonical(gold_ids if shard_index == 0 else cfg.get("all_gold_ids", []))) != contract.get("gold_membership_sha256")):
-        raise ValueError("Runtime membership does not match the immutable cache contract")
-    shards = [[ids[n] for n in part] for part in cache.make_shards(ids, 4)]
-    members = cache.make_shards(ids, 4)[shard_index]
-    expected_part = contract.get("partitions", [])[shard_index]
-    if (expected_part.get("studies") != len(members) or
-            expected_part.get("ordinals_sha256") != smoke.digest(smoke.canonical(members)) or
-            expected_part.get("ordered_ids_sha256") != smoke.digest(smoke.canonical([ids[n] for n in members]))):
-        raise ValueError("Runtime shard partition differs from the immutable contract")
+    frozen_hashes = cfg["frozen32_uid_sha256"]
     gold_members = list(range(len(gold_ids)))
     if out.is_symlink(): raise ValueError("Cache root symlink forbidden")
     out.mkdir(parents=True, exist_ok=True)

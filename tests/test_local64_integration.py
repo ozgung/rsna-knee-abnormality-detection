@@ -26,6 +26,34 @@ def entry_fixture():
 
 
 class MetadataTests(unittest.TestCase):
+    def test_all_four_bootstrap_configs_validate_gold_identity_without_staging_it_elsewhere(self):
+        import hashlib
+        ids = [f'fixture-train-{i}' for i in range(cache.TRAIN_COUNT)]
+        gold = [f'fixture-gold-{i}' for i in range(cache.GOLD_COUNT)]
+        parts = cache.make_shards(ids, 4)
+        common = dict(version=cache.VERSION, shard_count=4,
+            training_membership_sha256=cache.digest(ids), gold_membership_sha256=cache.digest(gold),
+            frozen32={'uid_sha256': [hashlib.sha256(u.encode()).hexdigest() for u in ids[:32]]},
+            partitions=[{'studies': len(ns), 'ordinals_sha256': cache.digest(ns),
+                         'ordered_ids_sha256': cache.digest([ids[n] for n in ns])} for ns in parts])
+        for i in range(4):
+            contract = dict(common, shard_index=i)
+            cfg = runtime.make_runtime_config(contract=contract, training_ids=ids, all_gold_ids=gold,
+                                               data_root='/fixture', code='/fixture', out='/fixture')
+            got_ids, cached_gold, index, members = runtime.validate_runtime_population(cfg)
+            self.assertEqual(got_ids, ids)
+            self.assertEqual(index, i)
+            self.assertEqual(members, parts[i])
+            self.assertEqual(cached_gold, gold if i == 0 else [])
+            self.assertEqual(cfg['all_gold_ids'], gold)
+            broken = dict(cfg); broken.pop('all_gold_ids')
+            with self.assertRaises(ValueError):
+                runtime.validate_runtime_population(broken)
+            if i:
+                broken = dict(cfg, gold_ids=gold)
+                with self.assertRaises(ValueError):
+                    runtime.validate_runtime_population(broken)
+
     def test_notebook_exec_exception_preserves_private_diagnostic(self):
         source = ("import os\nseen=[]\n"
                   "def private_failure(kind,error,tb): seen.append((kind.__name__,str(error)))\n"
