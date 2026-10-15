@@ -8,6 +8,8 @@ import unittest
 
 from knee import local64_cache as cache, local64_runtime as runtime
 from scripts import collect_local64_cache_metadata as collector
+from scripts import build_local64_cache as builder
+from knee.fresh_reader_setup import dataset_root
 
 HAVE_NUMPY = importlib.util.find_spec('numpy') is not None
 
@@ -24,6 +26,38 @@ def entry_fixture():
 
 
 class MetadataTests(unittest.TestCase):
+    def test_notebook_exec_exception_preserves_private_diagnostic(self):
+        source = ("import os\nseen=[]\n"
+                  "def private_failure(kind,error,tb): seen.append((kind.__name__,str(error)))\n"
+                  "os.environ.update()\nraise ValueError('fixture private detail')\n")
+        namespace = {}
+        with self.assertRaisesRegex(RuntimeError, 'private diagnostics preserved'):
+            exec(builder.guard_bootstrap(source), namespace)
+        self.assertEqual(namespace['seen'], [('ValueError', 'fixture private detail')])
+
+    def test_bootstrap_attachment_manifest_includes_all_required_mounts(self):
+        metadata = builder.kernel_metadata('fixture-local64')
+        self.assertEqual(metadata['dataset_sources'], list(builder.DATASET_REQUIREMENTS))
+        self.assertIn('heliosli/rsna-knee-compact-v1', metadata['dataset_sources'])
+        self.assertEqual(metadata['title'], 'fixture-local64')
+        self.assertFalse(metadata['enable_gpu'])
+        self.assertFalse(metadata['enable_internet'])
+        with tempfile.TemporaryDirectory() as tmp:
+            inputs = Path(tmp)
+            for ref, names in builder.DATASET_REQUIREMENTS.items():
+                if ref == 'heliosli/rsna-knee-compact-v1':
+                    continue  # Original failed packets omitted this attachment.
+                root = inputs / ref.split('/')[1]; root.mkdir()
+                for name in names:
+                    (root / name).write_bytes(b'fixture-only')
+            with self.assertRaises(ValueError):
+                {ref: dataset_root(inputs, ref, names) for ref, names in builder.DATASET_REQUIREMENTS.items()}
+            compact = inputs / 'rsna-knee-compact-v1'; compact.mkdir()
+            for name in builder.DATASET_REQUIREMENTS['heliosli/rsna-knee-compact-v1']:
+                (compact / name).write_bytes(b'fixture-only')
+            resolved = {ref: dataset_root(inputs, ref, names) for ref, names in builder.DATASET_REQUIREMENTS.items()}
+            self.assertEqual(set(resolved), set(metadata['dataset_sources']))
+
     def test_identity_binding_rejects_changed_duplicate_or_reordered_studies(self):
         rows = [{'StudyInstanceUID': 'fixture-a'}, {'StudyInstanceUID': 'fixture-b'}]
         expected = cache.digest(['fixture-a', 'fixture-b'])

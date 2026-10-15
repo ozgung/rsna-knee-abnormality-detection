@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import textwrap
 import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +23,15 @@ ENVIRONMENT_RECEIPT_SHA = "898c6a24271a48490ecfcef0adc5aa43a9a11343d9dde0bc8a116
 TRAIN_CSV_SHA = "8ca2203c0e9d61c080c7a314c7cdb51c1b03a1d9eb4770819f7f34af53ef4e33"
 S6_MANIFEST_SHA = "1c1211e64b73f1f6433ade804816572db1a2aa5422ed9c57365184bc6a9517e6"
 OWNER = "ozgung"
+DATASET_REQUIREMENTS = {
+    smoke.CORPORA[0]: ["all_ids.npy"],
+    smoke.CORPORA[1]: ["extra_ids.npy"],
+    smoke.ASSETS: ["folds_v0.json"],
+    "heliosli/rsna-knee-compact-v1": ["manifest.json", "side_cls.pt", "state_spec.json",
+        *[f"E_lrprior_s0_f{i}.pt" for i in range(4)]],
+    "heliosli/rsna-orthofoundation-fold0-epoch7-20261004": ["anatomy.pt"],
+    "goodpjw2008/rsna-knee-2-5d-convnext-reader": list(CODECS),
+}
 SOURCES = (
     "knee/__init__.py", "knee/public_training_smoke.py", "knee/source96_cache.py",
     "knee/source_span_pilot.py", "knee/corpus44_parity.py", "knee/public_rich_cache.py",
@@ -29,6 +39,26 @@ SOURCES = (
     "knee/local64_cache.py", "knee/local64_runtime.py",
     "knee/local64_loader.py",
 )
+
+
+def kernel_metadata(slug):
+    """Keep declared attachments identical to the bootstrap discovery contract."""
+    cache.slug(slug)
+    return {"id": OWNER + "/" + slug, "title": slug, "code_file": "notebook.ipynb",
+        "language": "python", "kernel_type": "notebook", "is_private": True,
+        "enable_gpu": False, "enable_tpu": False, "enable_internet": False,
+        "competition_sources": ["rsna-knee-abnormality-detection"],
+        "dataset_sources": list(DATASET_REQUIREMENTS),
+        "kernel_sources": [smoke.IDENTITY_KERNEL], "model_sources": [], "docker_image": DOCKER_IMAGE}
+
+
+def guard_bootstrap(source):
+    """Catch notebook-cell exceptions too; IPython does not use sys.excepthook."""
+    boundary = source.index("os.environ.update(")
+    return (source[:boundary] + "try:\n" + textwrap.indent(source[boundary:], "    ") +
+            "\nexcept BaseException as error:\n"
+            "    private_failure(type(error), error, error.__traceback__)\n"
+            "    raise RuntimeError('local64 setup/runtime failed; private diagnostics preserved') from None\n")
 
 
 def _bundle(notebook_path):
@@ -165,6 +195,7 @@ def build(destination, slug, *, evidence_root, public_source, shard_index, shard
         "code_revision": revision, "sources": {n: smoke.digest(t.encode()) for n, t in sources.items()},
         "source_bundle_sha256": source_bundle_sha256, "asset_manifest_sha256": asset_manifest_sha256,
         "input_pins": input_pins, "qualified_environment": env_receipt["environment"],
+        "dataset_requirements": DATASET_REQUIREMENTS,
         "training_membership_sha256": smoke.digest(smoke.canonical(ids)),
         "gold_membership_sha256": smoke.digest(smoke.canonical(gold_ids)),
         "frozen32": {"ordered_membership_sha256": smoke.digest(smoke.canonical(frozen_ids)),
@@ -214,6 +245,7 @@ from knee import source96_cache as membership_cache
 from pathlib import Path
 if sys.version_info[:2]!=(3,12):raise ValueError('Pinned Python 3.12 environment differs')
 inputs=Path('/kaggle/input')
+roots={{ref:dataset_root(inputs,ref,required) for ref,required in CONTRACT['dataset_requirements'].items()}}
 competition=inputs/'competitions/rsna-knee-abnormality-detection'
 if not competition.is_dir():competition=inputs/'rsna-knee-abnormality-detection'
 for name,pin in CONTRACT['input_pins']['competition'].items():require_file(competition/name,pin)
@@ -222,11 +254,11 @@ require_file(identity/'sealed-manifest-private.json',smoke.MANIFEST_SHA)
 identity_doc=json.loads((identity/'sealed-manifest-private.json').read_bytes())
 historical=[]
 for ref,prefix in zip(smoke.CORPORA,('all','extra')):
-    root=dataset_root(inputs,ref,[prefix+'_ids.npy'])
+    root=roots[ref]
     require_file(root/(prefix+'_ids.npy'),smoke.PINS[prefix+'_ids.npy'])
     import numpy as np
     historical.extend(np.load(root/(prefix+'_ids.npy'),allow_pickle=False).astype(str).tolist())
-hpo=dataset_root(inputs,smoke.ASSETS,['folds_v0.json'])
+hpo=roots[smoke.ASSETS]
 require_file(hpo/'folds_v0.json',CONTRACT['input_pins']['folds_sha256'])
 folds=json.loads((hpo/'folds_v0.json').read_bytes())['folds']
 ids,membership=membership_cache.membership(historical,competition/'train.csv',folds,identity_doc)
@@ -235,13 +267,12 @@ gold=[uid for uid in historical if uid in gold_set]
 if membership!=CONTRACT['membership'] or cache.digest(ids)!=CONTRACT['training_membership_sha256'] or cache.digest(gold)!=CONTRACT['gold_membership_sha256']:raise ValueError('Historical membership differs')
 frozen_hashes=CONTRACT['frozen32']['uid_sha256']
 if sum(hashlib.sha256(uid.encode()).hexdigest() in set(frozen_hashes) for uid in ids)!=32:raise ValueError('Frozen32 hashed membership differs')
-anatomy_root=dataset_root(inputs,'heliosli/rsna-orthofoundation-fold0-epoch7-20261004',['anatomy.pt'])
-compact=dataset_root(inputs,'heliosli/rsna-knee-compact-v1',['manifest.json','side_cls.pt'])
+anatomy_root=roots['heliosli/rsna-orthofoundation-fold0-epoch7-20261004']
+compact=roots['heliosli/rsna-knee-compact-v1']
 require_file(anatomy_root/'anatomy.pt',CONTRACT['input_pins']['anatomy_sha256'])
 require_file(compact/'side_cls.pt',CONTRACT['input_pins']['side_cls_sha256'])
 verify_assets(compact,anatomy_root/'anatomy.pt',CONTRACT['s6_manifest'],{{'manifest_sha256':CONTRACT['input_pins']['s6_manifest_sha256']}})
-from knee.fresh_reader_setup import dataset_root as find_dataset
-codec_root=find_dataset(inputs,'goodpjw2008/rsna-knee-2-5d-convnext-reader',list(CONTRACT['input_pins']['codecs']))
+codec_root=roots['goodpjw2008/rsna-knee-2-5d-convnext-reader']
 wheels=[]
 for name,pin in CONTRACT['input_pins']['codecs'].items():
     p=codec_root/name;require_file(p,pin);wheels.append(str(p))
@@ -257,6 +288,7 @@ cfg={{'data_root':str(competition),'code':str(code),'out':'/kaggle/working/local
 receipt=run(cfg)
 print(json.dumps({{'event':'local64_done','status':receipt['status'],'studies':receipt['completed_studies'],'k0':'UNKNOWN'}}))
 '''
+    bootstrap = guard_bootstrap(bootstrap)
     compile(bootstrap, "local64-cache-notebook", "exec")
     nb = {"nbformat": 4, "nbformat_minor": 5, "metadata": {"kernelspec": {"name": "python3", "display_name": "Python3", "language": "python"}},
           "cells": [{"cell_type": "markdown", "id": "protocol", "metadata": {}, "source": [
@@ -266,13 +298,7 @@ print(json.dumps({{'event':'local64_done','status':receipt['status'],'studies':r
               "K0 remains UNKNOWN until bound montage and signed visual review.\n"]},
               {"cell_type": "code", "id": "run", "metadata": {}, "execution_count": None, "outputs": [], "source": bootstrap.splitlines(True)}]}
     blob = (json.dumps(nb, indent=2) + "\n").encode()
-    metadata = {"id": OWNER + "/" + slug, "title": slug, "code_file": "notebook.ipynb",
-        "language": "python", "kernel_type": "notebook", "is_private": True,
-        "enable_gpu": False, "enable_tpu": False, "enable_internet": False,
-        "competition_sources": ["rsna-knee-abnormality-detection"],
-        "dataset_sources": [*smoke.CORPORA, smoke.ASSETS, "heliosli/rsna-orthofoundation-fold0-epoch7-20261004",
-                            "goodpjw2008/rsna-knee-2-5d-convnext-reader"],
-        "kernel_sources": [smoke.IDENTITY_KERNEL], "model_sources": [], "docker_image": DOCKER_IMAGE}
+    metadata = kernel_metadata(slug)
     receipt = {"status": "BUILD_ONLY", "notebook_sha256": smoke.digest(blob), "notebook_bytes": len(blob),
         "contract_sha256": smoke.digest(smoke.canonical(contract)), "source_bundle_sha256": source_bundle_sha256,
         "code_revision": revision, "kernel": metadata["id"], "shard_index": shard_index,
