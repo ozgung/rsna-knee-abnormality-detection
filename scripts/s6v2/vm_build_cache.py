@@ -258,6 +258,14 @@ def watchdog():
         n += 1; time.sleep(30)
 
 
+def binding():
+    def h(p):
+        return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+    return {"order_sha256": h(ORDER), "anatomy_sha256": h(ANATOMY), "px_cache_sha256": h(Path(SRC) / "px_cache.py"),
+            "compact_infer_sha256": h(Path(SRC) / "compact_infer.py"), "train_series_sha256": h(DATA / "train_series.csv"),
+            "size": SIZE, "views": VIEWS, "slices": SLICES, "phys_mm": PHYS}
+
+
 def main():
     import numpy as np
     threading.Thread(target=watchdog, daemon=True).start()
@@ -269,12 +277,16 @@ def main():
     if index_path.exists():
         index = json.load(open(index_path))
         assert index["config"]["size"] == SIZE and index["config"]["views"] == VIEWS
+        assert index["order"] == order, "resume: study order differs"
+        bind = index["config"].get("binding")
+        assert bind is None or bind == binding(), "resume: source / anatomy / config binding differs"
     else:
         index = {"order": order, "n_upper": N_UPPER, "done": {}, "blocks": {}, "cursor": 0, "errors": {}, "removed_series": 0,
                  "meta_cols": META_COLS, "seconds": {},
                  "config": {"size": SIZE, "local_mm": 100.0, "policy": "series_companded", "views": VIEWS, "anchors": "skm-tea (per study, compact_infer.CStudies.rows)",
                             "view_recipe": "v4 via compact_infer.CStudies.rows", "duplicates": "collapse_exact",
-                            "rows": "one per (series, view, slice), physical order", "builder": "s6v2 vm_build_cache.py"}}
+                            "rows": "one per (series, view, slice), physical order", "builder": "s6v2 vm_build_cache.py",
+                            "binding": binding()}}
     off_path, shards_path = OUT / "px.png.off.npy", OUT / "px.png.shards.json"
     offsets = list(np.load(off_path)[:index["cursor"] + 1].tolist()) if off_path.exists() else [0]
     assert len(offsets) == index["cursor"] + 1, "offsets / cursor mismatch"
@@ -409,7 +421,11 @@ if __name__ == "__main__":
         n = idx["cursor"]
         finalize_npy(OUT / "meta.f32.npy", n)
         import numpy as np
-        off = np.load(OUT / "px.png.off.npy"); sh = json.load(open(OUT / "px.png.shards.json"))
+        sh = json.load(open(OUT / "px.png.shards.json"))
+        while len(sh) > 1 and os.path.getsize(OUT / sh[-1]["file"]) == 0:     # empty tail shard rolled after the last study
+            os.remove(OUT / sh[-1]["file"]); sh.pop()
+        json.dump(sh, open(OUT / "px.png.shards.json", "w"))
+        off = np.load(OUT / "px.png.off.npy")
         assert len(off) == n + 1 and all(x["complete"] for x in sh)
         assert sum(os.path.getsize(OUT / x["file"]) for x in sh) == off[-1]
         idx["n_upper"] = n; json.dump(idx, open(OUT / "index.json", "w"))

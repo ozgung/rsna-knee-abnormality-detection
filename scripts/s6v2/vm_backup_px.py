@@ -39,6 +39,8 @@ def main():
         for sh in shards:
             if not sh["complete"] or sh["file"] in done:
                 continue
+            if not (PX / sh["file"]).exists() or os.path.getsize(PX / sh["file"]) == 0:   # empty tail shard: nothing to back up
+                done.add(sh["file"]); continue
             n = sh["file"].rsplit(".", 1)[-1]
             d = BK / ("s" + n); d.mkdir(exist_ok=True)
             if not (d / sh["file"]).exists():
@@ -47,7 +49,7 @@ def main():
             if create(d, "%s-s%s" % (BASE, n), "knee-s6-px-v4-320-20261015-s%s" % n):
                 done.add(sh["file"]); json.dump(sorted(done), open(done_path, "w"))
                 log("uploaded shard", n, "%.1f GB in %.0f s" % (os.path.getsize(d / sh["file"]) / 2 ** 30, time.time() - t0))
-        if prog.get("final") and all(s["complete"] and s["file"] in done for s in shards):
+        if prog.get("final") and all(s["file"] in done for s in shards if (PX / s["file"]).exists()):
             if (PX / "FINALIZED").exists() and "index" not in done:
                 d = BK / "index"; d.mkdir(exist_ok=True)
                 for f in ("index.json", "px.png.off.npy", "px.png.shards.json", "meta.f32.npy", "progress.json"):

@@ -71,6 +71,12 @@ EDITS = [
         self.cv2 = cv2
         self.off = np.load(os.path.join(d, "px.png.off.npy"))
         sh = json.load(open(os.path.join(d, "px.png.shards.json"), encoding="utf-8"))
+        partial = os.environ.get("S6V2_ALLOW_PARTIAL") == "1"   # smoke tests on a cache still being built (never a fit)
+        if not partial and (not os.path.exists(os.path.join(d, "FINALIZED")) or not all(x["complete"] for x in sh)):
+            raise SystemExit("PNG row store is not finalized (missing FINALIZED or an incomplete shard)")
+        sh = [x for x in sh if os.path.getsize(os.path.join(d, x["file"])) > 0]      # an empty tail shard holds no rows
+        if not partial and sum(os.path.getsize(os.path.join(d, x["file"])) for x in sh) != int(self.off[-1]):
+            raise SystemExit("PNG row store byte total differs from the offsets")
         self.byte0 = np.array([x["byte0"] for x in sh], np.int64)
         self.bufs = [np.memmap(os.path.join(d, x["file"]), dtype=np.uint8, mode="r") for x in sh]
         first = self._row(0)
@@ -80,7 +86,10 @@ EDITS = [
         lo, hi = int(self.off[i]), int(self.off[i + 1])
         s = int(np.searchsorted(self.byte0, lo, side="right")) - 1
         b0 = int(self.byte0[s])
-        return self.cv2.imdecode(np.asarray(self.bufs[s][lo - b0:hi - b0]), self.cv2.IMREAD_UNCHANGED)
+        x = self.cv2.imdecode(np.asarray(self.bufs[s][lo - b0:hi - b0]), self.cv2.IMREAD_UNCHANGED)
+        if x is None or x.dtype != np.uint8 or x.shape != (320, 320):
+            raise ValueError("PNG row %d does not decode to uint8 320x320" % i)
+        return x
 
     def __getitem__(self, idx):
         idx = np.asarray(idx)
