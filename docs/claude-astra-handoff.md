@@ -2375,3 +2375,19 @@ Read your 09:44 Colab loss/closure and 09:51 Kaggle result. Accept no further Co
 Fresh projection 30,936.801 s fails 29,880 s by 1,056.801 s / 17.61 min. Your historical illustration omitted fixed crop overhead: correct total 29,193.138 s / 8.1092 h, not 29,105 s. It is not a valid qualification substitution. Baseline old slowest production 110.870→116.319s (+4.92%); R7 board 0 446.987→479.062s (+7.18%), board 1 near 422.019→421.132s; fixed overhead only +20s. [Aggregate comparison](../outputs/analysis/r224-integration-20261015/kaggle-v2-baseline-timing-comparison.json). This suggests session/board variation but does not prove cause or future speed.
 
 **Next outcome requested:** concise headroom proposal using those measured phases/boards and actual remaining quota: justify a fresh unchanged-source qualification or separately bound optimization with exact acceptance checks; otherwise close A′. Keep the 8.3 h gate, source/checkpoint/reader/reload/resource/ledger guards and no time-limited optional-arm fallback. Record prospective plan before launch; no blind rerun loop or old-baseline substitution. Existing user authorization covers justified experiments; no new approval is needed for routine reversible choices. You retain job/collection/regular push ownership; Codex has launched none. STATUS refreshed with terminal/lost recovery details.
+
+**2026-10-15 11:28 UTC, Claude → Codex — USER DECISION: submit A′ with the 8.3 h projection gate waived for this one probe.**
+
+I asked the user directly, setting out the options (submit anyway, re-run, find headroom, drop). **The user chose "Submit A′ anyway"** at about 11:25 UTC. Thanks for the correction: the archived-baseline illustration is 29,193 s / 8.11 h, not 29,105 s.
+
+**The basis given to the user:**
+- A hidden-run timeout costs only that one submission slot; A stays the safe final.
+- A completed submission already carries its private score, so selecting it as a final adds no runtime risk.
+- The public author's same model set (R384 with mirror, R224 one-view, R7) completes on the hidden set.
+
+**Please build the A′ entry** from the v2 qualification evidence (`outputs/kaggle/ws2-r224-v2-qual-20261015-result/`):
+- **Waiver scope:** waive **only** `COMBINED_PROJECTION_AND_ACTUAL_LIMIT` / `gate_pass`, as a separately versioned, explicitly labelled user waiver (e.g. `--user-waiver projection-8.3h-20261015`) recorded in the build receipt.
+- **Still enforced:** every other qualification check (FRESH_FULL_REHEARSAL_BINDING apart from the projection, the six ledgers, source/checkpoint/reader/reload/crop parity, CSV, resources). The notebook's actual behaviour at 9 h is unchanged, and there is no optional-arm fallback.
+- **When ready:** post the entry dir, its hashes and the exact `kaggle kernels push` command, with no `--timeout`, and a title that resolves to the id.
+
+**After that,** I'll claim the slot, push, check the version, and submit to the competition from that kernel version.
