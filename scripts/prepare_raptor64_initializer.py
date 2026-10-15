@@ -158,7 +158,10 @@ def _prepare_published(root, pin, meta, transport, disk_usage):
         try:
             with open(payload, 'rb') as f:
                 magic = f.read(2)
-            if magic == b'PK':
+            # A torch checkpoint is itself a zip ('PK'): Kaggle now serves the raw pinned file, so exact pinned
+            # bytes are accepted as-is before any single-member wrapper extraction is attempted.
+            raw = payload.stat().st_size == pin['size'] and s96.file_sha(payload) == pin['sha256']
+            if magic == b'PK' and not raw:
                 with zipfile.ZipFile(payload) as archive:
                     items = archive.infolist()
                     # Kaggle may rename the sole member. Its name is never used as an

@@ -102,6 +102,24 @@ class DreadTests(unittest.TestCase):
         self.assertEqual({k: prep.DREAD_PIN[k] for k in ('dataset', 'file', 'sha256', 'size')}, {k: guard.DREAD_PIN[k] for k in ('dataset', 'file', 'sha256', 'size')})
         self.assertEqual({k: prep.NARTAA_PIN[k] for k in ('dataset', 'file', 'sha256', 'size')}, {k: guard.NARTAA_PIN[k] for k in ('dataset', 'file', 'sha256', 'size')})
 
+    def test_raw_payload_that_is_itself_a_zip_accepted_when_pinned(self):
+        """Regression (na-orig boot 2026-10-15): torch .pt files are zip archives; Kaggle served the raw file."""
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as z:
+            z.writestr('archive/data.pkl', b'p' * 50); z.writestr('archive/data/0', b'q' * 70)
+        data = buffer.getvalue(); pin = dict(prep.NARTAA_PIN, sha256=hashlib.sha256(data).hexdigest(), size=len(data))
+        with patch.object(prep, 'NARTAA_PIN', pin):
+            r = prep.prepare_nartaa(self.root / 'rawzip', transport=FakeKaggle(data))
+            self.assertEqual(Path(json.loads(Path(r['descriptor']).read_text())['weights_file']).read_bytes(), data)
+        with patch.object(prep, 'DREAD_PIN', dict(prep.DREAD_PIN, sha256=hashlib.sha256(data).hexdigest(), size=len(data))):
+            prep.prepare_dread(self.root / 'rawzip-dread', transport=FakeKaggle(data))
+            with self.assertRaises(ValueError):   # a multi-member zip that is NOT the pinned bytes is still rejected
+                other = io.BytesIO()
+                with zipfile.ZipFile(other, 'w') as z:
+                    z.writestr('archive/data.pkl', b'P' * 50); z.writestr('archive/data/0', b'q' * 70)
+                prep.prepare_dread(self.root / 'otherzip', transport=FakeKaggle(other.getvalue()))
+            self.assertFalse((self.root / 'otherzip/initializer.json').exists())
+
     def test_nartaa_descriptor_matches_trainer_loader_contract(self):
         pin = dict(prep.NARTAA_PIN, sha256=hashlib.sha256(self.data).hexdigest(), size=len(self.data))
         with patch.object(prep, 'NARTAA_PIN', pin):
