@@ -279,7 +279,7 @@ def main():
         assert index["config"]["size"] == SIZE and index["config"]["views"] == VIEWS
         assert index["order"] == order, "resume: study order differs"
         bind = index["config"].get("binding")
-        assert bind is None or bind == binding(), "resume: source / anatomy / config binding differs"
+        assert bind is not None and bind == binding(), "resume: source / anatomy / config binding missing or differs"
     else:
         index = {"order": order, "n_upper": N_UPPER, "done": {}, "blocks": {}, "cursor": 0, "errors": {}, "removed_series": 0,
                  "meta_cols": META_COLS, "seconds": {},

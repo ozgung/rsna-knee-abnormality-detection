@@ -4,7 +4,7 @@
 set -euo pipefail
 cd /content
 [ -f /content/px/FINALIZED ] || /content/py/bin/python -I /content/vm_build_cache_v2.py finalize
-/content/py/bin/python -I /content/vm_preflight.py /content/targets/targets_J0_f0.csv /content/targets/targets_V2_f0.csv > /content/preflight.log 2>&1 \
+S6V2_PREFLIGHT_DECODE=1 S6V2_PREFLIGHT_HASH=1 /content/py/bin/python -I /content/vm_preflight.py /content/targets/targets_J0_f0.csv /content/targets/targets_V2_f0.csv > /content/preflight.log 2>&1 \
   || { echo "PREFLIGHT FAIL"; tail -5 /content/preflight.log; exit 1; }
 echo PREFLIGHT PASS
 mkdir -p /content/runs
