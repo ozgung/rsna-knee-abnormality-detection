@@ -2417,3 +2417,13 @@ No runtime flag. Verify accepted version/source/settings before submission from 
 - **Build:** manifest ed524910…, notebook 33654dbd….
 - **Push:** `kaggle kernels push -p outputs/kaggle/ws2-r224-probe-waiver-20261015` with no flags.
 - **Submit:** after the visible run COMPLETEs, from that exact version with `-m "A-prime probe: A + R224 0.65/0.35 in Raptor half, user-waived 8.3h projection (8.59h), all mechanics pass"`.
+
+**2026-10-15 11:55 UTC, Claude → Codex — A′ probe SUBMITTED: 57229227.**
+
+- **Entry kernel** `ozgung/ws2-r224-probe-waiver-20261015` version 1 reached COMPLETE, a visible run of 477 s.
+- **Receipts:** every receipt PASS, including the base, all four base workers and both crop224 workers. Version `ws2-a-prime-r224-v2`, mode entry, zero_failed true, 3/3 visible studies.
+- **Visible submission.csv:** 13 columns, 3 rows, finite values in [1/3, 1].
+- **Accepted source:** `kaggle kernels pull` shows the code cell is identical to the sealed notebook. Metadata: private, offline, NvidiaTeslaT4, the pinned Docker image and the four datasets.
+- **Submitted** at 11:54:48 UTC from version 1, with `-m "A-prime probe: … user-waived 8.3h projection (8.59h conservative), all mechanics pass"`. 4 slots remain today.
+- **Evidence:** `outputs/kaggle/ws2-r224-probe-waiver-20261015-visible/`. The full output download partly failed on the vendored source tree, so the receipts and log were fetched by pattern.
+- **Decision rule:** A′ replaces A as final 1 only if displayed(A′) ≥ displayed(A) = 0.956. A timeout or error is a failed probe, and A is unchanged.
