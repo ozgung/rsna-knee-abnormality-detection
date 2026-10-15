@@ -2,7 +2,7 @@
 heliosli's compact_infer.CStudies.rows (native_cache.prepare -> geometry_bank -> SKM-TEA anchors -> px_cache.StudySlices.build,
 the same path compact_infer scores test studies with) -> px.u8.npy / meta.f32.npy / index.json in px_cache's format, read by
 compact_train.  DICOMs are deleted as soon as their study is rendered, so disk stays bounded.  Resumable (index.json).
-Pixel rows are stored losslessly as one PNG per row (px.png.bin + px.png.off.npy, ~1.9x smaller than px.u8.npy: the raw
+Pixel rows are stored losslessly as one PNG per row (px.png.bin.NNN shards + px.png.off.npy + px.png.shards.json, ~1.9x smaller than px.u8.npy: the raw
 v4/320 cache of 4,407 studies (~310 GB) does not fit the 183 GB VM disk); compact_train_s6v2.py decodes them bit-exactly.
 Never prints study IDs or credentials.  Config by environment (S6V2_*), defaults for /content."""
 import hashlib, io, json, multiprocessing as mp, os, queue, shutil, struct, sys, threading, time, zipfile, zlib
@@ -21,7 +21,8 @@ WORKERS = int(E("S6V2_WORKERS", "10"))
 STAGERS = int(E("S6V2_STAGERS", "8"))
 AHEAD = int(E("S6V2_AHEAD", "40"))                     # studies staged on disk at most
 LIMIT = int(E("S6V2_LIMIT", "0"))
-N_UPPER = int(E("S6V2_N_UPPER", "3200000"))            # sparse row allocation; finalize() truncates to the real count
+N_UPPER = int(E("S6V2_N_UPPER", "3200000"))
+SHARD_BYTES = int(float(E("S6V2_SHARD_GB", "8")) * 2 ** 30)   # PNG bytes are split into shard files (rolled at study boundaries)            # sparse row allocation; finalize() truncates to the real count
 SIZE, VIEWS, SLICES, PHYS = 320, "v4", 3, 3.5
 COMP = "rsna-knee-abnormality-detection"
 META_COLS = ["series_idx", "slot", "plane", "view_id", "rel_pos", "log_spacing", "extent_130", "fluid",
@@ -274,11 +275,16 @@ def main():
                  "config": {"size": SIZE, "local_mm": 100.0, "policy": "series_companded", "views": VIEWS, "anchors": "skm-tea (per study, compact_infer.CStudies.rows)",
                             "view_recipe": "v4 via compact_infer.CStudies.rows", "duplicates": "collapse_exact",
                             "rows": "one per (series, view, slice), physical order", "builder": "s6v2 vm_build_cache.py"}}
-    off_path, bin_path = OUT / "px.png.off.npy", OUT / "px.png.bin"
+    off_path, shards_path = OUT / "px.png.off.npy", OUT / "px.png.shards.json"
     offsets = list(np.load(off_path)[:index["cursor"] + 1].tolist()) if off_path.exists() else [0]
     assert len(offsets) == index["cursor"] + 1, "offsets / cursor mismatch"
-    binf = open(bin_path, "r+b" if bin_path.exists() else "w+b")
-    binf.truncate(offsets[-1]); binf.seek(offsets[-1])
+    shards = json.load(open(shards_path)) if shards_path.exists() else [{"file": "px.png.bin.000", "byte0": 0, "complete": False}]
+    while len(shards) > 1 and shards[-1]["byte0"] > offsets[-1]:
+        shards.pop()
+    shards[-1]["complete"] = False
+    cur_shard = OUT / shards[-1]["file"]
+    binf = open(cur_shard, "r+b" if cur_shard.exists() else "w+b")
+    binf.truncate(offsets[-1] - shards[-1]["byte0"]); binf.seek(offsets[-1] - shards[-1]["byte0"])
     meta_mm = open_mm(OUT / "meta.f32.npy", (index["n_upper"], len(META_COLS)), np.float32)
     todo = [u for u in order if u not in index["done"] and u not in index["errors"]]
     log("studies", len(order), "todo", len(todo), "done", len(index["done"]), "errors", len(index["errors"]))
@@ -286,6 +292,9 @@ def main():
     def save(final=False):
         binf.flush(); os.fsync(binf.fileno()); meta_mm.flush()
         np.save(str(off_path) + ".tmp.npy", np.asarray(offsets, np.int64)); os.replace(str(off_path) + ".tmp.npy", off_path)
+        if final:
+            shards[-1]["complete"] = True
+        json.dump(shards, open(str(shards_path) + ".tmp", "w")); os.replace(str(shards_path) + ".tmp", shards_path)
         tmp = str(index_path) + ".tmp"
         json.dump(index, open(tmp, "w")); os.replace(tmp, index_path)
         prog = {"done": len(index["done"]), "errors": len(index["errors"]), "total": len(order), "rows": index["cursor"],
@@ -379,6 +388,12 @@ def main():
                 index["blocks"][uid] = blocks
                 index["cursor"] = cur + n
                 index["removed_series"] += info["removed"]
+                if offsets[-1] - shards[-1]["byte0"] >= SHARD_BYTES:        # roll the shard at a study boundary
+                    binf.flush(); os.fsync(binf.fileno()); binf.close()
+                    shards[-1]["complete"] = True
+                    shards.append({"file": "px.png.bin.%03d" % len(shards), "byte0": offsets[-1], "complete": False})
+                    binf = open(OUT / shards[-1]["file"], "w+b")
+                    save(); last = time.time()
             results = still
             if time.time() - last > 60:
                 save(); last = time.time()
@@ -394,8 +409,11 @@ if __name__ == "__main__":
         n = idx["cursor"]
         finalize_npy(OUT / "meta.f32.npy", n)
         import numpy as np
-        off = np.load(OUT / "px.png.off.npy"); assert len(off) == n + 1 and os.path.getsize(OUT / "px.png.bin") == off[-1]
+        off = np.load(OUT / "px.png.off.npy"); sh = json.load(open(OUT / "px.png.shards.json"))
+        assert len(off) == n + 1 and all(x["complete"] for x in sh)
+        assert sum(os.path.getsize(OUT / x["file"]) for x in sh) == off[-1]
         idx["n_upper"] = n; json.dump(idx, open(OUT / "index.json", "w"))
+        (OUT / "FINALIZED").write_text("rows %d\n" % n)
         log("finalized rows", n)
     else:
         main()

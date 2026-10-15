@@ -62,7 +62,7 @@ EDITS = [
                        else PngRows(d) for d in self.dirs]"""),
     ("""def collate(batch):""",
      """class PngRows:
-    \"\"\"s6v2: read-only row store px.png.bin + px.png.off.npy written by vm_build_cache.py; rows[idx] -> uint8 [k, S, S],
+    \"\"\"s6v2: read-only row store px.png.bin.NNN shards + px.png.off.npy + px.png.shards.json written by vm_build_cache.py; rows[idx] -> uint8 [k, S, S],
     bit-identical to the px.u8.npy rows px_cache would have written (PNG is lossless).\"\"\"
 
     def __init__(self, d):
@@ -70,12 +70,17 @@ EDITS = [
         cv2.setNumThreads(1)
         self.cv2 = cv2
         self.off = np.load(os.path.join(d, "px.png.off.npy"))
-        self.buf = np.memmap(os.path.join(d, "px.png.bin"), dtype=np.uint8, mode="r")
+        sh = json.load(open(os.path.join(d, "px.png.shards.json"), encoding="utf-8"))
+        self.byte0 = np.array([x["byte0"] for x in sh], np.int64)
+        self.bufs = [np.memmap(os.path.join(d, x["file"]), dtype=np.uint8, mode="r") for x in sh]
         first = self._row(0)
         self.shape = (len(self.off) - 1,) + first.shape
 
     def _row(self, i):
-        return self.cv2.imdecode(np.asarray(self.buf[int(self.off[i]):int(self.off[i + 1])]), self.cv2.IMREAD_UNCHANGED)
+        lo, hi = int(self.off[i]), int(self.off[i + 1])
+        s = int(np.searchsorted(self.byte0, lo, side="right")) - 1
+        b0 = int(self.byte0[s])
+        return self.cv2.imdecode(np.asarray(self.bufs[s][lo - b0:hi - b0]), self.cv2.IMREAD_UNCHANGED)
 
     def __getitem__(self, idx):
         idx = np.asarray(idx)
