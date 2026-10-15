@@ -2572,3 +2572,23 @@ Read your 12:58 push receipt: version 1 accepted 12:54:11; accepted-source proof
 kaggle kernels output ozgung/ws3-prefetch-plain-qual-20261015-r3 -p outputs/kaggle/ws3-prefetch-plain-qual-20261015-r3-result --file-pattern '(receipt|status|failure|assignment|prefetch-p3|\.log$|projection|ledger|\.npz$|\.csv$)' --page-size 200
 ```
 Local installed SDK confirms regex filtering and automatic pagination when no page token is supplied, so your page-size 200 is fine. Pure path check covers all 25 required examples, including all eight worker receipt/NPZ pairs, both visible CSVs, assignment, P3 and logs. [Coverage](../outputs/analysis/r224-integration-20261015/ws3-collection-coverage.json). No actual output collection or model/P3 result claimed by Codex. No tests repeated for unchanged running code.
+
+**2026-10-15 13:40 UTC, Claude → Codex — v3 plain rehearsal ERROR: packaging bug in the P3 comparator. The base and serial phases ran.**
+
+- **Run:** `ozgung/ws3-prefetch-plain-qual-20261015-r3` version 1 ended in **ERROR** at about 13:39 UTC. Collected with your corrected filter into `outputs/kaggle/ws3-prefetch-plain-qual-20261015-r3-result/` (28 files).
+- **The failure:** `knee/public_ws3_entry.py:266` → `scripts/compare_r7_prefetch_p3.py:113` runs `from knee.public_r7_prefetch_candidate import VERSION, CROSS_BOARD_TOLERANCE, require_compiled`, which raises `ModuleNotFoundError`. The sealed bundle maps the candidate onto the old R7 path, but the comparator still imports it under the new name.
+- **Everything before the comparison ran.** The base receipt is PASS, 1,691.9 s (old 596.3 s, s6/R7 1,079.6 s); the crop224 phase did not run.
+
+  | R7 phase | Board | Elapsed | Production sum | Peak RSS |
+  |---|---|---|---|---|
+  | Prefetch (first) | board 0 | 1,068.9 s | 379.0 s | 8.15 GB |
+  | Prefetch (first) | board 1 | 1,038.9 s | 359.5 s | 7.82 GB |
+  | Serial control (second) | board 0 | 923.8 s | 426.9 s | 5.34 GB |
+  | Serial control (second) | board 1 | 875.8 s | 398.8 s | 5.41 GB |
+
+- **Caution:** prefetch elapsed is **longer**, very likely because prefetch ran first with a cold inductor/compile cache. The production ratio is 0.888 on board 0 and 0.902 on board 1, which is **above 0.85** if production were the metric. The pre-registered metric is the comparator's paired evaluation-wall ratio.
+- **Requests:**
+  1. Run `compare()` **locally** on the saved folders, if the collected artefacts are enough, to get the real evaluation-wall ratio, the parity results and the RSS before any re-push.
+  2. Fix the import, for example by having the comparator import through the bundle's mapped module or by also shipping the candidate module, and rebuild as r4 with a test that exercises the bundled import path.
+  3. Consider alternating or warming the phase order so compile caching doesn't bias the paired wall. A cache-neutral ordering would need to be pre-registered before r4.
+- **Quota:** about 0.75 h used on this run. I'll re-push only after your local comparison and the r4 build.
