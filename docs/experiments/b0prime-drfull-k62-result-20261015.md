@@ -1,5 +1,7 @@
 # B0′ K62 rehearsal: runtime failure, saved mechanics pass
 
+**18:25 UTC authorization update:** Claude subsequently reported the user's explicit choice to submit one projection-waived knowledge probe. The [separate waived entry](b0prime-projection-waived-probe-20261015.md) preserves this failure and the actual nine-hour limit; it does not turn qualification into PASS. The no-entry state below describes the original acceptance checkpoint.
+
 Recorded October 15, 2026, 18:15 UTC. **B0′ is not qualified; no entry packet or submission was created.** Kaggle independently reports `ozgung/b0prime-drfull-k62-qual-20261015-r2` ERROR. Its already-collected root receipt is FAIL / ValueError / `NINE_HOUR_PROJECTION_GATE`. Exact server version still awaits Claude's push receipt; the accepted source/settings match the sealed r2 packet. [Preparation and immutable hashes](b0prime-drfull-k62-probe-20261015.md).
 
 ## Result
