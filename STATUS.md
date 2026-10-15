@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-15 21:13 UTC**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: [AGENTS.md](AGENTS.md); setup: [README.md](README.md). [Previous detailed snapshot/recovery](docs/status-archive/status-before-20261015-local64-r2.md).
+Updated **2026-10-15 21:11 UTC**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: [AGENTS.md](AGENTS.md); setup: [README.md](README.md). [Previous detailed snapshot/recovery](docs/status-archive/status-before-20261015-local64-r2.md).
 
 ## Current snapshot
 
@@ -40,4 +40,4 @@ Local64 current 18 focused ML checks PASS; last bare focused 18 OK/12 optional s
 
 Keep patient/study grouping limitations explicit, fit statistics on actual training folds, preserve masks, image-only inference, checkpoint/source binding and official schema/coverage. Synthetic mechanics, real-reader qualification, exposed development and competitive results are distinct. Final deadline last officially verified **Oct 22 23:59 UTC / Oct 23 02:59 TRT**; stop, preserve recovery and pause heartbeat then or on explicit user stop.
 
-**Latest: 2026-10-15 21:13 UTC — Codex.** A′ official COMPLETE0.956, B0′PENDING; GPU rescue closed/no r4. After desktop inspection stalled, verified withdrawn local64 version3 state and stopped only shard0; official cancellation acknowledged,1–3 still running at last check. User explicitly stopped computer-use session; no further UI actions. R3b remains held to prevent duplicates. Main S6 cache now owner-reported s6v2c with changed PNG reader; targeted new-reader/config/cache membership acceptance remains next.18 focused local64 checks pass, full-suite environment limits retained. No new run/collector/submission/automation by Codex.
+**Latest: 2026-10-15 21:11 UTC — Codex.** A′ official COMPLETE0.956, B0′PENDING; GPU rescue closed/no r4. After desktop inspection stalled, verified withdrawn local64 version3 state and stopped only shard0; official cancellation acknowledged,1–3 still running at last check. User explicitly stopped computer-use session; no further UI actions. R3b remains held to prevent duplicates. Main S6 cache now owner-reported s6v2c with changed PNG reader; targeted new-reader/config/cache membership acceptance remains next.18 focused local64 checks pass, full-suite environment limits retained. No new run/collector/submission/automation by Codex.
