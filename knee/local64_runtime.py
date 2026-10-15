@@ -245,10 +245,13 @@ def _render_slots(uid, data_root, work, dataset, public, metadata, *, code, mont
     planned, substitutions = slot_plan(public, uid, {uid: raw_records})
     selected_ids = [str(row["SeriesInstanceUID"]) for row, _ in planned if row is not None]
     geo_by_id = {}
-    for sid in selected_ids:
+    # The bank may use unselected sagittal/other series for the joint/slab prior.
+    # Checking targets alone would permit an unregistered anchor source.
+    anchor_source_ids = list(native_by_id)
+    for sid in anchor_source_ids:
         gp = Path(work) / "geometry" / (hashlib.sha256((uid + "/" + sid).encode()).hexdigest()[:24] + ".json")
         if gp.is_file(): geo_by_id[sid] = json.loads(gp.read_bytes())
-    frame_reason = cache.frame_reference_fallback(geo_by_id, selected_ids, anchor)
+    frame_reason = cache.frame_reference_fallback(geo_by_id, anchor_source_ids, anchor)
     series_by_uid = {row["SeriesInstanceUID"]: row for row in raw_records}
     anchor_counts = Counter()
     for slot_index, ((row, count), (plane, fluid, expected_count)) in enumerate(zip(planned, cache.SLOTS)):
@@ -406,6 +409,8 @@ def _render_slots(uid, data_root, work, dataset, public, metadata, *, code, mont
                            if any(slot.get("series_key") == hashlib.sha256(sid.encode()).hexdigest()[:24]
                                   for slot in slots[:2])), None) if anchor else None
     anchor_summary = {"path": primary_sag_path, "bank_method": bank_method,
+                      "frame_reference_scope": "all_native_anchor_sources_and_targets",
+                      "frame_reference_series_count": len(anchor_source_ids),
                       "field_center_reasons": sorted({slot.get("fallback_reason") for slot in slots if slot.get("fallback_reason")}),
                       "axis_error": None, "sagittal_truncated": None,
                       "axial_patella_retained": None, "frame_reference_fallback": frame_reason,

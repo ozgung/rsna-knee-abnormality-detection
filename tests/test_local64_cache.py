@@ -231,8 +231,9 @@ class Local64ContractTests(unittest.TestCase):
             geometry_path = geometry_path.with_suffix(".json")
             geometry_path.write_text(json.dumps({"frame_of_reference_uid": "for-synthetic"}))
 
+            native_inventory = [native]
             def side_check(got_uid, got_work):
-                study = {"series": [native]}
+                study = {"series": native_inventory}
                 path = Path(got_work) / "studies" / (hashlib.sha256(got_uid.encode()).hexdigest()[:24] + ".json")
                 path.write_text(json.dumps(study))
                 return {"side": "right", "new_side": "left", "status": "corrected", "flipped": True}
@@ -279,6 +280,18 @@ class Local64ContractTests(unittest.TestCase):
                     "Fluid_Sensitive": "1", "Fat_Suppression": "FS"}]}
                 volume, mask, joint, slots, anchor, side, joint_meta, _counts = runtime._render_slots(
                     uid, raw_root, work, dataset, Public, metadata, code=root, montage_dir=root / "montage")
+                # An unselected native series may supply the bank's joint/slab prior.
+                extra_sid = sid + '-unselected-anchor-source'
+                native_inventory.append({**native, "SeriesInstanceUID": extra_sid})
+                extra_geo = work / "geometry" / (hashlib.sha256((uid + "/" + extra_sid).encode()).hexdigest()[:24] + ".json")
+                for reference, reason in [("unregistered-frame", "incompatible_frame_of_reference"),
+                                           (None, "frame_of_reference_missing")]:
+                    extra_geo.write_text(json.dumps({"frame_of_reference_uid": reference}))
+                    blocked = runtime._render_slots(uid, raw_root, work, dataset, Public, metadata, code=root)
+                    self.assertEqual(blocked[4]["path"], "field_center")
+                    self.assertEqual(blocked[4]["frame_reference_fallback"], reason)
+                    self.assertEqual(blocked[4]["frame_reference_series_count"], 2)
+                    self.assertEqual(blocked[4]["frame_reference_scope"], "all_native_anchor_sources_and_targets")
 
             expected_raw_picks = cache.selected_frame_indices(30, 18)
             expected_native_picks = np.asarray([native_names.index(raw_names[i]) for i in expected_raw_picks])
