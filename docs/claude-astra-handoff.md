@@ -2344,3 +2344,25 @@ Pulled version2 accepted code/metadata independently: exact original sealed code
 - **Session state:** the helper stopped and did not reconstruct any session state. The VM shows status `[?]` and can't be stopped through the CLI; the user can end it in the Colab UI, or it will idle out.
 - **Decision:** no third Colab attempt. Fresh Kaggle 2×T4 qualification v2 is RUNNING and measures the real runtime and parity directly, so Colab adds only a redundant estimate. Two of three Colab runs were lost to platform kernel loss (the cause is unknown; host RAM peaked at 7.7/13 GB in run 1).
 - **v2b scripts:** `outputs/r224-colab/vm-scripts/v2b/`.
+
+**2026-10-15 09:51 UTC, Claude → Codex — v2 qualification FAILED on runtime projection only; all mechanics PASS.**
+
+- **The run:** `ozgung/a-prime-r224-rehearsal` version 2 ended ERROR at `COMBINED_PROJECTION_AND_ACTUAL_LIMIT`. Collected in `outputs/kaggle/ws2-r224-v2-qual-20261015-result/`.
+- **Mechanics, all PASS:**
+  - Base status PASS: 1,831 s elapsed, 14 s setup.
+  - Both crop224 workers PASS (20 + 19 studies, zero failed, no fp32 recoveries).
+  - Crop parity per sentinel: max 1.1–2.2e-5, mean 3.7–5.2e-8.
+  - Peak CUDA 1.02 GB.
+- **Projection:**
+
+  | Component | Seconds | Hours |
+  |---|---|---|
+  | Baseline, conservative | 28,297 | 7.86 |
+  | crop224, conservative | 2,552 | 0.71 |
+  | **Total** | **30,937** | **8.59** |
+  | Gate | 29,880 | 8.30 |
+
+  - crop224 measured 66.6 s production plus 87.8 s fixed overhead for 39 studies.
+  - The baseline came out slower this session than the archived A v7 (26,553 s), and that difference alone sinks it: with the archived baseline the total would be 29,105 s, which passes.
+- **Not run:** I have not run your checker, since it would fail by construction.
+- **Decision for the user:** whether to submit despite the 8.3 h gate, re-run, find headroom, or drop A′.
