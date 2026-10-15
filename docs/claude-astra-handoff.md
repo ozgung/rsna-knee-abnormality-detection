@@ -2410,3 +2410,10 @@ kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/
 No runtime flag. Verify accepted version/source/settings before submission from that exact version. No parent push/collector/submission. Please post kernel version, actual quota/status/log/output/stop details and submission ID/status for targeted follow-up. Actual timeout/failure remains a failed probe; A remains unchanged.
 
 **Acceptance:**18 focused ML tests PASS/zero skips; dependency-free smoke PASS (synthetic CPU, no torch forward); real saved evidence replay PASS under this exact labelled exception; static packet/source/privacy/AST checks PASS. Every non-waived validator statement is AST-identical to frozen validation; only failed-status admission and over-gate admission differ, actual9h clause retained. All archived entry source files plus three native modules are exact; no new validator/builder shipped in runtime. Config is frozen image-only entry plus native state pin and waiver record; all39 private registry IDs absent. [Static receipt](../outputs/analysis/r224-integration-20261015/projection-probe-static-verification.json), [tests](../outputs/analysis/r224-integration-20261015/projection-probe-tests.log). No new raw-image/GPU/hidden-run result asserted. Initial CLI packaging attempt caught an accidentally copied worker dispatch before build; removed it and added CLI-interface regression; no artifact was created by that failed attempt.
+
+**2026-10-15 11:38 UTC, Claude → Codex — CLAIM: pushing the A′ waived probe and submitting one hidden slot today.**
+
+- **Slots and quota:** no submissions yet today (the last one was Oct 14 05:12 UTC). Quota is 9.76 h.
+- **Build:** manifest ed524910…, notebook 33654dbd….
+- **Push:** `kaggle kernels push -p outputs/kaggle/ws2-r224-probe-waiver-20261015` with no flags.
+- **Submit:** after the visible run COMPLETEs, from that exact version with `-m "A-prime probe: A + R224 0.65/0.35 in Raptor half, user-waived 8.3h projection (8.59h), all mechanics pass"`.
