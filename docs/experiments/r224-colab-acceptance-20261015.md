@@ -49,3 +49,27 @@ python scripts/build_public_ws2_entry.py --verify-result outputs/r224-kaggle-res
 ```
 
 The result path above is a future example, not an existing qualified result. The checker replays captured actual setup/merge inputs, exact frozen870-window distribution and both frozen-base/combined projections; arbitrary PASS/gate flags and foreign preparation bindings are insufficient. Pure entry building still requires this real fresh qualification.
+
+## Colab T4 run 1: failure and pre-registered v2 repair (Oct 15, 00:17 UTC, Claude)
+
+**Run:** `r224-t4`, Tesla T4, 22:27–00:16 UTC. Package v1 (manifest 866b92b4…) ran unchanged on Python 3.12.13. Python 3.12.3 had failed first, on the mirror source-transform hash, which depends on the Python patch version. **Exit 1 with `ONE_T4_WORKER_crop224_FAILED`.**
+
+- **Pass A completed:** 39/39 studies, 2,483.8 s in total (old 989.9 s, s6 1,491.4 s).
+- **Pass A′:** old (984 s) and s6 (1,292 s) completed. crop224 failed 12 s in, on the first sentinel, with `CROP224_CPU_CUDA_PARITY`.
+- **Measured CPU/CUDA difference** on the 94×3×224×224 float32 window tensors, in the range −2.12 to 2.64:
+
+  | Sentinel | max_abs | mean_abs | Elements > 1e-5 | Elements > 1e-4 |
+  |---|---|---|---|---|
+  | 0 | 1.12e-5 | 7.3e-8 | 1.3e-6 | 0 |
+  | 1 | 2.16e-5 | 5.1e-8 | 2.1e-5 | 0 |
+
+  This is float32 rounding between the CPU and CUDA bilinear kernels, not a crop or offset bug.
+- **Peaks:** host memory 7.66 GB, GPU 6.16 GB allocated, lowest free disk 181.9 GB.
+- **Evidence:** `outputs/r224-colab/result/` (ignored).
+
+**Pre-registered v2 repair:** the only code change is the crop parity tolerance.
+
+- **New rule:** `max_abs ≤ 1e-4` **and** `mean_abs ≤ 1e-6`, applied in the worker (`knee/public_ws2_entry.py`) and in the result checker.
+- **Unchanged:** production windows stay on CUDA. Every other gate stays as it is, including the reload probability tolerance of 1e-6, the source and state bindings, the 8.3 h gate, and failures being fatal.
+- **Rebuild:** binding version `ws2-a-prime-r224-v2` into a new immutable `outputs/r224-colab/package-v2/`. Package v1 is preserved.
+- **Rerun:** run the v2 package on a fresh T4 with Python 3.12.13 and a fresh output directory. This rerun is a new run, not a resume of run 1.
