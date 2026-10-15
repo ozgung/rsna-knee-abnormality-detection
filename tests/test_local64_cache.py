@@ -1,16 +1,22 @@
 import tempfile
 import unittest
+import importlib.util
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
 
-import numpy as np
+HAVE_NUMPY = importlib.util.find_spec("numpy") is not None
+HAVE_TORCH = importlib.util.find_spec("torch") is not None
+HAVE_CV2 = importlib.util.find_spec("cv2") is not None
+if HAVE_NUMPY:
+    import numpy as np
 
 from knee import local64_cache as cache
 from knee import local64_loader as loader
 from knee import local64_runtime as runtime
 
 
+@unittest.skipUnless(HAVE_NUMPY, "NumPy required")
 class Local64ContractTests(unittest.TestCase):
     def test_historical_partition_and_gold_are_disjoint(self):
         train = [f"train-{i:04d}" for i in range(cache.TRAIN_COUNT)]
@@ -165,6 +171,7 @@ class Local64ContractTests(unittest.TestCase):
         volume[0, 20, 20] = 1
         self.assertTrue(cache.validate_arrays(volume, mask, np.zeros((352, 352), np.uint8)))
 
+    @unittest.skipUnless(HAVE_TORCH, "PyTorch required")
     def test_local_loader_hash_binding_and_pinned_384_window_contract(self):
         volume = np.zeros((64, 352, 352), np.uint8)
         mask = np.zeros(64, np.uint8); mask[0] = 1
@@ -191,6 +198,7 @@ class Local64ContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "pinned to 384"):
                 loader.eval_windows(public, *loaded[:2], resolution=352)
 
+    @unittest.skipUnless(HAVE_CV2, "OpenCV required")
     def test_render_slots_binds_dread_frames_to_native_pixels_and_keeps_source_mask(self):
         import hashlib
         import json
@@ -270,7 +278,7 @@ class Local64ContractTests(unittest.TestCase):
                 metadata = {uid: [{"SeriesInstanceUID": sid, "Anatomical_Plane": "Sagittal",
                     "Fluid_Sensitive": "1", "Fat_Suppression": "FS"}]}
                 volume, mask, joint, slots, anchor, side, joint_meta, _counts = runtime._render_slots(
-                    uid, raw_root, work, dataset, Public, metadata, code=root)
+                    uid, raw_root, work, dataset, Public, metadata, code=root, montage_dir=root / "montage")
 
             expected_raw_picks = cache.selected_frame_indices(30, 18)
             expected_native_picks = np.asarray([native_names.index(raw_names[i]) for i in expected_raw_picks])
@@ -288,6 +296,13 @@ class Local64ContractTests(unittest.TestCase):
             self.assertTrue(side["flipped"])
             self.assertTrue(joint.any())
             self.assertEqual(joint_meta["schema"], cache.MASK_SCHEMA)
+            self.assertEqual(_counts["montage"]["frame_count"], 18)
+            self.assertEqual(sum(p["frame_count"] for p in _counts["montage"]["pages"]), 18)
+            self.assertEqual(len(_counts["montage"]["pages"]), 4)  # three frame pages plus one diagnostic
+            self.assertEqual(joint_meta["diagnostic"]["role"], "single_segmentation_diagnostic_not_dense_channels")
+            for page in _counts["montage"]["pages"]:
+                from knee.public_training_smoke import file_sha
+                self.assertEqual(file_sha(root / "montage" / page["file"]), page["sha256"])
 
 
 if __name__ == "__main__":

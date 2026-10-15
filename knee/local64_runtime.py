@@ -16,6 +16,7 @@ import resource
 import shutil
 import sys
 import time
+import traceback
 
 from knee import local64_cache as cache
 from knee import public_training_smoke as smoke
@@ -42,8 +43,14 @@ def _read_series(path, selected_ids):
 def _stage_image_only_inputs(raw_root, staged_root, selected_ids):
     """Stage only selected IDs and public image metadata; train.csv contains IDs only."""
     raw_root, staged_root = Path(raw_root), Path(staged_root)
+    if staged_root.is_symlink():
+        raise ValueError("Image-only staging root must not be a symlink")
+    # Only rebuild our derived image-only links/metadata. Never follow links to
+    # immutable raw DICOMs; completed NPZ/index checkpoints live outside this tree.
     if staged_root.exists():
-        raise ValueError("Fresh isolated image-only staging directory required")
+        if not staged_root.is_dir() or {p.name for p in staged_root.iterdir()} != {"train.csv", "train_series.csv", "train_series"}:
+            raise ValueError("Unexpected image-only staging inventory")
+        shutil.rmtree(staged_root)
     ordered_ids = list(selected_ids)
     selected = set(ordered_ids)
     staged_root.mkdir(parents=True)
@@ -336,6 +343,7 @@ def _render_slots(uid, data_root, work, dataset, public, metadata, *, code, mont
         offset += count
         del native_volume, rendered
     joint_mask = np.zeros((cache.STORAGE, cache.STORAGE), dtype=np.uint8)
+    mask_diagnostic = None
     mask_meta = {"schema": cache.MASK_SCHEMA, "available": False,
                  "reason": "no_selected_sagittal_series", "source_series_key": None,
                  "native_frame_index": None, "slot_index": None, "crop_mm": None}
@@ -365,6 +373,31 @@ def _render_slots(uid, data_root, work, dataset, public, metadata, *, code, mont
                          "render_crop_xyxy": list(mask_geometry.crop_xyxy),
                          "valid_xyxy": list(mask_geometry.valid_xyxy), "center_crop_xyxy": [16, 16, 368, 368],
                          "segment_reason": segment_reason}
+            mask_meta["selected_cache_frame_indices"] = [
+                sum(s["count"] for s in slots[:slot_index]) + i
+                for i, n in enumerate(sagittal_slot["native_frame_indices"]) if n == int(mask_index)]
+            if montage_dir is not None:
+                native_path = Path(native["path"])
+                if not native_path.exists():
+                    native_path = Path(work) / "series" / native_path.name
+                native_volume = np.load(native_path, mmap_mode="r", allow_pickle=False)
+                diagnostic, _ = _render_one(native, int(mask_index), centers_by_id[sid], 100.,
+                    view_geometry=view_geometry, normalize_intensity=normalize_intensity,
+                    select_display_window=ND.select_display_window, cv2=cv2, volume=native_volume)
+                plain = cv2.cvtColor(diagnostic, cv2.COLOR_GRAY2BGR)
+                overlay = plain.copy()
+                overlay[joint_mask.astype(bool)] = (
+                    .5 * overlay[joint_mask.astype(bool)] + np.array([0, 127.5, 0])).astype(np.uint8)
+                destination = Path(montage_dir); destination.mkdir(parents=True, exist_ok=True)
+                artifact = destination / "joint-mask-diagnostic.png"
+                if not cv2.imwrite(str(artifact), np.concatenate([plain, overlay], axis=1)):
+                    raise ValueError("Could not write joint-mask diagnostic")
+                mask_diagnostic = {"file": artifact.name, "sha256": smoke.file_sha(artifact),
+                    "bytes": artifact.stat().st_size, "frame_count": 0,
+                    "role": "single_segmentation_diagnostic_not_dense_channels",
+                    "native_frame_index": int(mask_index), "source_series_key": sagittal_slot["series_key"]}
+                mask_meta["diagnostic"] = mask_diagnostic
+                del native_volume
         else:
             mask_meta.update(reason="segmentation_unavailable:" + str(segment_reason),
                              source_series_key=sagittal_slot["series_key"])
@@ -401,6 +434,8 @@ def _render_slots(uid, data_root, work, dataset, public, metadata, *, code, mont
             "score": None if not side_note else side_note.get("score"),
             "wrong_side": None}
     montage_receipt = _montage_pages(uid, diagnostic_frames, montage_dir, cv2=cv2) if montage_dir is not None else None
+    if mask_diagnostic is not None:
+        montage_receipt["pages"].append(mask_diagnostic)
     return volume, mask, joint_mask, slots, anchor_summary, side, mask_meta, {
         "selected_slots": sum(slot["selected"] for slot in slots),
         "missing_slots": sum(not slot["selected"] for slot in slots),
@@ -423,11 +458,15 @@ def _index_rows(root, doc, contract_sha, ordinals, ids):
         n = row["ordinal"]
         if n not in ordinals or n in seen or row["StudyInstanceUID"] != ids[n] or row["file"] != cache.filename(n):
             raise ValueError("Private cache index membership/order differs")
-        volume, mask, joint = cache.read_npz(cache.safe_file(root, row["file"]))
+        path = cache.safe_file(root, row["file"])
+        if smoke.file_sha(path) != row.get("file_sha256"):
+            raise ValueError("Resume cache file identity differs")
+        volume, mask, joint = cache.read_npz(path)
         hashes = cache.array_hashes(volume, mask, joint)
         if any(hashes[k] != row.get(k) for k in hashes):
             raise ValueError("Private cache raw-array hashes differ")
-        row["verified_file_sha256"] = smoke.file_sha(cache.safe_file(root, row["file"]))
+        cache.validate_slot_mask(mask, row["slots"])
+        row["verified_file_sha256"] = smoke.file_sha(path)
         seen[n] = row
     return seen
 
@@ -498,9 +537,15 @@ def run(config):
                               "opencv_threads": cv2.getNumThreads(),
                               "packages": {p: importlib.metadata.version(p) for p in
                                   ("torch", "numpy", "pydicom", "opencv-python", "pylibjpeg", "pylibjpeg-libjpeg", "pylibjpeg-openjpeg")}},
-              "counters": {}}
+              "counters": {}, "counters_scope": "current invocation; per-study source counts retained in private index"}
     cache.atomic_json(out / "receipt.json", report)
     try:
+        free_disk = shutil.disk_usage(out).free
+        report["minimum_free_disk_bytes"] = free_disk
+        required_disk = cache.disk_required(len(members) - len(entries) + len(gold_ids))
+        report["required_free_disk_upper_bound_bytes"] = required_disk
+        if free_disk < required_disk:
+            raise ValueError("Insufficient disk for the bounded remaining cache")
         from knee.reference import load_definitions
         public, decoder = load_definitions(cfg["dread_module"], "", cfg["dread_manifest"])
         if decoder is not None: raise ValueError("Unexpected Dread decoder payload")
@@ -568,19 +613,24 @@ def run(config):
                 row = cache.private_study_entry(n, uid, cache.filename(n), file_receipt, slots, anchor, side, joint_meta)
                 # Keep only the first two sagittal slot paths attached to each selected series.
                 row["slots"] = slots
+                row["source_prepare_study"] = study_counts["source_prepare_study"]
                 if is_frozen32:
                     row["k0_montage"] = study_counts["montage"]
                     frozen_done.add(hashlib.sha256(uid.encode()).hexdigest())
                 cache.validate_private_entry(row)
                 dest_entries[n] = row
                 counters.update({k: v for k, v in study_counts.items() if type(v) is int})
+                counters.update({"source_" + k: v for k, v in study_counts["source_prepare_study"].items()
+                                 if type(v) is int})
                 cache.atomic_json(idx_path, {"version": cache.VERSION, "contract_sha256":
                     cache.digest(contract if target == out else gold_contract),
                     "entries": [dest_entries[x] for x in ordinals if x in dest_entries]})
                 report.update(status="RUNNING", phase="decode", completed_studies=len(entries),
                               elapsed_seconds=time.monotonic() - started, counters=dict(counters),
                               private_index_sha256=smoke.file_sha(indexfile),
-                              minimum_free_disk_bytes=shutil.disk_usage(out).free)
+                              minimum_free_disk_bytes=min(report["minimum_free_disk_bytes"], shutil.disk_usage(out).free),
+                              peak_rss_bytes=int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss) *
+                                  (1 if sys.platform == "darwin" else 1024))
                 cache.atomic_json(out / "receipt.json", report)
                 del volume, mask, joint
             if _anchor_model_state(dataset) != state_before:
@@ -606,10 +656,15 @@ def run(config):
                       k0={"status": "UNKNOWN", "montage_review": "PENDING", "anatomy_pass_claimed": False,
                           "frozen32_studies_montaged": len(frozen_done),
                           "montage_pages": sum(len(row["k0_montage"]["pages"]) for row in entries.values() if "k0_montage" in row)},
-                      minimum_free_disk_bytes=shutil.disk_usage(out).free)
+                      minimum_free_disk_bytes=min(report["minimum_free_disk_bytes"], shutil.disk_usage(out).free),
+                      peak_rss_bytes=int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss) *
+                          (1 if sys.platform == "darwin" else 1024))
         cache.atomic_json(out / "receipt.json", report)
         return report
     except BaseException as error:
+        cache.atomic_json(out / "error-private.json", {
+            "failure_type": type(error).__name__, "message": str(error),
+            "traceback": traceback.format_exc(), "private": True})
         report.update(status="ERROR", failure_type=type(error).__name__, elapsed_seconds=time.monotonic() - started,
                       counters=dict(counters), k0={"status": "UNKNOWN", "anatomy_pass_claimed": False})
         cache.atomic_json(out / "receipt.json", report)

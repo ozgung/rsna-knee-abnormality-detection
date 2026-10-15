@@ -14,7 +14,40 @@ def _json(path):
     return json.loads(Path(path).read_bytes())
 
 
-def qualify(build_root, result_root, *, review_path=None):
+def verify_identities(rows, expected_sha256):
+    """Bind metadata to exact ordered membership without reading label values."""
+    ids = [row["StudyInstanceUID"] for row in rows]
+    if len(set(ids)) != len(ids) or cache.digest(ids) != expected_sha256:
+        raise ValueError("Cache study identities/order differ from the sealed population")
+    return set(ids)
+
+
+def verify_cache_files(root, rows, *, verify_pixels):
+    """Optional remote/staging pixel check; default collector stays metadata-only."""
+    for row in rows:
+        cache.validate_private_entry(row)
+        if row.get("file") != cache.filename(row["ordinal"]):
+            raise ValueError("Cache filename/ordinal differs")
+        for field in ("file_sha256", "volume_sha256", "mask_sha256", "joint_mask_sha256"):
+            value = row.get(field)
+            if not isinstance(value, str) or len(value) != 64 or any(c not in "0123456789abcdef" for c in value):
+                raise ValueError("Cache metadata content hash missing")
+    if not verify_pixels:
+        return
+    if {p.name for p in root.glob("*.npz")} != {row["file"] for row in rows}:
+        raise ValueError("Cache file inventory differs")
+    for row in rows:
+        path = cache.safe_file(root, row["file"])
+        if smoke.file_sha(path) != row["file_sha256"]:
+            raise ValueError("Cache NPZ file identity differs")
+        arrays = cache.read_npz(path)
+        hashes = cache.array_hashes(*arrays)
+        if any(hashes[k] != row.get(k) for k in hashes):
+            raise ValueError("Cache array/index hashes differ")
+        cache.validate_slot_mask(arrays[1], row["slots"])
+
+
+def qualify(build_root, result_root, *, review_path=None, verify_pixels=False):
     """Return a metadata-only receipt; no cache pixels are copied or promoted here."""
     build_root, result_root = Path(build_root), Path(result_root)
     contracts, all_entries, all_indices = [], [], []
@@ -38,19 +71,8 @@ def qualify(build_root, result_root, *, review_path=None):
                 [row.get("ordinal") for row in index.get("entries", [])] != members):
             raise ValueError(f"Shard {shard} receipt/index coverage differs")
         rows = index["entries"]
-        found_files = {p.name for p in result.glob("*.npz")}
-        expected_files = {cache.filename(n) for n in members}
-        if found_files != expected_files:
-            raise ValueError(f"Shard {shard} cache file inventory differs")
-        for row in rows:
-            cache.validate_private_entry(row)
-            path = cache.safe_file(result, row["file"])
-            if row.get("verified_file_sha256") and row["verified_file_sha256"] != smoke.file_sha(path):
-                raise ValueError(f"Shard {shard} NPZ file signature differs")
-            arrays = cache.read_npz(path)
-            if any(cache.array_hashes(*arrays)[k] != row.get(k) for k in cache.array_hashes(*arrays)):
-                raise ValueError(f"Shard {shard} NPZ arrays differ from private index")
-            cache.validate_slot_mask(arrays[1], row["slots"])
+        verify_identities(rows, expected_ids_sha)
+        verify_cache_files(result, rows, verify_pixels=verify_pixels)
         common = {k: v for k, v in contract.items() if k not in {"shard_index", "shard_studies"}}
         contracts.append(common)
         all_entries.extend(rows)
@@ -58,11 +80,14 @@ def qualify(build_root, result_root, *, review_path=None):
         shards.append({"shard_index": shard, "studies": len(rows), "contract_sha256": cache.digest(contract),
                        "index_sha256": smoke.file_sha(result / "index-private.json"),
                        "receipt_sha256": smoke.file_sha(result / "receipt.json"),
-                       "cache_files": len(found_files), "k0_montage_pages": sum(len(r.get("k0_montage", {}).get("pages", [])) for r in rows)})
+                       "cache_files_recorded": len(rows), "k0_montage_pages": sum(len(r.get("k0_montage", {}).get("pages", [])) for r in rows)})
     if any(doc != contracts[0] for doc in contracts[1:]):
         raise ValueError("Four shard scientific/source/input contracts differ")
     if len(all_entries) != cache.TRAIN_COUNT or sorted(e["ordinal"] for e in all_entries) != list(range(cache.TRAIN_COUNT)):
         raise ValueError("Training membership is incomplete or duplicated")
+    ordered = sorted(all_entries, key=lambda row: row["ordinal"])
+    training_ids = verify_identities(ordered, contracts[0]["training_membership_sha256"])
+    verify_identities(ordered, contracts[0]["membership"]["ordered_eligible_sha256"])
     # Shard zero's scoring-only population has an independent contract, index,
     # and directory. It is validated for completeness and never enters K0 or
     # the training membership/stage candidate.
@@ -83,16 +108,10 @@ def qualify(build_root, result_root, *, review_path=None):
     gold_rows = gold_index.get("entries", [])
     if [row.get("ordinal") for row in gold_rows] != list(range(cache.GOLD_COUNT)):
         raise ValueError("Scoring-only gold58 index coverage differs")
-    gold_files = {p.name for p in gold_root.glob("*.npz")}
-    if gold_files != {cache.filename(n) for n in range(cache.GOLD_COUNT)}:
-        raise ValueError("Scoring-only gold58 cache file inventory differs")
-    for row in gold_rows:
-        cache.validate_private_entry(row)
-        arrays = cache.read_npz(cache.safe_file(gold_root, row["file"]))
-        hashes = cache.array_hashes(*arrays)
-        if any(hashes[k] != row.get(k) for k in hashes):
-            raise ValueError("Scoring-only gold58 cache array/index hashes differ")
-        cache.validate_slot_mask(arrays[1], row["slots"])
+    gold_ids = verify_identities(gold_rows, contracts[0]["gold_membership_sha256"])
+    if training_ids & gold_ids:
+        raise ValueError("Scoring-only gold overlaps training cache")
+    verify_cache_files(gold_root, gold_rows, verify_pixels=verify_pixels)
     contract = contracts[0]
     if contract.get("membership", {}).get("eligible") != cache.TRAIN_COUNT:
         raise ValueError("Historical eligible population differs")
@@ -150,7 +169,11 @@ def qualify(build_root, result_root, *, review_path=None):
             "separate_from_training": True},
         "grouping": "Historical fixed fold0 membership; patient identities unavailable; cache makes no new split",
         "aggregate_contains_ids": False, "images_copied": False,
-        "k0": k0, "training_promotion_allowed": k0["status"] == "PASS"}
+        "k0": k0, "cache_qualification_pass": k0["status"] == "PASS",
+        "pixels_verified_by_collector": verify_pixels,
+        "pixel_evidence": "all file/raw hashes replayed" if verify_pixels else "bound worker receipts/index; staging verification still required",
+        "training_promotion_allowed": False,
+        "integration_status": "LOADER_STAGE_GATE_REQUIRED"}
     stage_config = None
     if k0["status"] == "PASS":
         stage_config = {"version": cache.VERSION, "membership": contract["membership"],
@@ -169,11 +192,14 @@ def main(argv=None):
     parser.add_argument("--receipt", type=Path, required=True)
     parser.add_argument("--montage-manifest", type=Path, required=True)
     parser.add_argument("--review", type=Path)
+    parser.add_argument("--verify-pixels", action="store_true",
+                        help="Verify full cache files on the remote staging host; default collects metadata only")
     parser.add_argument("--stage-config", type=Path)
     args = parser.parse_args(argv)
     if args.receipt.exists() or args.montage_manifest.exists() or (args.stage_config and args.stage_config.exists()):
         raise SystemExit("Fresh output paths required")
-    receipt, stage_config, montage = qualify(args.build_root, args.result_root, review_path=args.review)
+    receipt, stage_config, montage = qualify(args.build_root, args.result_root, review_path=args.review,
+                                           verify_pixels=args.verify_pixels)
     args.receipt.parent.mkdir(parents=True, exist_ok=True)
     args.montage_manifest.parent.mkdir(parents=True, exist_ok=True)
     args.receipt.write_text(json.dumps(receipt, indent=2, allow_nan=False) + "\n")

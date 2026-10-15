@@ -181,6 +181,16 @@ def build(destination, slug, *, evidence_root, public_source, shard_index, shard
     encoded_manifest = base64.b64encode(smoke.canonical(reader_manifest)).decode()
     bootstrap = f'''import base64,json,hashlib,os,sys,zlib,subprocess,time
 from pathlib import Path
+def private_failure(exc_type, error, tb):
+    import traceback
+    out=Path('/kaggle/working/local64_cache');out.mkdir(parents=True,exist_ok=True)
+    detail=out/'bootstrap-error-private.json'
+    detail.write_text(json.dumps(dict(failure_type=exc_type.__name__,message=str(error),traceback=''.join(traceback.format_exception(exc_type,error,tb))),indent=2))
+    detail.chmod(0o600)
+    if not (out/'receipt.json').exists():
+        (out/'receipt.json').write_text(json.dumps(dict(status='ERROR',phase='bootstrap',failure_type=exc_type.__name__,training_promotion_allowed=False)))
+    print(json.dumps(dict(status='ERROR',failure_type=exc_type.__name__,diagnostic_file=detail.name)),flush=True)
+sys.excepthook=private_failure
 os.environ.update(HF_HUB_OFFLINE='1',TRANSFORMERS_OFFLINE='1',HF_HUB_DISABLE_TELEMETRY='1',CUDA_VISIBLE_DEVICES='',BUILD_MONAI='0')
 SOURCES=json.loads(zlib.decompress(base64.b64decode({encoded_sources!r},validate=True)))
 CONTRACT={contract!r}
