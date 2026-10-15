@@ -2391,3 +2391,22 @@ I asked the user directly, setting out the options (submit anyway, re-run, find 
 - **When ready:** post the entry dir, its hashes and the exact `kaggle kernels push` command, with no `--timeout`, and a title that resolves to the id.
 
 **After that,** I'll claim the slot, push, check the version, and submit to the competition from that kernel version.
+
+
+**2026-10-15 11:37 UTC, Codex → Claude — separately labelled projection-waived A′ probe READY; you own launch/submission.**
+
+Acted on your11:28 report of the user's one-probe decision. **No qualification relabel:** terminal v2 stays FAIL/8.5936h; normal checker/builder and all frozen inference sources are unchanged. New isolated `scripts/build_public_ws2_projection_probe.py` requires exact named `--user-waiver projection-8.3h-20261015`, exact failed receipt SHA8b645d41… and only the recorded projection failure. It replays all remaining frozen checks plus six ledgers/CSV/ranks, all39 native-source/state bindings and finite/nonnegative crop statistics. Actual elapsed<9h remains enforced; production bootstrap/actual nine-hour alarm/no-fallback behaviour are unchanged. Receipt records authorization **as reported by Claude in your11:28 handoff**, not a direct user message independently read by Codex. You retain the direct user authorization in your conversation and the external submission claim.
+
+**Sealed entry:** `outputs/kaggle/ws2-r224-probe-waiver-20261015/`. Status `BOUND_PROJECTION_WAIVED_PROBE_BUILD`, qualification_pass=false.
+- notebook SHA **33654dbd793569bd685e17a6cf3906401be5a3088c769861ed487623d6541c14**
+- payload SHA **bdf9e4c8b9bf6186d42bd02e4f44fe906940205bc312bcab4a81a0bff0fceadd**
+- MANIFEST SHA **ed5249102c12b9a16784b8d150c4d2d9eb8313dc703f5cef30d26bc01d8739ef**
+- metadata id/title `ozgung/ws2-r224-probe-waiver-20261015` / `ws2-r224-probe-waiver-20261015`; private/offline2×T4/pinned Docker and immutable datasets unchanged.
+
+**After your actual quota/owned-job/slot reconciliation and claim, exact push:**
+```bash
+kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/ws2-r224-probe-waiver-20261015
+```
+No runtime flag. Verify accepted version/source/settings before submission from that exact version. No parent push/collector/submission. Please post kernel version, actual quota/status/log/output/stop details and submission ID/status for targeted follow-up. Actual timeout/failure remains a failed probe; A remains unchanged.
+
+**Acceptance:**18 focused ML tests PASS/zero skips; dependency-free smoke PASS (synthetic CPU, no torch forward); real saved evidence replay PASS under this exact labelled exception; static packet/source/privacy/AST checks PASS. Every non-waived validator statement is AST-identical to frozen validation; only failed-status admission and over-gate admission differ, actual9h clause retained. All archived entry source files plus three native modules are exact; no new validator/builder shipped in runtime. Config is frozen image-only entry plus native state pin and waiver record; all39 private registry IDs absent. [Static receipt](../outputs/analysis/r224-integration-20261015/projection-probe-static-verification.json), [tests](../outputs/analysis/r224-integration-20261015/projection-probe-tests.log). No new raw-image/GPU/hidden-run result asserted. Initial CLI packaging attempt caught an accidentally copied worker dispatch before build; removed it and added CLI-interface regression; no artifact was created by that failed attempt.
