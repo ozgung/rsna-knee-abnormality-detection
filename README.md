@@ -99,7 +99,7 @@ Build a private training notebook with the competition, vanilla DINOv2-Small and
 
 ```bash
 python3.12 scripts/build_kaggle.py outputs/kaggle/train knee-dino-train-20261008 scripts/train_kaggle_entry.py --internet
-kaggle kernels push -p outputs/kaggle/train --timeout 7200
+kaggle kernels push -p outputs/kaggle/train
 ```
 
 The training entry downloads pinned Linux codec wheels once and saves them beside the feature cache and trained head. Kaggle/Colab preserve the host CUDA PyTorch; the local Mac lock is not installed there. Each run records actual package versions, code/source hash, data fingerprints, preprocessing, seed and metrics. See the [first experiment record](docs/experiments/20261008-first-baseline.md) for the exact bounds and label-provenance limitation.
@@ -108,15 +108,17 @@ After that version completes, build an independent offline rehearsal:
 
 ```bash
 python3.12 scripts/build_kaggle.py outputs/kaggle/rehearsal knee-dino-rehearsal-20261008 scripts/rehearse_kaggle_entry.py --no-weak-labels --kernel-source ozgung/knee-dino-train-20261008
-kaggle kernels push -p outputs/kaggle/rehearsal --timeout 1800
+kaggle kernels push -p outputs/kaggle/rehearsal
 ```
 
 It reprocesses all gold images and compares predictions against the saved cache-based evaluation, then checks the visible test twice. The final entry only reads the actual test metadata/images and checkpoint:
 
 ```bash
 python3.12 scripts/build_kaggle.py outputs/kaggle/submission knee-dino-submission-20261008 scripts/submit_kaggle_entry.py --no-weak-labels --kernel-source ozgung/knee-dino-train-20261008
-kaggle kernels push -p outputs/kaggle/submission --timeout 28800
+kaggle kernels push -p outputs/kaggle/submission
 ```
+
+`kaggle kernels push --timeout` sets the kernel’s execution limit; it is not a client request timeout. Omit it for normal runs and respect the actual platform and competition limits. After an ambiguous push response, reconcile the accepted server version/status before retrying.
 
 Only submit a completed, successfully rehearsed version. Inspect its actual version number and current quota first. `STATUS.md` records authorized submissions and their results. Do not overwrite an existing training notebook while a dependent submission is pending. Data, private linkage hashes, feature caches, outputs and weights stay out of Git.
 
