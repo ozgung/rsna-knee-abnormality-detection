@@ -1,4 +1,4 @@
-"""VM-only pinned Raptor64 initializer preparation. CLI: ROOT --init {imagenet,dread_v4}.
+"""VM-only pinned Raptor64 initializer preparation. CLI: ROOT --init {imagenet,dread_v4,nartaa_oai}.
 
 imagenet: fixed-revision timm/coatnet_rmlp_2_rw_384.sw_in12k_ft_in1k safetensors from the
 public Hugging Face endpoint, normalized to backbone-only tensors (reviewed classifier keys
@@ -7,6 +7,8 @@ dread_v4: the CC0 Dread checkpoint raptor_ft_coatnet_v4_full.pt as one exact fil
 public Kaggle dataset dreaddevelopment/raptor-knee-widedense (existing VM Kaggle credential;
 no terms accepted). Bytes and size are pinned; the trainer later loads backbone tensors only
 and enforces missing=0/unexpected=0.
+nartaa_oai: nartaa's OAI-pretrained SWA Raptor raptor_ft_alldata_t16_blendjev_oai_d96_r384_swa.pt from the public
+Kaggle dataset nartaa/rsna-knee-publication-swa-weights-20261007, same exact-file path and pins as dread_v4.
 Writes ROOT/initializer.json; never overwrites a completed descriptor.
 """
 import argparse
@@ -30,6 +32,8 @@ IMAGENET_PIN = {'repo': 'timm/' + ARCH, 'revision': '2c31d82376cc244c907c0643329
                 'sha256': '91570c7af10fea0af03c1b0a49be3e4775596239890eb4193c75129b3045623e', 'size': 295695280}
 DREAD_PIN = {'dataset': 'dreaddevelopment/raptor-knee-widedense', 'file': 'raptor_ft_coatnet_v4_full.pt',
              'sha256': '89606f05849838529e1b4658d28fb049623205d9853371548403bca460361ded', 'size': 292829402}
+NARTAA_PIN = {'dataset': 'nartaa/rsna-knee-publication-swa-weights-20261007', 'file': 'raptor_ft_alldata_t16_blendjev_oai_d96_r384_swa.pt',
+              'sha256': '7e5315dad125b99fc65b340b3de41de628e9be51ff5835355dd61c86472244ef', 'size': 292840787}
 TIMM_VERSION = s96.TIMM_VERSION
 CHUNK = 1024 * 1024
 
@@ -131,18 +135,33 @@ class KaggleFile:
 
 
 def prepare_dread(root, *, transport=None, disk_usage=shutil.disk_usage):
+    return _prepare_published(root, DREAD_PIN, {
+        'init': 'dread_v4', 'kind': 'dread_v4_full', 'label': 'Dread v4_full', 'licence': 'CC0-1.0 (dataset card fetched 2026-10-12)',
+        'exposure': 'Trained by Dread on all non-gold competition studies; fold-0 OOF is exposed'}, transport, disk_usage)
+
+
+def prepare_nartaa(root, *, transport=None, disk_usage=shutil.disk_usage):
+    return _prepare_published(root, NARTAA_PIN, {
+        'init': 'nartaa_oai', 'kind': 'nartaa_oai_swa', 'label': 'nartaa OAI SWA', 'licence': 'per dataset card (other; OAI acknowledgement)',
+        'exposure': 'nartaa trained on all competition studies plus OAI; fold-0 OOF is exposed'}, transport, disk_usage)
+
+
+def _prepare_published(root, pin, meta, transport, disk_usage):
     root, descriptor = _fresh(root)
-    weights = root / DREAD_PIN['file']; payload = root / 'download.part'
+    weights = root / pin['file']; payload = root / 'download.part'
     if payload.exists() or payload.is_symlink():
         raise ValueError('Partial download preserved; use a fresh directory')
     if not weights.exists():
-        if disk_usage(root).free < 3 * DREAD_PIN['size'] + 512 * 1024 * 1024:
+        if disk_usage(root).free < 3 * pin['size'] + 512 * 1024 * 1024:
             raise OSError('Insufficient disk for download, extraction and reserve')
-        (transport or KaggleFile()).fetch(DREAD_PIN['dataset'], DREAD_PIN['file'], payload, DREAD_PIN['size'] + 64 * 1024 * 1024)
+        (transport or KaggleFile()).fetch(pin['dataset'], pin['file'], payload, pin['size'] + 64 * 1024 * 1024)
         try:
             with open(payload, 'rb') as f:
                 magic = f.read(2)
-            if magic == b'PK':
+            # A torch checkpoint is itself a zip ('PK'): Kaggle now serves the raw pinned file, so exact pinned
+            # bytes are accepted as-is before any single-member wrapper extraction is attempted.
+            raw = payload.stat().st_size == pin['size'] and s96.file_sha(payload) == pin['sha256']
+            if magic == b'PK' and not raw:
                 with zipfile.ZipFile(payload) as archive:
                     items = archive.infolist()
                     # Kaggle may rename the sole member. Its name is never used as an
@@ -150,7 +169,7 @@ def prepare_dread(root, *, transport=None, disk_usage=shutil.disk_usage):
                     mode = items[0].external_attr >> 16 if len(items) == 1 else 0
                     if (len(items) != 1 or items[0].is_dir() or
                             stat.S_IFMT(mode) not in (0, stat.S_IFREG) or
-                            items[0].file_size != DREAD_PIN['size'] or items[0].flag_bits & 1):
+                            items[0].file_size != pin['size'] or items[0].flag_bits & 1):
                         raise ValueError('Unexpected archive member')
                     with archive.open(items[0]) as source, open(weights.with_name(weights.name + '.part'), 'xb') as out:
                         shutil.copyfileobj(source, out, CHUNK); out.flush(); os.fsync(out.fileno())
@@ -161,20 +180,20 @@ def prepare_dread(root, *, transport=None, disk_usage=shutil.disk_usage):
             for p in (payload, weights.with_name(weights.name + '.part')):
                 if p.exists():
                     p.unlink()
-    if weights.is_symlink() or weights.stat().st_size != DREAD_PIN['size'] or s96.file_sha(weights) != DREAD_PIN['sha256']:
-        raise ValueError('Dread v4_full size/checksum differs from the pin')
+    if weights.is_symlink() or weights.stat().st_size != pin['size'] or s96.file_sha(weights) != pin['sha256']:
+        raise ValueError(meta['label'] + ' size/checksum differs from the pin')
     os.chmod(weights, 0o444)
-    d = {'init': 'dread_v4', 'kind': 'dread_v4_full', 'dataset': DREAD_PIN['dataset'], 'file': DREAD_PIN['file'],
-         'weights_file': str(weights.resolve()), 'weights_sha256': DREAD_PIN['sha256'], 'weights_bytes': DREAD_PIN['size'],
-         'licence': 'CC0-1.0 (dataset card fetched 2026-10-12)', 'use': 'backbone.* tensors only; head fresh; missing=0/unexpected=0 enforced at load',
-         'exposure': 'Trained by Dread on all non-gold competition studies; fold-0 OOF is exposed'}
+    d = {'init': meta['init'], 'kind': meta['kind'], 'dataset': pin['dataset'], 'file': pin['file'],
+         'weights_file': str(weights.resolve()), 'weights_sha256': pin['sha256'], 'weights_bytes': pin['size'],
+         'licence': meta['licence'], 'use': 'backbone.* tensors only; head fresh; missing=0/unexpected=0 enforced at load',
+         'exposure': meta['exposure']}
     s96.atomic_json(descriptor, d)
-    return {'descriptor': str(descriptor.resolve()), 'descriptor_sha256': s96.file_sha(descriptor), 'init': 'dread_v4',
-            'weights_sha256': DREAD_PIN['sha256'], 'training': False}
+    return {'descriptor': str(descriptor.resolve()), 'descriptor_sha256': s96.file_sha(descriptor), 'init': meta['init'],
+            'weights_sha256': pin['sha256'], 'training': False}
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__); parser.add_argument('root', type=Path)
-    parser.add_argument('--init', choices=('imagenet', 'dread_v4'), required=True)
+    parser.add_argument('--init', choices=('imagenet', 'dread_v4', 'nartaa_oai'), required=True)
     a = parser.parse_args()
-    print(json.dumps(prepare_imagenet(a.root) if a.init == 'imagenet' else prepare_dread(a.root), indent=2))
+    print(json.dumps({'imagenet': prepare_imagenet, 'dread_v4': prepare_dread, 'nartaa_oai': prepare_nartaa}[a.init](a.root), indent=2))

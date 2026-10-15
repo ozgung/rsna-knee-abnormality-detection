@@ -100,6 +100,38 @@ class DreadTests(unittest.TestCase):
         from knee import raptor64_training as guard
         self.assertEqual(prep.IMAGENET_PIN, guard.IMAGENET_PIN)
         self.assertEqual({k: prep.DREAD_PIN[k] for k in ('dataset', 'file', 'sha256', 'size')}, {k: guard.DREAD_PIN[k] for k in ('dataset', 'file', 'sha256', 'size')})
+        self.assertEqual({k: prep.NARTAA_PIN[k] for k in ('dataset', 'file', 'sha256', 'size')}, {k: guard.NARTAA_PIN[k] for k in ('dataset', 'file', 'sha256', 'size')})
+
+    def test_raw_payload_that_is_itself_a_zip_accepted_when_pinned(self):
+        """Regression (na-orig boot 2026-10-15): torch .pt files are zip archives; Kaggle served the raw file."""
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as z:
+            z.writestr('archive/data.pkl', b'p' * 50); z.writestr('archive/data/0', b'q' * 70)
+        data = buffer.getvalue(); pin = dict(prep.NARTAA_PIN, sha256=hashlib.sha256(data).hexdigest(), size=len(data))
+        with patch.object(prep, 'NARTAA_PIN', pin):
+            r = prep.prepare_nartaa(self.root / 'rawzip', transport=FakeKaggle(data))
+            self.assertEqual(Path(json.loads(Path(r['descriptor']).read_text())['weights_file']).read_bytes(), data)
+        with patch.object(prep, 'DREAD_PIN', dict(prep.DREAD_PIN, sha256=hashlib.sha256(data).hexdigest(), size=len(data))):
+            prep.prepare_dread(self.root / 'rawzip-dread', transport=FakeKaggle(data))
+            with self.assertRaises(ValueError):   # a multi-member zip that is NOT the pinned bytes is still rejected
+                other = io.BytesIO()
+                with zipfile.ZipFile(other, 'w') as z:
+                    z.writestr('archive/data.pkl', b'P' * 50); z.writestr('archive/data/0', b'q' * 70)
+                prep.prepare_dread(self.root / 'otherzip', transport=FakeKaggle(other.getvalue()))
+            self.assertFalse((self.root / 'otherzip/initializer.json').exists())
+
+    def test_nartaa_descriptor_matches_trainer_loader_contract(self):
+        pin = dict(prep.NARTAA_PIN, sha256=hashlib.sha256(self.data).hexdigest(), size=len(self.data))
+        with patch.object(prep, 'NARTAA_PIN', pin):
+            t = FakeKaggle(self.data); r = prep.prepare_nartaa(self.root / 'na', transport=t)
+            self.assertEqual(t.calls, [('nartaa/rsna-knee-publication-swa-weights-20261007', 'raptor_ft_alldata_t16_blendjev_oai_d96_r384_swa.pt')])
+            d = json.loads(Path(r['descriptor']).read_text())
+            # knee.raptor64_training.load_published requires exactly this kind/dataset/sha for init nartaa_oai
+            self.assertEqual((d['init'], d['kind'], d['dataset'], d['weights_sha256']),
+                             ('nartaa_oai', 'nartaa_oai_swa', 'nartaa/rsna-knee-publication-swa-weights-20261007', pin['sha256']))
+            with self.assertRaises(ValueError):
+                prep.prepare_nartaa(self.root / 'nabad', transport=FakeKaggle(b'x' * len(self.data)))
+            self.assertFalse((self.root / 'nabad/initializer.json').exists())
 
 
 @unittest.skipUnless(HAVE_TIMM, 'timm/safetensors required')

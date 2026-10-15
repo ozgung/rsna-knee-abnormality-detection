@@ -9,7 +9,7 @@
   health                 aggregate sanitized progress for all arms to /content/raptor64-health.json
 
 Layout (all under /content): packages raptor64-ARM-pkg, work raptor64-ARM-fold0, inputs
-input-raptor64-ARM, initializers raptor64-init-{imagenet,dread_v4}, cache raptor64_cache,
+input-raptor64-ARM, initializers raptor64-init-{imagenet,dread_v4,nartaa_oai}, cache raptor64_cache,
 backup dataset ozgung/knee-raptor64-ARM-fold0-20261013. Credential: /content/kaggle.json (mode 600).
 Nothing here starts training except `launch`, which requires a reviewed config SHA.
 """
@@ -25,8 +25,8 @@ import subprocess
 import sys
 
 ROOT = Path('/content')
-ARMS = ('in-orig', 'in-plane', 'dr-orig', 'dr-plane', 'dr-full', 'in-mirror', 'in-distil', 'in-distil-w1', 'in-distil-flip', 'ax-crop', 'ax-full')
-INIT = {'in-orig': 'imagenet', 'in-plane': 'imagenet', 'dr-orig': 'dread_v4', 'dr-plane': 'dread_v4', 'dr-full': 'dread_v4', 'in-mirror': 'imagenet', 'in-distil': 'imagenet', 'in-distil-w1': 'imagenet', 'in-distil-flip': 'imagenet', 'ax-crop': 'imagenet', 'ax-full': 'imagenet'}
+ARMS = ('in-orig', 'in-plane', 'dr-orig', 'dr-plane', 'dr-full', 'in-mirror', 'in-distil', 'in-distil-w1', 'in-distil-flip', 'ax-crop', 'ax-full', 'na-orig')
+INIT = {'na-orig': 'nartaa_oai', 'in-orig': 'imagenet', 'in-plane': 'imagenet', 'dr-orig': 'dread_v4', 'dr-plane': 'dread_v4', 'dr-full': 'dread_v4', 'in-mirror': 'imagenet', 'in-distil': 'imagenet', 'in-distil-w1': 'imagenet', 'in-distil-flip': 'imagenet', 'ax-crop': 'imagenet', 'ax-full': 'imagenet'}
 DATE = '20261013'
 PACKAGES = ['timm==1.0.26', 'kaggle==2.2.4', 'safetensors', 'pydicom', 'opencv-python-headless', 'pyarrow']
 PERSISTER_SHA = '8923bd872500b87f85be78aefd9fc799a6f88942e94503045b5e01ea66c118df'
@@ -81,7 +81,7 @@ def setup(args):
     if info['packages']['timm'] != '1.0.26':
         raise SystemExit('timm 1.0.26 required')
     results = {}
-    for init in ('imagenet', 'dread_v4'):
+    for init in ('imagenet', 'dread_v4', 'nartaa_oai'):
         target = ROOT / f'raptor64-init-{init}'
         if (target / 'initializer.json').exists():
             results[init] = {'descriptor_sha256': sha(target / 'initializer.json'), 'reused': True}
