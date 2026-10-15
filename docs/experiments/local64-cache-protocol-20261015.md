@@ -37,3 +37,37 @@ Expected 4–6 h/shard and 25–30 GB total are recipe estimates, not measured C
 Keep full caches remote; local starter budget 2 GiB remains. Only bounded synthetic/source checks and small metadata locally. CPU packets private/offline, enable_gpu=false, title=id; normal push has no `--timeout`. No provisioning or new terms. Builder must pin mounted data/auxiliary asset versions and omit reports/labels from staged inference inputs. Package no private identifiers in committed source. Use atomic per-study outputs and index checkpoints for recoverability; verify exact config/source/membership/content before any resume, never blindly retry ERROR.
 
 Final packet names, hashes, commands, measured resources and actual job/version/session IDs will be appended after sealing/owner claim. Codex has launched no jobs. Claude must record X1b Colab session/run/log/checkpoint plus stop/resume instructions separately; owner-reported intent is not independently verified liveness.
+
+## Sealed preparation checkpoint — October 15, 19:08 UTC
+
+**Prepared as a secondary lane; no remote jobs launched.** Claude's 19:00 user-reported main-lane pivot prioritizes S6/labels-v2. Core helper dc0dd14 integrated as a53df3d; parent acceptance/recovery fixes committed as **ce8a978**. Full staging/trainer promotion remains disabled. This completes packet preparation; real cache and anatomy qualification remain pending owner execution.
+
+Packets: `outputs/kaggle/local64-cache-20261015/shard{0..3}/`, each 814,070 bytes, 232 hash-bound sources including 194 vendored MONAI files, pinned Docker, private/offline CPU, literal title=id, no runtime flags. Source bundle SHA **d24d6fd969ada1cf30e5525242de0ad8dbfa3997c1fb91d4f2f9c8d455a0fed2**. Full notebook/metadata/contract/receipt hashes in [sealed index](../../outputs/kaggle/local64-cache-20261015/SEALED-BUILD.json).
+
+| Shard | Training studies | Notebook SHA256 |
+| --- | --- | --- |
+| 0 | 1087 | `74a968110ec1ad9d2974014d146030aea5cff8b38b0caf437fa7f5cbf1bbacfc` |
+| 1 | 1086 | `955a0f8aff17776517da23a2c715ef7f153d7400d705b918514110e1cabd38aa` |
+| 2 | 1086 | `aa214ac552a92da7532b9391ac304e4d0a07b78bfeb0c4967301a67de7bdf3f3` |
+| 3 | 1086 | `20e5b54fd7447475bce297b7b5291650e7ae5425ac4cf65a5955728db7633fd9` |
+
+Shard 0 additionally emits a separate 58-study scoring cache. Frozen review membership was independently checked: all 32 are eligible training studies, split 9/8/5/10 across shards. Every selected frame is paginated with matched source and retained-crop outline; a separate genuine diagnostic-mask overlay has its own source/native index and artifact hash. No mask broadcasting.
+
+**Acceptance:** all **14 focused ML checks PASS**, including actual pinned historical StudyWindows/public K42 352→384 tensor equality, K8 training interface, mask preservation, frame remapping, full montage/diagnostic artifact hashes, exact population binding, metadata-only collection and resume tampering. Bare focused checks OK, 11 optional skips. Twelve synthetic aspect/spacing/edge-center rendering cases match the pinned S6 pixel primitive byte-for-byte. Four separately unpacked packets compile and import with exact source hashes, settings, partitions and no private IDs embedded. Default smoke and installed PyTorch CPU forward smoke PASS, synthetic only.
+
+Evidence: [focused tests](../../outputs/analysis/local64-20261015/targeted-tests.log), [window/render proof](../../outputs/analysis/local64-20261015/pinned-render-primitive-proof.json), [packet audit](../../outputs/analysis/local64-20261015/sealed-packets-acceptance.json), [frozen membership](../../outputs/analysis/local64-20261015/frozen32-membership-proof.json), [CPU smoke](../../outputs/analysis/local64-20261015/torch-cpu-smoke.log).
+
+Broad checks were run and **did not pass**: bare 1322 tests, 22 errors/757 skips, all 22 optional-dependency errors reproduced on pre-change d04a426 (18 NumPy, three pydicom, one torch). Installed-ML 1350 tests: four failures, six errors, 162 skips. Nine existing staging cases reproduce on d04a426 because this Mac has 3.6 GiB free against their unchanged 5 GiB preflight reserve; the remaining existing Versia multiprocessing case is blocked by sandbox `torch_shm_manager` permission. No unrelated reserve/threshold change. [Bare comparison](../../outputs/analysis/local64-20261015/baseline-error-comparison.json), [ML comparison](../../outputs/analysis/local64-20261015/baseline-ml-error-comparison.json), [ML full log](../../outputs/analysis/local64-20261015/ml-suite.log). Focused checks cover the final local64 changes; no overall-suite PASS is claimed.
+
+**Owner execution, only if claimed after reconciling main-lane resources:**
+
+```bash
+kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/local64-cache-20261015/shard0
+kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/local64-cache-20261015/shard1
+kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/local64-cache-20261015/shard2
+kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/local64-cache-20261015/shard3
+```
+
+No `--timeout`, duplicate jobs or local full-cache downloads. Claude posts actual accepted versions/source/settings, job status and log/result paths. Collect only contract/index/receipts and K0 PNGs into `outputs/kaggle/local64-cache-20261015-result/shardN/local64_cache/`; `scripts/collect_local64_cache_metadata.py` defaults to metadata-only validation. `--verify-pixels` is for a remote staging host with all NPZ files, not this laptop. Both modes keep training promotion false until full loader/stage integration, immutable file/access verification and real K0 review pass.
+
+Recovery: workers write atomic NPZ/index checkpoints, private failure details, source decode counts and disk/RSS/runtime measurements. In-place recovery verifies exact contract, source membership, NPZ file/raw hashes and montage hashes, then rebuilds only derived image links. A new Kaggle run resets working storage; attachment/transport resume is not implemented, so preserve partial outputs and request a separately sealed recovery build rather than blind retry. No job currently needs stop/resume. Actual CPU auxiliary forward, real DICOM/native geometry, anatomy, throughput and full staging remain unverified.

@@ -36,6 +36,6 @@ Approved by the user as the main lane on Oct 15. The R1 local-view fine-tune and
 - **Timeline target:** fold-0 pair read out by Oct 16 ~18:00 UTC; all-data fit and probe by Oct 18; last hidden submission Oct 20 16:00 UTC.
 
 ## Limits
-- Gold-58 is small, and nartaa selected their models on it, so it is selection-exposed for public weights. It is clean for our arms.
+- Gold-58 is selection-exposed for public weights **and our V2 comparison**: labels_v2_base_own224_w30 was selected among about ten label variants using gold-58 (labels-v2 result §6). Training-ID exclusion does not restore independence. The primary delta/bootstrap and promotion threshold are exposed development heuristics, not clean validation or selection-adjusted inference. Freeze the arms before read-out; retain the public probe as a separate competitive result.
 - J0 may not reproduce nartaa exactly, because the JEV reconstruction and code versions may differ.
 - A label gain on gold-58 is not proven to be a leaderboard gain.
