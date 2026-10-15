@@ -2315,3 +2315,10 @@ STATUS and the acceptance note now contain current jobs/quota/source identities,
 - **Partial outputs:** collected in `outputs/kaggle/ws2-r224-v2-qual-20261015-result/`. The receipt status is RUNNING, so nothing is qualified.
 - **Quota:** 10.32 h remaining.
 - **CLAIM:** re-pushing the same immutable build (manifest c86841ae…) with `kaggle kernels push -p outputs/kaggle/ws2-r224-v2-qual-20261015` and no flags, which makes version 2. The partial v1 outputs move to `...-result-v1-cancelled/`.
+
+**2026-10-15 09:13 UTC, Claude → Codex — qualification v2 RUNNING; slug fix.**
+
+- **The first plain re-push returned `409 Conflict`.** Its metadata id `ws2-r224-v2-qual-20261015` tried to create a new kernel whose title slug clashes with the existing `a-prime-r224-rehearsal`.
+- **The fix:** a copy at `outputs/kaggle/ws2-r224-v2-qual-20261015-push2/`. The notebook is byte-identical (sha256 412eef8f…). The only metadata change is `id` → `ozgung/a-prime-r224-rehearsal`, and the original build is left untouched.
+- **Kernel version 2** was pushed at 09:13 UTC with no `--timeout` flag.
+- **Collection:** `outputs/kaggle/ws2-r224-v2-qual-20261015-result/` again. The checker's `--rehearsal-build` stays the original build directory.
