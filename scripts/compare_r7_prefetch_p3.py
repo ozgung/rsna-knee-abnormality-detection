@@ -110,7 +110,7 @@ def positive_finite(value):
 def compare(serial_folders,prefetch_folders,v7,compiled,expected_studies=39,expected_sentinels=4,
             serial_phase=None,prefetch_phase=None):
     import numpy as np
-    from knee.public_r7_prefetch_candidate import VERSION,CROSS_BOARD_TOLERANCE,require_compiled
+    from knee.public_r7_recovery_entry import VERSION,CROSS_BOARD_TOLERANCE,require_compiled
     require_tol=TOLERANCE[compiled];worker_rss_limit=WORKER_RSS_LIMIT;assert TOLERANCE['separate']==CROSS_BOARD_TOLERANCE['s6']
     checks=[];note=lambda name,ok,detail=None:checks.append({'check':name,'pass':bool(ok),**({'detail':detail} if detail is not None else {})})
     v7w={w['board']:w for w in v7['workers']['s6']};v7in={row['id']:row['input'] for w in v7['workers']['s6'] for row in w['records']}

@@ -1,5 +1,6 @@
 """WS3 admission/accounting boundaries, independent of private evidence files."""
 import csv
+import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
@@ -104,6 +105,71 @@ class WS3CoordinatorGateTests(unittest.TestCase):
                 self.assertEqual(control.call_count,1)
                 self.assertFalse(control.call_args.args[0]['r7_prefetch'])
                 self.assertEqual(native.call_count,int(mechanics and (speed or not mirror)))
+
+
+    def test_serial_measurements_survive_comparator_failure(self):
+        import json
+        import time
+        from unittest import mock
+        from scripts import compare_r7_prefetch_p3 as P3
+        with tempfile.TemporaryDirectory() as folder:
+            out=Path(folder)/'run'
+            cfg={'mode':'rehearsal','r7_prefetch':True,'ws2_binding':{},'r224_mirror':False,
+                 'p3_v7_reference':{'synthetic':True},'heliosli_reference':{'submission':{}}}
+            phase={'wall_seconds':2.,'peaks':{'host_rss_bytes':123}}
+            def baseline(root,cfg,base_out,**kwargs):
+                base_out.mkdir();(base_out/'assignment.json').write_text(json.dumps({'ids':['synthetic-a','synthetic-b']}))
+                return {'status':'PASS','boards':[{'uuid':'synthetic-0'},{'uuid':'synthetic-1'}],
+                        'stage_binding':{},'phases':{'s6':{'wall_seconds':1.}}}
+            with mock.patch.object(W,'require_baseline_visible_reference',return_value=0.),\
+                 mock.patch.object(W.R7,'run',side_effect=baseline),\
+                 mock.patch.object(W.R7,'launch',return_value=([],phase)),\
+                 mock.patch.object(P3,'compare',side_effect=ModuleNotFoundError('synthetic comparator failure')),\
+                 mock.patch.object(W,'launch_crop224') as native:
+                with self.assertRaisesRegex(ModuleNotFoundError,'synthetic comparator'):W.run(Path(folder),cfg,out,started=time.monotonic())
+            partial=json.loads((out/'receipt.json').read_bytes())
+            durable=json.loads((out/'serial-control-status.json').read_bytes())
+            self.assertEqual(partial['status'],'FAIL')
+            self.assertEqual(partial['serial_control']['phase'],phase)
+            self.assertEqual(durable['phase'],phase)
+            self.assertIsNone(durable['comparison'])
+            native.assert_not_called()
+
+
+class WS3UnpackedImportTests(unittest.TestCase):
+    @unittest.skipUnless(importlib.util.find_spec('numpy'),'optional numpy unavailable')
+    def test_comparator_runs_without_unshipped_candidate_alias(self):
+        import ast
+        import json
+        import subprocess
+        import sys
+        import numpy as np
+        sources={
+            'knee/__init__.py':'', 'scripts/__init__.py':'',
+            'knee/public_r7_recovery_entry.py':"VERSION='synthetic'\nCROSS_BOARD_TOLERANCE={'s6':.001}\ndef require_compiled(value):return True\n",
+            'scripts/compare_r7_prefetch_p3.py':(Path(B.__file__).parent/'compare_r7_prefetch_p3.py').read_text()}
+        # Exercise the actual generated bootstrap extraction loop, not a separate unpack implementation.
+        packet={'sources':sources,'cfg':{},'codecs':{}}
+        script=B.bootstrap(packet);tree=ast.parse(script)
+        unpack=next(n for n in tree.body if isinstance(n,ast.For) and isinstance(n.iter,ast.Call)
+                    and isinstance(n.iter.func,ast.Attribute) and n.iter.func.attr=='items')
+        with tempfile.TemporaryDirectory() as folder:
+            project=Path(folder)/'project';code=project/'source'
+            exec(compile(ast.Module(body=[unpack],type_ignores=[]),'<actual-bundle-unpack>','exec'),
+                 {'payload':packet,'project':project,'code':code})
+            # A separate isolated interpreter cannot accidentally resolve modules from the checkout.
+            program="""import sys,importlib.util
+sys.path.insert(0,sys.argv[1])
+sys.path.append(sys.argv[2])
+assert importlib.util.find_spec('knee.public_r7_prefetch_candidate') is None
+from scripts.compare_r7_prefetch_p3 import compare
+r=compare([],[],{'workers':{'s6':[]}},'separate',expected_studies=0,expected_sentinels=0)
+assert 'mechanics_pass' in r and r['mirror_speed_pass'] is False
+print('UNPACKED_COMPARATOR_IMPORT_PASS')
+"""
+            run=subprocess.run([sys.executable,'-I','-S','-c',program,str(project),str(Path(np.__file__).parent.parent)],cwd=folder,capture_output=True,text=True)
+            self.assertEqual(run.returncode,0,run.stderr)
+            self.assertIn('UNPACKED_COMPARATOR_IMPORT_PASS',run.stdout)
 
 
 if __name__=='__main__':unittest.main()

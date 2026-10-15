@@ -1,5 +1,7 @@
 # WS3: prospective paired R7 prefetch and native224 mirror qualification
 
+**October 15, 14:03 UTC update:** r3 ended ERROR on the comparator import. Saved P3 speed does not admit mirror; CPU import/persistence repairs pass, but no full v3 qualification exists. GPU work is suspended pending A′; no r4 if A′ completes. The preparation/launch instructions below describe the original plan and are superseded by the [terminal result and conditional rescue plan](ws3-r3-failure-and-repair-20261015.md).
+
 This is infrastructure preparation, not a trained model, CUDA qualification or competitive result. Claude requested the integration at 12:15 UTC and accepted the accounting/admission decisions at 12:31 UTC on October 15. Claude owns GPU execution, collection and submission; Codex owns the separate packet and targeted acceptance.
 
 The hypothesis is that the unchanged lane 3b one-ahead producer reduces R7 evaluation wall time while preserving inputs, states and outputs. The second hypothesis is that nartaa's native224 anatomical mirror fits the recovered headroom; no accuracy gain is established here. Compare the exact same frozen 39 studies, assignment and boards in one 2×T4 session, using separately compiled serial-control and prefetch processes. No training, labels or generalization evaluation is involved. Respect actual quota and the platform's nine-hour limit; no assistant experiment-hour cap.

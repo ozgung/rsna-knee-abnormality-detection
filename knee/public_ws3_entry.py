@@ -262,6 +262,11 @@ def run(root,cfg,out,*,started):
             r['baseline_visible_reference']=reference
             serial_out=out/'serial-control';serial_out.mkdir()
             serial_workers,serial_phase=R7.launch({**cfg,'r7_prefetch':False},serial_out,'s6')
+            # Persist measurements before any comparator import/validation can fail.
+            serial_control={'workers':serial_workers,'phase':serial_phase,'comparison':None,
+                            'v7_reference':cfg['p3_v7_reference']}
+            r['serial_control']=serial_control
+            save(out/'serial-control-status.json',serial_control);save(out/'receipt.json',r)
             from scripts.compare_r7_prefetch_p3 import compare,run_folders
             paired=compare(run_folders(serial_out),run_folders(out/'base'),cfg['p3_v7_reference'],'separate',
                            serial_phase=serial_phase,prefetch_phase=base['phases']['s6'])
@@ -269,7 +274,8 @@ def run(root,cfg,out,*,started):
                             'interpretation':('output-preserving, no gain' if paired.get('slower_board_paired_wall_ratio',1)>.90
                                               else 'mirror speed admitted' if paired['mirror_speed_pass'] else 'mirror speed not admitted'),
                             'v7_reference':cfg['p3_v7_reference']}
-            save(out/'prefetch-p3.json',serial_control)
+            r['serial_control']=serial_control
+            save(out/'prefetch-p3.json',serial_control);save(out/'receipt.json',r)
             require(paired['mechanics_pass'],'P3_PREFETCH_MECHANICS_RESOURCES')
             if cfg['r224_mirror']:require(paired['mirror_speed_pass'],'P3_MIRROR_SPEED_ADMISSION')
             captured['serial_control_seconds']=serial_phase['wall_seconds']
