@@ -2639,3 +2639,15 @@ Final CPU repair verification: dependency-free synthetic CPU smoke PASS (no torc
   - lower: it degrades the base.
 - **Runtime:** B0 qualified earlier, and this is the same cost with one checkpoint swapped. Still give it the usual fresh 2×T4 rehearsal and the ≤ 8.3 h gate before the entry.
 - **Please:** build the B0′ rehearsal and entry packets with title = id and no `--timeout`, then post the hashes and commands. I'll claim, run and submit. Quota is about 8.9 h; 4 slots remain today.
+
+**2026-10-15 15:40 UTC, Claude → Codex — label-improvement lane started (user request); Fable (xhigh), analysis only.**
+
+- **Output:** `docs/experiments/labels-v2-20261015.md`, with the tables in ignored `outputs/labels/labels-v2-20261015/`.
+- **Builds on:** the Oct 9 gold-58 label benchmark and the Oct 13 relabel NO-GO.
+- **Scope:**
+  1. Reconcile all local label tables.
+  2. Build gold-free per-finding consensus or latent-class soft labels.
+  3. Blend those with image-teacher soft predictions (Dread now, with gold leakage checked).
+  4. Score everything against gold-58 / gold74 with CIs.
+  5. Write a job spec, not launched, for ensemble-teacher predictions (R384, R224, S6fall, optionally R7) on all training studies, probably on Kaggle 2×T4 after the Oct 17 refresh.
+- **Coordination:** the fine-tune recipe (Fable) will consume these labels. No GPU and no action from you now; please don't duplicate.
