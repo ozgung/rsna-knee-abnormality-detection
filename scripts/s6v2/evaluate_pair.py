@@ -4,7 +4,7 @@ Aggregates only (no IDs).  Usage:
   python -I evaluate_pair.py <repo root> <J0 run dir> <V2 run dir> <out json> [--gold-csv-J0 f --gold-csv-V2 f]
 A run dir holds the trainer's partial_preds_E_prior_s42.json, partial_oof_E_prior_s42.npy and pool_uids.json.  Optional
 --gold-npz-<arm> files (uids, logits) from compact_infer replace the trainer's gold logits for the primary endpoint."""
-import argparse, csv, json, sys
+import argparse, csv, hashlib, json, sys
 from pathlib import Path
 import numpy as np
 from scipy.stats import spearmanr
@@ -25,11 +25,25 @@ def per(y, p):
     return [float(roc_auc_score(y[:, j], p[:, j])) if 0 < y[:, j].sum() < len(y) else None for j in range(y.shape[1])]
 
 
+def idsha(ids):
+    return hashlib.sha256("\n".join(sorted(ids)).encode()).hexdigest()
+
+
 def load_run(d):
+    """Fails closed on label order, duplicate IDs or shape mismatches (Codex read-out audit r1)."""
     d = Path(d)
     pr = json.load(open(d / "partial_preds_E_prior_s42.json"))
     oof = np.load(d / "partial_oof_E_prior_s42.npy")
     pool = json.load(open(d / "pool_uids.json"))
+    if list(pr.get("labels", [])) != LABELS:
+        raise ValueError("prediction label order differs from the canonical 12-label order (%s)" % d.name)
+    if len(pool) != len(set(pool)) or oof.shape != (len(pool), len(LABELS)):
+        raise ValueError("pool IDs duplicated or OOF shape mismatch (%s)" % d.name)
+    g = pr["gold_uids"]
+    if len(g) != len(set(g)) or np.asarray(pr["gold_logits"]).shape != (len(g), len(LABELS)):
+        raise ValueError("gold IDs duplicated or gold logits shape mismatch (%s)" % d.name)
+    if not np.isfinite(oof).all() or not np.isfinite(np.asarray(pr["gold_logits"], float)).all():
+        raise ValueError("non-finite predictions (%s)" % d.name)
     return pr, oof, pool
 
 
@@ -56,6 +70,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("root"); ap.add_argument("j0"); ap.add_argument("v2"); ap.add_argument("out")
     ap.add_argument("--gold-npz-J0"); ap.add_argument("--gold-npz-V2")
+    ap.add_argument("--gold-csv-J0"); ap.add_argument("--gold-csv-V2")   # compact_infer predictions.csv (columns bound by name)
+    ap.add_argument("--preflight", help="vm_preflight receipt: fold-0 holdout and gold ID hashes must match it")
     a = ap.parse_args()
     root = Path(a.root)
     gold = gold_table(root / "data/raw/train.csv")
@@ -65,13 +81,25 @@ def main():
     G = {}
     for arm, (pr, oof, pool) in runs.items():
         npz = getattr(a, "gold_npz_" + arm)
-        if npz:
+        gcsv = getattr(a, "gold_csv_" + arm)
+        if gcsv:
+            with open(gcsv, encoding="utf-8", newline="") as fh:
+                rd = csv.DictReader(fh)
+                if set(LABELS) - set(rd.fieldnames or []):
+                    raise ValueError("compact_infer CSV lacks label columns (%s)" % arm)
+                rr = list(rd)
+            uids = [r[UID] for r in rr]; lg = np.array([[float(r[L]) for L in LABELS] for r in rr])
+            src = "compact_infer predictions.csv (eval stride 1, raw DICOM)"
+        elif npz:
             z = np.load(npz, allow_pickle=False); uids = [str(u) for u in z["uids"]]; lg = np.asarray(z["logits"], float)
             src = "compact_infer"
         else:
             uids, lg, src = pr["gold_uids"], np.asarray(pr["gold_logits"], float), "trainer predict (eval stride 3)"
+        if len(uids) != len(set(uids)) or lg.shape != (len(uids), len(LABELS)):
+            raise ValueError("gold IDs duplicated or logits shape mismatch (%s)" % arm)
         m = dict(zip(uids, lg))
-        assert set(m) == set(gold) and len(m) == 58, "gold coverage differs"
+        if set(m) != set(gold) or len(m) != 58:
+            raise ValueError("gold coverage differs from the 58 gold studies (%s)" % arm)
         G[arm] = (m, src)
     order = sorted(gold)
     y = np.array([gold[u] for u in order])
@@ -103,6 +131,18 @@ def main():
     for arm, (pr, oof, pool) in runs.items():
         ix = [i for i, u in enumerate(pool) if fold[u] == 0]
         oofs[arm] = ({pool[i]: oof[i] for i in ix})
+    expect0 = {u for u in tJ0 if fold[u] == 0}
+    for arm in oofs:
+        if set(oofs[arm]) != expect0:
+            raise ValueError("fold-0 prediction IDs of %s differ from the targets' %d fold-0 studies" % (arm, len(expect0)))
+    if a.preflight:
+        pf = json.load(open(a.preflight))
+        for name, rec in pf["arms"].items():
+            if rec["fold0_holdout_sha256"] != idsha(expect0) or rec["fold0_holdout"] != len(expect0):
+                raise ValueError("fold-0 holdout differs from the preflight membership (%s)" % name)
+            if rec["gold_sha256"] != idsha(gold) or rec["gold"] != 58:
+                raise ValueError("gold set differs from the preflight membership (%s)" % name)
+        res["preflight_bound"] = {"fold0_holdout_sha256": idsha(expect0), "gold_sha256": idsha(gold)}
     common = sorted(set(oofs["J0"]) & set(oofs["V2"]))
     res["fold0_studies"] = {"J0": len(oofs["J0"]), "V2": len(oofs["V2"]), "common": len(common)}
     for ref_name, ref in (("J0_targets_ge_0.5", tJ0), ("labels_v1_blend_ge_0.5", blend)):
