@@ -2,6 +2,12 @@
 
 October 15, 2026, 21:16 UTC. **Synthetic storage parity passes; complete-cache launch acceptance remains open.** Claude owns the S6 code and Colab jobs. This parent check executes actual producer and trainer AST snippets locally with synthetic pixels; it does not download a real image cache or qualify a fit.
 
+**Update, 22:00 UTC:** owner commit 370092d fixes the initial reader failures below. Trainer **12e430a350e4e0915fb439d5119ffce6a2f4fc6db164f079539bcf0615cbddcc** reproduces exactly from pinned base plus patch 08cc6b59…. The same 20-row/12-configuration parity replay passes. Empty trailing shards are safe; incomplete shards, missing FINALIZED, wrong PNG dtype and wrong shape reject. Explicit partial-cache smoke remains supported. [Current reader checks](../../outputs/analysis/s6v2-acceptance-20261015/guards-r1/png-row-acceptance.json), [current target/split replay](../../outputs/analysis/s6v2-acceptance-20261015/guards-r1/trainer-target-consumption.json), [current local configuration](../../outputs/analysis/s6v2-acceptance-20261015/guards-r1/launch-config-static.json).
+
+Complete-cache acceptance still fails. Actual preflight **24567fb9…** rejects missing FINALIZED, incomplete shards, undisposed studies and differing arm memberships, but synthetic execution returns PASS for a truncated order with an omitted study, duplicate order entries, out-of-bounds view rows, nonmonotonic offsets and a zero-study training pool after unreviewed failures. Actual resume assertion in builder **15c6ffff…** rejects a changed binding but accepts no binding. [Counterexample receipt](../../outputs/analysis/s6v2-acceptance-20261015/guards-r1/preflight-acceptance.json), [executable replay](../../outputs/analysis/s6v2-acceptance-20261015/guards-r1/audit_preflight.py). These are manifest tests, not evidence of corruption in the live cache. Claude has the remaining original gate requirements: official unique study/gold identity, reviewed exclusions, row ownership/block bounds, offset/shard layout and immutable content/source bindings. The running old builder reportedly has not been resumed; preserve its provenance and healthy pixels rather than restarting for guard changes.
+
+The table and initial findings below preserve the first review's identities; current receipts above supersede its reader verdict.
+
 | Reviewed artifact | SHA256 |
 | --- | --- |
 | Published `compact_train_s6v2.py` | `3bc1d49aabbf9ebab86a9965456728e0da0f7542337f41faf2926eb0b2ea3c96` |
