@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-15 18:43 UTC**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: [AGENTS.md](AGENTS.md); setup: [README.md](README.md). [Previous snapshot and recovery details](docs/status-archive/status-before-20261015-ws3-r3-failure.md).
+Updated **2026-10-15 19:04 UTC**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: [AGENTS.md](AGENTS.md); setup: [README.md](README.md). [Previous snapshot and recovery details](docs/status-archive/status-before-20261015-ws3-r3-failure.md).
 
 ## Current snapshot
 
@@ -22,13 +22,13 @@ Updated **2026-10-15 18:43 UTC**. Read this snapshot, then [shared handoff](docs
 | Owner / task | State and concrete next action |
 | --- | --- |
 | Claude — B0′ waived probe monitoring | Own57240823 terminal status/score/failure. Visible/source parity independently accepted; no duplicate collection/submission. Actual9h unchanged. |
-| Codex — local64 X1a cache | ACTIVE in isolated cheaper helper; parent owns integration/acceptance. Exact Dread raw-frame64 slots/masks, S6 native/side/anchor/render,352 storage; four4345-study training shards plus shard0 separate gold58. Finish runtime/builder/collector, source/render/loader tests and K0 review gates, then seal CPU-only packets. Claude owns launch. [Protocol](docs/experiments/local64-cache-protocol-20261015.md). |
+| Codex — local64 X1a cache | ACTIVE parent integration; helper commit dc0dd14 integrated as a53df3d. Exact Dread raw-frame64 slots/masks, S6 native/side/anchor/render,352 storage; four4345-study training shards plus shard0 separate gold58. Finish runtime/builder/collector, source/render/loader tests and K0 review gates, then seal CPU-only packets. Claude owns launch. [Protocol](docs/experiments/local64-cache-protocol-20261015.md). |
 | Codex — B0′ targeted acceptance | COMPLETE: accepted source, four visible ledgers/input/raw-arm/blend parity PASS. Hidden result unknown; ordinary qualification FAIL retained. |
 | Claude — A′ monitoring | Own 57229227 terminal monitoring; post official status/score/failure evidence. Avoid duplicate collection/jobs. |
 | Codex — conditional v3 acceptance | CPU repairs complete. Accept 13:53 GPU suspension. A′ COMPLETE→close v3; timeout/ERROR→implement/test prospective cache-array hash policy before any fresh r4. Do not relabel r3 or build from synthetic qualification. |
 | Claude + Codex — provenance/finals | Planned Oct 16/20 provenance rechecks and Oct 21 user selection; final two proposal pending. Preserve best A and selection rules. No paid provisioning/new terms. |
 
-One implementation task at a time. One helper `/root/local64_x1a_impl` active in `/Users/ozgun/.codex/worktrees/local64-x1a/rsna-knee-abnormality-detection`; no remote job launched by helper/Codex. Preserve changes until integration; archive after acceptance. Earlier helpers/worktrees finished/archived. Label-v2 analysis is done and cloud recipe delivered. Claude reports a separately authorized X1b Colab training job; its ownership/recovery stays with him. The prior lost R224 Colab lane remains closed; do not reuse its session or reconstruct auth.
+One implementation task at a time. Helper `/root/local64_x1a_impl` completed; managed worktree awaits parent acceptance/archive. No remote job launched by helper/Codex. Earlier helpers/worktrees finished/archived. Label-v2 analysis is done and cloud recipe delivered. Claude reports a separately authorized X1b Colab training job; its ownership/recovery stays with him. The prior lost R224 Colab lane remains closed; do not reuse its session or reconstruct auth.
 
 ## Recovery and immutable evidence
 
@@ -46,4 +46,4 @@ Scratch totals sum serialized cache files, including path/timing metadata; −11
 
 Preserve grouping, label masks, fold-only fitting, image-only inference and exact source/checkpoint/reader/state bindings. Keep private identifiers/images/reports/weights/credentials out of Git. Mechanical checks do not establish generalization. Official last verified final deadline **Oct 22 23:59 UTC / Oct 23 02:59 TRT**; stop/preserve/pause heartbeat then or explicit user stop.
 
-**Latest: 2026-10-15 18:43 UTC — Codex.** B0′ accepted source/visible four-ledger/input/probability/blend replay PASS;57240823 and A′57229227 officially PENDING18:35/no scores. Local64 schema/runtime/352 loader in helper: seven synthetic tests pass, no real cache/anatomical claim. Accepted frame-reference fallback, singular diagnostic mask and separate gold outputs recorded in protocol. Parent now checks runtime/render and seals CPU-only packets after integration. No new Codex job/collector/submission/schedule; v3 rescue remains suspended. Claude should post X1b actual session/run/log/checkpoint and recovery details before it is represented as verified running.
+**Latest: 2026-10-15 19:04 UTC — Codex.** Local64 helper integrated; parent hardened resume/file identity, metadata-only collection, exact population binding, disk/RSS/error receipts and separate diagnostic-mask montage. All 14 focused ML tests PASS, including actual pinned historical trainer/public K42 parity at352→384; bare focused checks OK/11 optional skips. Full bare suite has22 optional-dependency errors, all reproduced on pre-change d04a426; installed-ML full suite running. No real CPU cache/aux-forward/anatomy qualification. **Next:** commit accepted integration, seal/audit four CPU packets and hand them to Claude. Full loader/stage promotion remains disabled pending verified staging/K0; no paired fit. B0′57240823 and A′57229227 last official18:35 PENDING; v3 rescue suspended.
