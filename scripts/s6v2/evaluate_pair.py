@@ -118,11 +118,18 @@ def main():
     # ---- pre-registered rules (primary OOF reference: J0 targets >= 0.5)
     j0g, j0o = res["arms"]["J0"]["gold58_macro"], res["arms"]["J0"]["fold0_oof_macro_J0_targets_ge_0.5"]
     od = res["fold0_oof_delta_J0_targets_ge_0.5"]
+    # rule 1 gates every actionable verdict: NaN / undefined sanity compares False and blocks (DEBUG); raw threshold flags are kept apart
     res["rules"] = {
-        "rule1_j0_sanity": {"gold_in_band": abs(j0g - NARTAA_GOLD) <= 0.02, "oof_in_band": abs(j0o - NARTAA_OOF) <= 0.01,
-                            "j0_gold": j0g, "j0_oof": j0o, "bands": "gold 0.931 +- 0.02, oof 0.907 +- 0.01 (oof reference definition unknown)"},
-        "rule2_promote": bool(d_point >= 0.005 and od >= -0.010),
-        "rule3_kill": bool(d_point <= -0.010)}
+        "rule1_j0_sanity": {"gold_in_band": bool(abs(j0g - NARTAA_GOLD) <= 0.02), "oof_in_band": bool(abs(j0o - NARTAA_OOF) <= 0.01),
+                            "pass": bool(abs(j0g - NARTAA_GOLD) <= 0.02 and abs(j0o - NARTAA_OOF) <= 0.01),
+                            "j0_gold": j0g, "j0_oof": j0o,
+                            "bands": "gold 0.931 +- 0.02, oof 0.907 +- 0.01; nartaa's 0.907 is on their labels / eval path and may not be comparable to ours"},
+        "raw_delta_flags": {"promote_thresholds_met": bool(d_point >= 0.005 and od >= -0.010), "kill_threshold_met": bool(d_point <= -0.010),
+                            "gold_delta": d_point, "oof_delta": od},
+        "rule2_promote": bool(abs(j0g - NARTAA_GOLD) <= 0.02 and abs(j0o - NARTAA_OOF) <= 0.01 and d_point >= 0.005 and od >= -0.010),
+        "rule3_kill": bool(abs(j0g - NARTAA_GOLD) <= 0.02 and abs(j0o - NARTAA_OOF) <= 0.01 and d_point <= -0.010),
+        "verdict": ("BLOCKED_DEBUG_J0_SANITY" if not (abs(j0g - NARTAA_GOLD) <= 0.02 and abs(j0o - NARTAA_OOF) <= 0.01)
+                    else "PROMOTE" if (d_point >= 0.005 and od >= -0.010) else "KILL" if d_point <= -0.010 else "NEITHER")}
     json.dump(res, open(a.out, "w"), indent=1)
     print(json.dumps({k: res[k] for k in ("gold58_delta", "rules", "fold0_studies")}, indent=1))
     for arm in res["arms"]:
