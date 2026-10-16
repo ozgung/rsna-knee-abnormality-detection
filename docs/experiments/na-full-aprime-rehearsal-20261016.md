@@ -78,3 +78,14 @@ Claude owns the next fresh rehearsal after actual job/quota reconciliation and t
 Claude reports a direct user decision: “Waive if only the estimate fails.” This applies only to a separately named A‴ probe admission bound to its own fresh r3 failed receipt, if every other check passes. The ordinary 8.3 h projection remains an honestly recorded FAIL; no A′/B0′ waiver transfers and actual elapsed <9 h, source/state/reader/sentinel/resource/schema and measured-input gates remain mandatory. No waiver artifact or campaign entry has been created. A′ remains final-1 unless A‴ displays at least A′, per Claude's reported user rule; this is a competitive selection rule, not a generalization claim.
 
 At 21:55 UTC, Claude reports r3 push refused by Kaggle's two-session GPU cap and a local one-shot queue behind the two running solo rehearsals. Its queue identity/recovery details are requested in the shared handoff. Parent started no queue, launch or collector. Prepared r3 identities and original r2 failures above remain unchanged. See the [shared launch/decision log](../claude-astra-handoff.md) for owner provenance.
+
+
+## R3 real result: projection-only condition met — Oct 17, 01:45 TRT / Oct 16, 22:45 UTC
+
+Claude collected the 68-file terminal result once under outputs/kaggle/nafull-aprime-rehearsal-r3-20261016-result/nafull-aprime/. Official latest endpoint ERROR at 22:40; owner reports version 1 pushed 22:05:08. Both failure diagnostics name COMBINED_PROJECTION_AND_ACTUAL_LIMIT. Top receipt SHA256 **97c8a8adbc1c62bc31003348c2dc8433325c1dddd3a088ed3a8fb1289acaccbc** remains FAIL and byte-preserved.
+
+Parent reproduces that original failure, then isolates only its projection component in memory for the conditional-waiver audit. Every remaining original contract passes: sealed r3 binding, full base/six workers, actual two-board state/reload/sentinels/resources, all four genuine measured timing inputs, 39 genuine studies per arm, unchanged R7/R224 all-39 input/probability parity, complete-population recovery/ranks and exact visible CSV. No failed gate or saved receipt is rewritten.
+
+Actual elapsed **1778.398682128 s <9 h**. Exact saved/replayed projection **29943.477036176795 s =8.317632510 h**, **63.477036177 s above** ordinary 8.3 h. Ordinary qualification remains FAIL. This meets Claude's reported direct-user “Waive if only the estimate fails” condition for a separately named, exact-receipt-bound A‴ probe admission. No waiver artifact or entry has yet been built; Claude owns that implementation and returns code/negative checks/packet for parent acceptance. Preserve every other gate and all r1/r2/r3 failure provenance; no prior waiver transfers.
+
+[Independent r3 acceptance](../../outputs/analysis/na-full-aprime-rehearsal-20261016/r3-real/failure-acceptance.json), [read-only replay](../../outputs/analysis/na-full-aprime-rehearsal-20261016/r3-real/audit_failure.py).
