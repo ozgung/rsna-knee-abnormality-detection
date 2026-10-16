@@ -1,6 +1,20 @@
 # S6 paired read-out acceptance
 
-Updated October 16, 2026, 01:48 UTC. **Sanity/input/reporting patches and owner-collected run receipts pass targeted acceptance.** Claude owns the live S6 fits, source commits and deployment. No J0/V2 metric or validation gain is established.
+Updated October 16, 2026, 04:44 UTC. **Real stride-3 exports pass targeted artifact acceptance; registered J0 sanity fails, so promotion remains blocked.** Claude owns source commits, VM execution, post-fit evaluation and collection. Final stride-1/raw-image endpoints and final checkpoint hashes are still pending.
+
+Both supplied exports report seed42/fold0, 16 epochs, 27,792 optimizer steps and about21,609 seconds per arm. Parent replay with unchanged evaluator3a634638 and all2000 bootstrap draws exactly matches the owner readout. The separate audit verifies canonical target order, unique4345 pool/58 gold/870 holdout identities against preflight hashes, finite shapes, zero placeholders outside evaluated fold0, source CSV hashes and direct per-target gold AUCs. All12 gold targets are defined; support/class counts and macro policy are in the hash-bound aggregate receipt. [Artifact audit](../../outputs/analysis/s6v2-acceptance-20261015/stride3-readout-20261016/acceptance.json), [replayed readout](../../outputs/analysis/s6v2-acceptance-20261015/stride3-readout-20261016/replayed-readout.json), [audit script](../../outputs/analysis/s6v2-acceptance-20261015/stride3-readout-20261016/audit.py).
+
+| Stride-3 development endpoint | J0 | V2 | V2 minus J0 |
+| --- | ---: | ---: | ---: |
+| Selection-exposed gold58 macro | 0.922913 | 0.928375 | +0.005461 |
+| Fold0, J0 target reference | 0.893171 | 0.901298 | +0.008128 |
+| Fold0, public blend reference | 0.907354 | 0.915915 | +0.008561 |
+
+Gold paired-study bootstrap95% interval is[-0.007940,0.018987], with2000 valid draws and none skipped. This exposed-development interval does not establish independent generalization. Largest gold regressions are lateral meniscus(-0.047205) and PF OA(-0.039897); largest gains are fracture(+0.052778) and synovitis(+0.051374), with small per-target samples.
+
+Raw delta thresholds are met, but **BLOCKED_DEBUG_J0_SANITY** is the registered verdict: J0's primary report reference0.893171 lies below0.897. The public blend reference0.907354 is numerically near the published0.907; this suggests reference comparability deserves investigation, not retrospective substitution of that reference or relaxation of the gate. Preserve original verdict, then evaluate final stride1 outputs and document any subsequent diagnostic separately. No promotion, kill, training restart or competitive probe follows this diagnostic alone. Gold remains selection-exposed and report references teacher-lineage-exposed; these are partial fold0 predictions, not full OOF. Supplied metadata does not independently bind final checkpoint bytes or prove live process state.
+
+The remaining paragraphs preserve earlier preparation and failure history; the accepted/applied source and run receipt state above supersedes their pending wording.
 
 Owner evaluator **3a634638…** is byte-identical to the tested reporting patch; prior synthetic checks are reused. Both supplied actual trainer configs differ only in target/output paths. Both membership receipts match accepted preflight hashes and counts: 3475 train, 870 holdout, 58 gold, seed 42, fold 0, all_data false, no train-gold overlap. Package pins match torch 2.8.0+cu128, torchvision 0.23.0+cu128, timm 1.0.20, NumPy 2.0.2, pydicom 3.0.1 and OpenCV-headless 4.12.0.88; code verification reports all 293 pinned members matching. [Parent reconciliation and artifact hashes](../../outputs/analysis/s6v2-acceptance-20261015/run-receipt-acceptance-20261016.json). These are supplied run artifacts, not independent VM process inspection or a completed-model evaluation. The owner also reports the draft's exposure claim corrected. Earlier pending statements below preserve preparation history.
 
