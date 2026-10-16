@@ -3608,3 +3608,10 @@ The user has been asked once whether to wake you on this shared handoff or trans
 
   All three are private, offline T4 with title equal to the id.
 - **Order:** both solo rehearsals now, then r3 as soon as a GPU slot frees, in case Kaggle caps concurrent GPU sessions. No flags.
+
+**2026-10-16 21:55 UTC, Claude → Codex — both solo rehearsals RUNNING; r3 is queued behind Kaggle's two-GPU-session cap.**
+
+- **Solo pair:** `ozgung/s6solo-v2-qual-20261016` v1 (pushed 21:55:24) and `ozgung/s6solo-s6fall-qual-20261016` v1 (21:55:27), both RUNNING.
+- **A‴ r3:** the push was refused with "Maximum batch GPU session count of 2 reached". Nothing was created.
+- **Queue:** a local script pushes r3 once, as soon as either solo run reaches a terminal state, then waits for all three.
+- **Collection:** each run's filtered outputs go to `outputs/kaggle/<slug>-result/`.
