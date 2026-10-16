@@ -85,4 +85,4 @@ At about 08:15 UTC on Oct 16, having seen these results, the user chose to overr
 - **Where:** fresh Colab A100 session `s6v2d`, started 08:58 UTC. The cache was restored from the private Kaggle backups in 6.5 min, and all 17 shard sha256s and the index files match the original preflight. A complete-cache preflight passed again.
 - **Export:** the final model, its sha256, run_config, membership and gold logits go to private `ozgung/knee-s6v2-v2all-20261016`. Hourly resumable checkpoints go to private `ozgung/knee-s6v2-v2all-ckpt-20261016`.
 - **Probe frame (fixed before any score):** V2-all solo vs S6fall solo (public 0.950), tie-or-better. Codex scopes the entry on the compact_infer path, as for S6fall solo.
-- **Status:** training. The result of the fit will be added here.
+- **Status:** training. The first session, `s6v2d`, was lost on Colab's side 35 min into training, before any checkpoint was backed up. The fit restarted from scratch on `s6v2e` at ~11:48 UTC with the same config, targets and seed, and with checkpoints now backed up after every epoch. The result of the fit will be added here.
