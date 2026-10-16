@@ -6,6 +6,7 @@ cd /content
 S6V2_PREFLIGHT_DECODE=1 /content/py/bin/python -I /content/vm_preflight.py /content/targets/targets_V2_all.csv > /content/preflight_all.log 2>&1 \
   || { echo "PREFLIGHT_ALL FAIL"; exit 1; }
 cp /content/px/preflight.json /content/px/preflight_all.json
+mkdir -p /content/runs
 S6V2_ALL_DATA=1 S6V2_LOADER_WORKERS=8 bash /content/vm_train.sh V2 /content/targets/targets_V2_all.csv /content/runs/V2_all --only-folds 0 \
   > /content/runs/V2_all.log 2>&1
 [ -s /content/runs/V2_all/models/E_prior_s42_f0.pt ] || { echo "ALLDATA_FAIL no model"; exit 1; }

@@ -71,3 +71,18 @@ Artifacts (ignored): `outputs/s6v2/vmout/` (preflight, readouts, predictions, ru
 - V2's teacher (own CoAtNet-224 OOF) was trained on our grouped folds, not folds_v0, so V2's training targets for folds 1–4 carry information from teacher models that saw fold-0 studies' report labels. This can favour V2 on the fold-0 OOF (secondary); gold-58 is clean.
 - nartaa's fold-0 OOF 0.907 reference definition is unknown; ours is scored against J0 targets ≥ 0.5 (report-derived) and labels_v1_blend ≥ 0.5.
 - A gold-58 gain is not proven to be a leaderboard gain.
+
+## Post-hoc user override (decided after the results were seen)
+
+The strict verdict above stands as written: **BLOCKED**. Rule 1's fold-0 OOF band failed under the pre-coded reference, so rule 2 did not promote V2.
+
+At about 08:15 UTC on Oct 16, having seen these results, the user chose to override the block and launch the V2 all-data fit. The decision is recorded as post-hoc in `docs/claude-astra-handoff.md` (014de1d). It is not a pre-registered promotion.
+
+- **Fit:** nartaa's all-data config (16 epochs, every pool study, no OOF prediction), seed 42, V2 targets (`targets_V2_all.csv`).
+  - Its bytes are identical to `targets_V2_f0.csv` (sha256 `e2283884…`), because the prior fill touches no cells.
+  - Trainer `compact_train_s6v2.py` `12e430a3…` with `S6V2_ALL_DATA=1`; launcher `vm_alldata.sh`.
+  - Membership receipt: train 4,345 (`dbd83070…`, the same pool as the fold-0 pair), holdout 0, gold 58 kept out.
+- **Where:** fresh Colab A100 session `s6v2d`, started 08:58 UTC. The cache was restored from the private Kaggle backups in 6.5 min, and all 17 shard sha256s and the index files match the original preflight. A complete-cache preflight passed again.
+- **Export:** the final model, its sha256, run_config, membership and gold logits go to private `ozgung/knee-s6v2-v2all-20261016`. Hourly resumable checkpoints go to private `ozgung/knee-s6v2-v2all-ckpt-20261016`.
+- **Probe frame (fixed before any score):** V2-all solo vs S6fall solo (public 0.950), tie-or-better. Codex scopes the entry on the compact_infer path, as for S6fall solo.
+- **Status:** training. The result of the fit will be added here.
