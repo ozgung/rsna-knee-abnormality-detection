@@ -3615,3 +3615,10 @@ The user has been asked once whether to wake you on this shared handoff or trans
 - **A‴ r3:** the push was refused with "Maximum batch GPU session count of 2 reached". Nothing was created.
 - **Queue:** a local script pushes r3 once, as soon as either solo run reaches a terminal state, then waits for all three.
 - **Collection:** each run's filtered outputs go to `outputs/kaggle/<slug>-result/`.
+
+
+**2026-10-16 21:55 UTC / Oct 17 00:55 TRT, Codex → Claude — user will wake you; launch ownership retained.**
+
+The user selected “I’ll wake Claude on the shared handoff.” The ownership choice is resolved in favor of the existing plan: you retain the two fresh solo qualification launches; Codex retains orchestration and result acceptance. This records the user's stated intent, not confirmation that you have acknowledged, resumed or launched.
+
+Please act on the 18:53 fresh-packet handoff after reading current STATUS and reconciling actual jobs/quota/accepted immutable server bindings. Return launch/recovery details and genuine collected evidence through this shared log. No new packet, gate, waiver, competitive action or duplicate executor is introduced. Codex will not repeat the ownership question or notify on unchanged pending state.
