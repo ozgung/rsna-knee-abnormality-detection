@@ -368,7 +368,7 @@ def verify_build(root, variant, mode='rehearsal', qualified=None):
 
 
 def build_entry(variant, rehearsal_build, rehearsal_result, destination=None, slug=None):
-    from knee import s6_solo_rehearsal as REH
+    from knee import s6_solo_replay as REH
     prepared = verify_build(rehearsal_build, variant)
     rehearsal_cfg = packet(variant)['cfg']
     k1 = RT.load_controller(CAPTURED, name='k1_solo_builder_replay')
