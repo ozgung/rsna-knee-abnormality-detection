@@ -58,6 +58,12 @@ def _tensor_fingerprint(value):
     return _fingerprint({'input': value})
 
 
+def _grid_names():
+    return frozenset('backbone.stages.%d.blocks.%d.attn.rel_pos.%s' % (stage, block, kind)
+                     for stage, count in ((2, 14), (3, 2)) for block in range(count)
+                     for kind in ('relative_position_index', 'rel_coords_log'))
+
+
 def _max_abs(a, b):
     import numpy as np
     if hasattr(a, 'detach'): a = a.detach().cpu().numpy()
@@ -69,6 +75,7 @@ def _install_model_observer(module, output_path):
     """Wrap only A's loader/forward boundary; production inference still calls the original functions."""
     original_load, original_infer = module.load_model, module.infer_pair_probs
     records, loaded = {}, {}
+    final_models = {}
     source = Path(module.__file__).read_bytes()
     source_ok = hashlib.sha256(source).hexdigest() == A_SOURCE_SHA256 and b'model.load_state_dict(ck["model"], strict=True)' in source
     if not source_ok:
@@ -82,22 +89,24 @@ def _install_model_observer(module, output_path):
                        'constructor_sha256': _constructor_fingerprint(model),
                        'state_sha256': _fingerprint(model.state_dict()),
                        'buffers_sha256': _fingerprint(dict(model.named_buffers())),
+                       'grid_sha256': _fingerprint({n: b for n, b in model.named_buffers() if n in _grid_names()}),
+                       'strict_loaded_before': True,
                        'device': key, 'used': False}
         return model, actual_res
 
     def observed_infer(model, plain, mirrored, device):
         key = str(device)
         entry = loaded.get(key)
+        before = _fingerprint(model.state_dict()) if entry is not None and not entry['used'] and entry['model'] is model else None
+        buffers_before = _fingerprint(dict(model.named_buffers())) if before is not None else None
+        grid_before = _fingerprint({n: b for n, b in model.named_buffers() if n in _grid_names()}) if before is not None else None
+        input_sha = hashlib.sha256((_tensor_fingerprint(plain) + _tensor_fingerprint(mirrored)).encode()).hexdigest() if before is not None else None
         # Keep normal predictions byte-for-byte on the original path. The one-time qualification
         # reload/sentinel is deliberately outside the returned production arithmetic.
-        started = time.time()
         out = original_infer(model, plain, mirrored, device)
         overhead = 0.0
-        if entry is not None and not entry['used'] and entry['model'] is model:
+        if before is not None:
             entry['used'] = True
-            before = _fingerprint(model.state_dict())
-            buffers_before = _fingerprint(dict(model.named_buffers()))
-            input_sha = hashlib.sha256((_tensor_fingerprint(plain) + _tensor_fingerprint(mirrored)).encode()).hexdigest()
             reload_t0 = time.time()
             import torch
             dev = torch.device(device)
@@ -115,15 +124,17 @@ def _install_model_observer(module, output_path):
                       'constructor_source_sha256': A_SOURCE_SHA256,
                       'buffers_before_sha256': buffers_before, 'buffers_after_sha256': _fingerprint(dict(model.named_buffers())),
                       'state_before_sha256': before, 'state_after_sha256': _fingerprint(model.state_dict()),
+                      'grid_before_sha256': grid_before, 'grid_after_sha256': _fingerprint({n: b for n, b in model.named_buffers() if n in _grid_names()}),
                       'reload_state_sha256': reloaded_state, 'reload_constructor_sha256': reloaded_constructor,
                       'reload_buffers_sha256': reloaded_buffers, 'input_sha256': input_sha,
                       'reload_input_sha256': sentinel_input_sha,
+                      'strict_loaded_before': entry['strict_loaded_before'],
                       'strict_reload': True, 'sentinel_same_input': True, 'sentinel_max_abs': max_abs,
                       'state_unchanged_from_load': before == entry['state_sha256'],
                       'buffers_unchanged_from_load': buffers_before == entry['buffers_sha256'],
                       'qualification_overhead_seconds': round(overhead, 4)}
             records[key] = record
-            write_receipt()
+            final_models[key] = model
             del fresh
         return out
 
@@ -131,6 +142,17 @@ def _install_model_observer(module, output_path):
     module.infer_pair_probs = observed_infer
 
     def write_receipt():
+        if not records or set(records) != set(final_models):
+            return
+        for key, model in final_models.items():
+            record = records[key]
+            record['state_after_sha256'] = _fingerprint(model.state_dict())
+            record['buffers_after_sha256'] = _fingerprint(dict(model.named_buffers()))
+            grid = {n: b for n, b in model.named_buffers() if n in _grid_names()}
+            record['grid_after_sha256'] = _fingerprint(grid)
+            record['state_unchanged_from_load'] = record['state_before_sha256'] == record['state_after_sha256']
+            record['buffers_unchanged_from_load'] = record['buffers_before_sha256'] == record['buffers_after_sha256']
+            record['grid_unchanged_from_load'] = record['grid_before_sha256'] == record['grid_after_sha256']
         # Index mapping is explicit and physical UUIDs come from the host inventory.
         import subprocess
         proc = subprocess.run(['nvidia-smi', '--query-gpu=index,uuid', '--format=csv,noheader'],
@@ -150,9 +172,12 @@ def _install_model_observer(module, output_path):
                             if k not in ('qualification_overhead_seconds',)},
                            'qualification_overhead_seconds': record['qualification_overhead_seconds']})
         result = {'source': 'runtime_observer', 'component_a_source_sha256': A_SOURCE_SHA256,
-                  'boards': boards, 'overhead_seconds': sum(x['qualification_overhead_seconds'] for x in boards)}
+                  'boards': boards, 'overhead_seconds': sum(x['qualification_overhead_seconds'] for x in boards),
+                  'overhead_scope': 'reload_and_same_input_sentinel_only; other observer work remains in wall stages'}
         path = Path(output_path); path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(result, sort_keys=True, indent=1) + '\n')
+        tmp = path.with_suffix(path.suffix + '.tmp')
+        tmp.write_text(json.dumps(result, sort_keys=True, indent=1) + '\n')
+        os.replace(tmp, path)
     return write_receipt
 
 
@@ -173,10 +198,9 @@ def run(run_py, test_root, expected_sha256=A_SOURCE_SHA256, module=MODULE, outpu
     write_observation = (_install_model_observer(m, output_path)
                         if expected_sha256 == A_SOURCE_SHA256 else (lambda: None))
     print('S6SOLO_A_RUNNER exact A %s... with the rehearsal fixture as its test root' % expected_sha256[:12], flush=True)
-    try:
-        return m.main()
-    finally:
-        write_observation()
+    result = m.main()
+    write_observation()
+    return result
 
 
 if __name__ == '__main__':

@@ -121,8 +121,11 @@ def prepare(cfg, project):
 def install(k1, cfg, state):
     require(cfg.get('mode') == 'rehearsal' and os.environ.get('K1_KAGGLE_ROOT') == state['fixture']['root']
             and str(k1.KROOT) == state['fixture']['root'], 'REHEARSAL_HOOKS_ON_FIXTURE_ONLY')
+    k1._s6_expected_models = _expected_model_qualification(cfg)
     runner, comp = state['runner'], state['fixture']['comp']
     k1.a_cmd = lambda adir: [sys.executable, '-u', runner, str(Path(adir) / 'run.py'), comp]
+    original_a_done = k1.a_done
+    k1.a_done = lambda adir: original_a_done(adir) and (Path(adir) / 'model-qualification.json').is_file()
     run_b = k1.run_b
 
     def run_b_with_pixel_hashes(I, tag, ids, split, budget_s, px=False):
@@ -148,6 +151,7 @@ def install(k1, cfg, state):
         env = original_b_env(gi, px)
         env = dict(env)
         env['S6SOLO_MODE'] = 'rehearsal'
+        env['S6SOLO_B_CHECKPOINT_SHA256'] = cfg['arm']['b_model']['sha256']
         env['S6SOLO_MODEL_RECEIPT'] = str(Path(px).parent / 'model-qualification.json')
         env['PYTHONPATH'] = str(hook_dir) + os.pathsep + str(project) + os.pathsep + env.get('PYTHONPATH', '')
         return env
@@ -170,9 +174,14 @@ def install(k1, cfg, state):
                     records.extend(json.loads(p.read_text()).get('boards', []))
             receipts = [Path(k1.OUT) / 'B' / ('part%d' % gi) / 'model-qualification.json' for gi in range(2)]
             if all(p.is_file() for p in receipts):
-                overhead = sum(float(json.loads(p.read_text()).get('overhead_seconds', 0)) for p in receipts)
+                part_receipts = [json.loads(p.read_text()) for p in receipts]
+                overhead = sum(float(r.get('overhead_seconds', 0)) for r in part_receipts)
+                inference_hashes = [r.get('inference_source_sha256') for r in part_receipts]
+                inference_sha = inference_hashes[0] if inference_hashes[0] == inference_hashes[1] else None
                 save(Path(k1.OUT) / 'B' / 'model-qualification.json',
-                     {'source': 'runtime_observer', 'boards': records, 'overhead_seconds': overhead})
+                     {'source': 'runtime_observer', 'boards': records, 'overhead_seconds': overhead,
+                      'overhead_scope': 'reload_and_same_input_sentinel_only; other observer work remains in wall stages',
+                      'inference_source_sha256': inference_sha})
         return result
     k1.run_b = run_b_with_qualification
     state['controller_t0'] = k1.T0
@@ -305,6 +314,16 @@ def _valid_model_receipt(model_receipt, expected_boards, expected_models):
     """Require observed per-board model identity, unchanged state and strict reload sentinel."""
     if not isinstance(model_receipt, dict) or model_receipt.get('source') != 'runtime_observer':
         return False
+    for component in ('a', 'b'):
+        expected = expected_models.get(component, {})
+        required = ('checkpoint_sha256', 'state_sha256', 'buffers_sha256', 'constructor_source_sha256')
+        if any(not isinstance(expected.get(k), str) or len(expected[k]) != 64 for k in required):
+            return False
+    if (not isinstance(expected_models['b'].get('inference_source_sha256'), str)
+            or len(expected_models['b']['inference_source_sha256']) != 64
+            or not isinstance(expected_models['a'].get('component_source_sha256'), str)
+            or len(expected_models['a']['component_source_sha256']) != 64):
+        return False
     records = model_receipt.get('boards')
     if not isinstance(records, list) or len(records) != 2:
         return False
@@ -332,13 +351,17 @@ def _valid_model_receipt(model_receipt, expected_boards, expected_models):
                     or m.get('buffers_before_sha256') != m.get('reload_buffers_sha256')
                     or m.get('input_sha256') != m.get('reload_input_sha256')
                     or m.get('strict_reload') is not True
+                    or m.get('strict_loaded_before') is not True
                     or m.get('sentinel_same_input') is not True
                     or m.get('sentinel_max_abs') != 0.0
                     or m.get('state_unchanged_from_load') is not True
                     or m.get('buffers_unchanged_from_load') is not True
+                    or (expected.get('grid_sha256') is not None and m.get('grid_unchanged_from_load') is not True)
                     or m.get('checkpoint_sha256') != expected_sha
                     or m.get('state_before_sha256') != expected.get('state_sha256')
                     or m.get('buffers_before_sha256') != expected.get('buffers_sha256')
+                    or (expected.get('grid_sha256') is not None and m.get('grid_before_sha256') != expected['grid_sha256'])
+                    or (expected.get('grid_sha256') is not None and m.get('grid_after_sha256') != expected['grid_sha256'])
                     or m.get('constructor_source_sha256') != expected.get('constructor_source_sha256')
                     or (expected.get('constructor_spec') is not None
                         and m.get('constructor_spec') != expected['constructor_spec'])
@@ -352,16 +375,40 @@ def _collect_model_qualification(k1_dir):
     a_path, b_path = Path(k1_dir) / 'A' / 'model-qualification.json', Path(k1_dir) / 'B' / 'model-qualification.json'
     try:
         a, b = json.loads(a_path.read_text()), json.loads(b_path.read_text())
-        amap = {r['gpu_uuid']: r['a'] for r in a['boards']}
-        bmap = {r['gpu_uuid']: r['b'] for r in b['boards']}
-        boards = [{'gpu_uuid': uid, 'a': amap[uid], 'b': bmap[uid]} for uid in sorted(set(amap) & set(bmap))]
+        ar, br = a['boards'], b['boards']
+        if (len(ar) != 2 or len(br) != 2 or any(not isinstance(r.get('gpu_uuid'), str) or not r.get('a') for r in ar)
+                or any(not isinstance(r.get('gpu_uuid'), str) or not r.get('b') for r in br)):
+            return None
+        amap = {r['gpu_uuid']: r['a'] for r in ar}
+        bmap = {r['gpu_uuid']: r['b'] for r in br}
+        if len(amap) != 2 or len(bmap) != 2 or set(amap) != set(bmap):
+            return None
+        boards = [{'gpu_uuid': uid, 'a': amap[uid], 'b': bmap[uid]} for uid in sorted(amap)]
         return {'source': 'runtime_observer' if a.get('source') == b.get('source') == 'runtime_observer' else 'invalid',
                 'boards': boards, 'overhead_seconds': float(a['overhead_seconds']) + float(b['overhead_seconds']),
+                'overhead_scope': 'reload_and_same_input_sentinel_only; other observer work remains in wall stages',
                 'component_a_source_sha256': a.get('component_a_source_sha256'),
                 'inference_source_sha256': b.get('inference_source_sha256'),
                 'a_receipt_sha256': file_sha(a_path), 'b_receipt_sha256': file_sha(b_path)}
     except (OSError, KeyError, TypeError, ValueError):
         return None
+
+
+def _expected_model_qualification(cfg):
+    model_sources = cfg['common'].get('model_sources', {})
+    b_cpu = cfg['arm'].get('cpu', {})
+    a_weight = cfg['common'].get('a_weight', {})
+    return {'a': {'checkpoint_sha256': a_weight.get('sha256'),
+                  'state_sha256': '1d8594d77f7dd592bd1ef1b2090d74eb8ea09580fe689f78dbab273c8ae8a219',
+                  'buffers_sha256': 'ecc59528d4a2a8b357169948626a542109a34473449003d3fa51bad9717739ca',
+                  'grid_sha256': 'ce369a0e8f83c9eff93053fc9053e9dd3f958a72ceeeb328f2416bdc23179523',
+                  'constructor_source_sha256': cfg['common'].get('embedded_a_sha256'),
+                  'component_source_sha256': cfg['common'].get('embedded_a_sha256'), 'buffer_inventory': None},
+            'b': {'checkpoint_sha256': cfg['arm']['b_model']['sha256'], 'state_sha256': b_cpu.get('state_sha256'),
+                  'buffers_sha256': b_cpu.get('constructor_buffers_sha256'),
+                  'constructor_source_sha256': model_sources.get('compact_train.py', {}).get('sha256'),
+                  'inference_source_sha256': model_sources.get('compact_infer.py', {}).get('sha256'),
+                  'constructor_spec': b_cpu.get('constructor'), 'buffer_inventory': b_cpu.get('buffer_inventory')}}
 
 
 def assemble(k1, cfg, k1_dir, final_csv, timing, sentinel_run, resources):
@@ -378,23 +425,8 @@ def assemble(k1, cfg, k1_dir, final_csv, timing, sentinel_run, resources):
     boards = resources.get('boards', [])
     checks['two_physical_t4'] = (env.get('n_gpu') == 2 and env.get('gpus') == ['Tesla T4', 'Tesla T4'] and len(boards) == 2
                                  and len({b['uuid'] for b in boards}) == 2 and all(b['name'] == 'Tesla T4' for b in boards))
-    code_files = cfg['common'].get('code_mount', {}).get('files', {})
-    b_cpu = cfg['arm'].get('cpu', {})
-    a_weight = cfg['common'].get('a_weight', {})
     checks['qualified_model_state_and_reload'] = _valid_model_receipt(
-        model_qualification, boards,
-        {'a': {'checkpoint_sha256': a_weight.get('sha256'),
-               'state_sha256': '1d8594d77f7dd592bd1ef1b2090d74eb8ea09580fe689f78dbab273c8ae8a219',
-               'buffers_sha256': 'ecc59528d4a2a8b357169948626a542109a34473449003d3fa51bad9717739ca',
-               'constructor_source_sha256': cfg['common'].get('embedded_a_sha256'),
-               'component_source_sha256': cfg['common'].get('embedded_a_sha256'),
-               'buffer_inventory': None},
-         'b': {'checkpoint_sha256': cfg['arm']['b_model']['sha256'],
-               'state_sha256': b_cpu.get('state_sha256'),
-               'constructor_source_sha256': code_files.get('compact_train.py', {}).get('sha256'),
-               'inference_source_sha256': code_files.get('compact_infer.py', {}).get('sha256'),
-               'constructor_spec': b_cpu.get('constructor'),
-               'buffer_inventory': b_cpu.get('buffer_inventory')}})
+        model_qualification, boards, _expected_model_qualification(cfg))
     checks['bound_variant'] = (kr.get('solo', {}).get('binding_sha256') == binding_digest(cfg)
                                and kr['inputs']['model']['sha256'] == cfg['arm']['b_model']['sha256']
                                and kr.get('solo_stage', {}).get('alias_sha256') == cfg['arm']['b_model']['sha256'])

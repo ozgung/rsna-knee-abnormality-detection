@@ -48,7 +48,10 @@ def _gpu_uuid():
     try:
         rows = subprocess.run(['nvidia-smi', '--query-gpu=index,uuid', '--format=csv,noheader'],
                               capture_output=True, text=True, timeout=20).stdout.splitlines()
-        index = int(os.environ.get('CUDA_VISIBLE_DEVICES', '0').split(',')[0])
+        visible = os.environ.get('CUDA_VISIBLE_DEVICES', '0').split(',')[0].strip()
+        if visible.startswith('GPU-'):
+            return visible
+        index = int(visible)
         for row in rows:
             i, uuid = [x.strip() for x in row.split(',', 1)]
             if int(i) == index:
@@ -88,6 +91,7 @@ def _patch(ct):
     original_torch_load = torch.load
     latest = {'checkpoint_sha256': None, 'state': None}
     records = []
+    models = []
 
     def observed_torch_load(path, *args, **kwargs):
         result = original_torch_load(path, *args, **kwargs)
@@ -109,7 +113,7 @@ def _patch(ct):
             bound.apply_defaults()
             self._s6_constructor_spec = {k: v for k, v in bound.arguments.items() if k != 'self'}
             self._s6_checkpoint_sha = latest['checkpoint_sha256']
-            self._s6_constructor_sha = _constructor(self)
+            self._s6_constructor_sha = None
             self._s6_constructor_source_sha = hashlib.sha256(Path(ct.__file__).read_bytes()).hexdigest()
             self._s6_loaded = False
             self._s6_state = latest['state']
@@ -117,6 +121,7 @@ def _patch(ct):
         def load_state_dict(self, state_dict, strict=True, *args, **kwargs):
             out = super().load_state_dict(state_dict, strict=strict, *args, **kwargs)
             self._s6_loaded = bool(strict is True)
+            self._s6_checkpoint_sha, self._s6_state = latest['checkpoint_sha256'], state_dict
             self._s6_state_sha = _hash_state(self.state_dict())
             self._s6_buffers_sha = _hash_state(dict(self.named_buffers()))
             return out
@@ -124,6 +129,7 @@ def _patch(ct):
         def load_deploy_state_dict(self, state_dict, *args, **kwargs):
             out = super().load_deploy_state_dict(state_dict, *args, **kwargs)
             self._s6_loaded = True
+            self._s6_checkpoint_sha, self._s6_state = latest['checkpoint_sha256'], state_dict
             self._s6_state_sha = _hash_state(self.state_dict())
             self._s6_buffers_sha = _hash_state(dict(self.named_buffers()))
             return out
@@ -131,6 +137,10 @@ def _patch(ct):
         def forward(self, *args, **kwargs):
             before = _hash_state(self.state_dict()) if not getattr(self, '_s6_observed', False) else None
             buffers_before = _hash_state(dict(self.named_buffers())) if before else None
+            input_before = _hash_state({'args': {'arg%d' % i: v for i, v in enumerate(args)}, 'kwargs': kwargs}) if before else None
+            if before is not None:
+                self._s6_constructor_sha = _constructor(self)
+                models.append(self)
             t0 = time.time()
             out = super().forward(*args, **kwargs)
             if before is not None:
@@ -149,7 +159,7 @@ def _patch(ct):
                         sentinel_input = _hash_state({'args': {'arg%d' % i: v for i, v in enumerate(args)}, 'kwargs': kwargs})
                         sentinel = fresh(*args, **kwargs)
                 max_abs = float((out.detach().float() - sentinel.detach().float()).abs().max().cpu())
-                input_h = _hash_state({'args': {'arg%d' % i: v for i, v in enumerate(args)}, 'kwargs': kwargs})
+                input_h = input_before
                 state_after = _hash_state(self.state_dict())
                 buffers_after = _hash_state(dict(self.named_buffers()))
                 records.append({'checkpoint_sha256': self._s6_checkpoint_sha,
@@ -163,6 +173,7 @@ def _patch(ct):
                                 'reload_state_sha256': fresh_state, 'reload_constructor_sha256': fresh_constructor,
                                 'reload_buffers_sha256': fresh_buffers, 'input_sha256': input_h,
                                 'reload_input_sha256': sentinel_input,
+                                'strict_loaded_before': bool(self._s6_loaded),
                                 'strict_reload': bool(self._s6_loaded and getattr(reload_result, 'missing_keys', []) == []
                                                       and getattr(reload_result, 'unexpected_keys', []) == []),
                                 'sentinel_same_input': input_h == sentinel_input,
@@ -183,15 +194,24 @@ def _patch(ct):
 
     def save_receipt():
         # One B model is expected in this pair; multiple model loads are rejected by admission.
-        record = records[0] if len(records) == 1 else None
+        for model, record in zip(models, records):
+            record['state_after_sha256'] = _hash_state(model.state_dict())
+            record['buffers_after_sha256'] = _hash_state(dict(model.named_buffers()))
+            record['state_unchanged_from_load'] = record['state_before_sha256'] == record['state_after_sha256']
+            record['buffers_unchanged_from_load'] = record['buffers_before_sha256'] == record['buffers_after_sha256']
+        record = records[0] if len(records) == 1 and len(models) == 1 else None
         boards = [{'gpu_uuid': _gpu_uuid(), 'b': record}] if record is not None else []
-        main_path = Path(__import__('sys').modules['__main__'].__file__)
-        inference_sha = hashlib.sha256(main_path.read_bytes()).hexdigest()
+        ci = __import__('sys').modules.get('compact_infer')
+        inference_path = Path(ci.__file__) if ci is not None and getattr(ci, '__file__', None) else None
+        inference_sha = hashlib.sha256(inference_path.read_bytes()).hexdigest() if inference_path and inference_path.is_file() else None
         result = {'source': 'runtime_observer', 'inference_source_sha256': inference_sha, 'boards': boards,
                   'overhead_seconds': sum(r['qualification_overhead_seconds'] for r in records),
+                  'overhead_scope': 'reload_and_same_input_sentinel_only; other observer work remains in wall stages',
                   'observed_model_count': len(records)}
         p = Path(receipt_path); p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps(result, sort_keys=True, indent=1) + '\n')
+        tmp = p.with_suffix(p.suffix + '.tmp')
+        tmp.write_text(json.dumps(result, sort_keys=True, indent=1) + '\n')
+        os.replace(tmp, p)
 
     import atexit
     atexit.register(save_receipt)
@@ -199,6 +219,10 @@ def _patch(ct):
 
 def install():
     if os.environ.get('S6SOLO_MODE') != 'rehearsal':
+        return
+    import sys
+    import multiprocessing
+    if Path(sys.argv[0]).name != 'k1_b_infer.py' or multiprocessing.current_process().name != 'MainProcess':
         return
     if not any(isinstance(x, _CompactTrainFinder) for x in __import__('sys').meta_path):
         __import__('sys').meta_path.insert(0, _CompactTrainFinder())

@@ -51,6 +51,8 @@ CODE_DATASET, CODE_VERSION, CODE_MOUNT = 'nartaa/rsna-knee-s6fall-weights', 3, '
 CODE_FILES = {'code_manifest.json': {'sha256': 'b66c574b5c0c13ccaa49d1219d41a8781431166186ef83e78cab6a9ba6b02d22', 'bytes': 52962},
               's6_extras.bin': {'sha256': 'ddc428d9f2cda0e1378b6731ca7efbdd0397978204763f2a2f81169979e50c8e', 'bytes': 256011},
               'checkpoint-manifest.json': {'sha256': 'ed3c6d8d2e69ae08c4a97eab3c860a9ec20c5c69484e35de6a3119d396d731cd', 'bytes': 1128}}
+MODEL_SOURCE_FILES = {'compact_train.py': {'sha256': '14767c7a8f0daa986477511fe9a83aefe032a208ae978fabf15a5f896992ac80'},
+                      'compact_infer.py': {'sha256': '34f433fe72b732543813165c3397ec80cef01b0d49b25b7b22668714f0b0ef4a'}}
 A_WEIGHT = {'dataset': 'nartaa/rsna-knee-publication-swa-weights-20261007', 'file': 'raptor_ft_alldata_t16_blendjev_oai_d96_r384_swa.pt',
             'sha256': '7e5315dad125b99fc65b340b3de41de628e9be51ff5835355dd61c86472244ef', 'bytes': 292840787}
 HELIOS = 'heliosli/rsna-orthofoundation-fold0-epoch7-20261004'
@@ -200,6 +202,7 @@ def common(captured_text):
     return {'version': VERSION, 'targets': PAIR.TARGETS, 'captured_source_sha256': RT.CAPTURED_SHA256,
             'embedded_a_sha256': RT.EMBEDDED_A_SHA256, 'contract': PAIR.COMMON,
             'code_mount': {'dataset': CODE_DATASET, 'version': CODE_VERSION, 'mount': CODE_MOUNT, 'files': CODE_FILES},
+            'model_sources': MODEL_SOURCE_FILES,
             'a_weight': A_WEIGHT, 'public_test_ids_count': len(captured_public_ids(captured_text))}
 
 
