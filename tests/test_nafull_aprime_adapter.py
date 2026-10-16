@@ -139,6 +139,55 @@ class NaFullAdapterTests(unittest.TestCase):
 
 
 class NaFullReaderIsolationTests(unittest.TestCase):
+    def test_projection_capture_reaches_cloned_run_and_restores_original(self):
+        """Execute the base orchestrator with synthetic workers and a WS2 hook."""
+        import time
+        from unittest.mock import patch
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest('optional numpy unavailable')
+        from knee import public_nafull_aprime_runtime as runtime
+        from knee import public_r7_recovery_entry as r7
+        base = runtime.make_base_facade({})
+        probes = ['synthetic-probe-' + str(i) for i in range(36)]
+        cfg = {'mode': 'rehearsal', 'binding': {}, 'nafull_base_binding': {}, 'probes': dict.fromkeys(probes, {}),
+               'probe_order': probes, 'development_windows': [400] * 870}
+        reports = [{'records': [{'production_seconds': 1., 'windows': 10}] * 20},
+                   {'records': [{'production_seconds': 1., 'windows': 10}] * 19}]
+        values = np.full((39, 12), .5)
+        missing = np.zeros(39, dtype=bool)
+        original = base.projection
+        captured = {}
+        def capture(project_cfg, phases, workers, setup, merge):
+            captured.update(base_setup_seconds=setup, base_merge_seconds=merge,
+                            development_windows=project_cfg['development_windows'])
+            return original(project_cfg, phases, workers, setup, merge)
+        # Stub only infrastructure in the actual execution globals, so the
+        # detached legacy facade reaches projection too and fails this test.
+        with tempfile.TemporaryDirectory() as folder, patch.dict(base.launch.__globals__,
+                test_contract=lambda *a, **k: (['StudyInstanceUID'] + A.LABELS,
+                                               ['synthetic-visible-' + str(i) for i in range(3)], {}),
+                read_series=lambda *a: dict.fromkeys(probes, []),
+                stage=lambda *a: {},
+                launch=lambda *a: (reports, {'wall_seconds': 30.}),
+                merge=lambda *a: (values, missing),
+                write_csv=lambda *a: 'synthetic-csv',
+                require_rehearsal=lambda *a: None), patch.object(base.subprocess,
+                    'check_output', return_value='0, synthetic-gpu0, Tesla T4\n1, synthetic-gpu1, Tesla T4'):
+            base.projection = capture
+            try:
+                receipt = base.run(Path(folder), cfg, Path(folder) / 'base', started=time.monotonic())
+            finally:
+                base.projection = original
+        self.assertEqual(receipt['status'], 'PASS')
+        self.assertEqual(set(captured), {'base_setup_seconds', 'base_merge_seconds', 'development_windows'})
+        self.assertEqual(captured['base_setup_seconds'], receipt['setup_seconds'])
+        self.assertEqual(captured['development_windows'], cfg['development_windows'])
+        self.assertGreaterEqual(captured['base_merge_seconds'], 0)
+        self.assertIs(base.projection, original)
+        self.assertIs(r7.projection, original)
+
     def test_old_worker_reader_is_isolated_and_restored_after_failure(self):
         import sys
         from unittest.mock import patch

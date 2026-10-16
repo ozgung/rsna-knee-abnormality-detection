@@ -185,7 +185,12 @@ continue""").body
 
 def make_base_facade(nafull_worker_cfg, *, rehearsal=False):
     """Return an R7-shaped module facade with the exact B0prime K62 old worker."""
-    ns = dict(vars(R7))
+    # WS2 temporarily replaces R7.projection to capture measured timing inputs.
+    # Cloned functions must see that replacement through the same live globals.
+    # SimpleNamespace(**ns) copies attributes and silently detaches the hook.
+    facade = types.ModuleType('knee.nafull_base_facade')
+    ns = facade.__dict__
+    ns.update(vars(R7))
     ns.update(VERSION=PROFILE.VERSION, ENTRY_MODULE='knee.public_nafull_aprime_entry',
         REHEARSAL_MODULE='knee.public_nafull_aprime_rehearsal',
         METHOD={**R7.METHOD, 'old': PROFILE.METHOD_OLD},
@@ -217,7 +222,7 @@ def make_base_facade(nafull_worker_cfg, *, rehearsal=False):
         return _archived_run(root, base_cfg, out, started=started)
 
     ns['run'] = run
-    return types.SimpleNamespace(**ns)
+    return facade
 
 
 def make_ws2_facade(base_facade):

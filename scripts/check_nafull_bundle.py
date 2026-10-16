@@ -37,8 +37,16 @@ manifest=cfg['nafull_worker_cfg']['public_manifest']
 runtime.nafull_profile_gate(None,manifest)  # Reproduces the real v1 missing-symbol failure.
 base=runtime.make_base_facade(cfg['nafull_worker_cfg'],rehearsal=True)
 runtime.make_ws2_facade(base)
+original_projection=base.projection
+projection_probe=object()
+try:
+    base.projection=projection_probe
+    assert base.launch.__globals__['projection'] is projection_probe,'LIVE_WS2_PROJECTION_CAPTURE_NAMESPACE'
+finally:
+    base.projection=original_projection
 result={'worker_entry_imports':modules,'all_imported_from_unpacked_project':True,
-        'nafull_profile_gate':True,'private_reference_symbols':False,'cpu_strict_load':False,'reader_checks':False}
+        'nafull_profile_gate':True,'projection_capture_namespace_live':True,
+        'private_reference_symbols':False,'cpu_strict_load':False,'reader_checks':False}
 with runtime.old_source_modules():
     from knee import reference,raptor_input
     from knee.reference import (RAPTOR_WEIGHT_DATASET,RAPTOR_WEIGHT_NAME,infer_checked,
