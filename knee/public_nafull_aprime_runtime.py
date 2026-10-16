@@ -58,7 +58,7 @@ NA_OLD_WORKER = _bind(B0P.old_worker, NA_WORKER_GLOBALS)
 def _nafull_rehearsal_checks(r, binding):
     """K62-only row/state checks, supplemental to the adapted R7 contract."""
     from knee.public_s6_recovery_b0 import RAPTOR62_COUNT_KEYS, GUARDED_PARTIAL_CASES
-    from knee import raptor_input as RI
+    from knee import public_nafull_raptor_input as RI
     import numpy as np
     workers = r.get('workers', {}).get('old', [])
     require(len(workers) == 2, 'NAFULL_TWO_BOARD_WORKERS')
@@ -259,12 +259,25 @@ def run_worker(config_path, *, rehearsal):
     facade = make_base_facade(cfg, rehearsal=rehearsal)
     if cfg.get('arm') == 'old':
         from knee.public_s6_recovery_b0_rehearsal import injection_hook
-        from knee.public_s6_recovery_runtime import require
         require(cfg['control_state_sha256'] == PROFILE.CHECKPOINT['state_sha256'], 'NAFULL_WORKER_STATE_BINDING')
         require(cfg['control_grid_sha256'] == cfg['binding']['qualified_state']['old_grid'], 'NAFULL_WORKER_GRID_BINDING')
         NA_WORKER_GLOBALS['DREAD_GRID_SHA256'] = cfg['control_grid_sha256']
         NA_WORKER_GLOBALS['rehearsal_hook'] = injection_hook if rehearsal else None
-        NA_OLD_WORKER(config_path)
+        # This process runs only the na-full old worker. Preserve the original
+        # pruned reader for R224/R7 in their separate processes and the parent.
+        import knee
+        import sys
+        from knee import public_nafull_raptor_input as full_reader
+        from knee import raptor_input as original_reader
+        original_module=sys.modules.get('knee.raptor_input')
+        knee.raptor_input=full_reader
+        sys.modules['knee.raptor_input']=full_reader
+        try:
+            NA_OLD_WORKER(config_path)
+        finally:
+            knee.raptor_input=original_reader
+            if original_module is None:sys.modules.pop('knee.raptor_input',None)
+            else:sys.modules['knee.raptor_input']=original_module
     else:
         facade.r7_worker(config_path)
 

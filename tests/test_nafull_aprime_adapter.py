@@ -136,5 +136,44 @@ class NaFullAdapterTests(unittest.TestCase):
         self.assertIs(archived_checker.__globals__['R7'], base)
 
 
+
+
+class NaFullReaderIsolationTests(unittest.TestCase):
+    def test_old_worker_reader_is_isolated_and_restored_after_failure(self):
+        import sys
+        from unittest.mock import patch
+        import knee
+        from knee import public_nafull_aprime_runtime as runtime
+        from knee import public_nafull_raptor_input as full_reader
+        from knee import raptor_input as shared_reader
+        cfg={'arm':'old','control_state_sha256':A.CHECKPOINT['state_sha256'],
+             'control_grid_sha256':A.CONSTRUCTOR_GRID_SHA256,
+             'binding':{'qualified_state':{'old_grid':A.CONSTRUCTOR_GRID_SHA256}}}
+        def worker(path):
+            from knee import raptor_input as active
+            self.assertIs(active,full_reader)
+            self.assertIs(sys.modules['knee.raptor_input'],full_reader)
+            raise RuntimeError('synthetic worker failure')
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'worker.json';path.write_text(json.dumps(cfg))
+            with patch.object(runtime,'NA_OLD_WORKER',side_effect=worker):
+                with self.assertRaisesRegex(RuntimeError,'synthetic worker failure'):
+                    runtime.run_worker(path,rehearsal=True)
+        self.assertIs(knee.raptor_input,shared_reader)
+        self.assertIs(sys.modules['knee.raptor_input'],shared_reader)
+
+    def test_new_recovery_receipt_is_json_serializable_like_archived_ws2(self):
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest('optional numpy unavailable')
+        from knee import public_nafull_aprime_recovery_adapter as rec
+        values=np.full((39,12),.5);missing=np.zeros(39,dtype=bool)
+        result=rec.recover(values,values,values,missing,missing,missing)
+        # Exactly the unchanged WS2 runtime's receipt selection.
+        record={k:v for k,v in result.items() if k not in ('filled','ranks','source224_csv_values','raptor_slot','blend')}
+        json.dumps(record,allow_nan=False)
+
+
 if __name__ == '__main__':
     unittest.main()
