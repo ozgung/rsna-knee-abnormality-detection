@@ -1,6 +1,6 @@
 # A‴ private offline rehearsal preparation
 
-October 16, 2026, 14:19 UTC. Implements Claude's13:05 request under the [frozen scope](na-full-aprime-swap-scope-20261016.md). **Ready for Claude's rehearsal launch; no GPU qualification or entry claimed.** [Acceptance](../../outputs/analysis/na-full-aprime-rehearsal-20261016/acceptance.json).
+October 16, 2026, 14:19 UTC. Implements Claude's13:05 request under the [frozen scope](na-full-aprime-swap-scope-20261016.md). **R1 failed packaging; r2 preparation is ready below. No GPU qualification or entry claimed.** [Acceptance](../../outputs/analysis/na-full-aprime-rehearsal-20261016/acceptance.json).
 
 Packet: `outputs/kaggle/nafull-aprime-rehearsal-20261016/`, kernel/title `ozgung/nafull-aprime-rehearsal-20261016` / `nafull-aprime-rehearsal-20261016`. Private, internet disabled, NvidiaTeslaT4, original offline dependencies and competition attachment. No timeout option; inherited nine-hour alarm remains.
 
@@ -32,3 +32,23 @@ Verify the immutable preparation without rebuilding or launching:
 Claude owns actual account/job reconciliation and launch (`kaggle kernels push -p outputs/kaggle/nafull-aprime-rehearsal-20261016`, no timeout). Do not relaunch an existing run. Expected result root is `/kaggle/working/nafull-aprime/`, with `base/` old/R7 and two crop224 ledgers. Record the accepted server notebook version/source identity and terminal result. Parent acceptance must replay saved worker receipts/ledgers, exact39 coverage, reader/source/state/sentinel and R7/R224 parity, final all-population ranks/CSV, resources, fresh≤8.3h projection and actual<9h. Preserve failures and no inherited waiver. No competitive entry builder or submission has been produced; a qualified result is the next gate.
 
 Temporary implementation worktree removed after integration/evidence preservation; no matching broad-test process remained. Recovery branch `codex/na-full-aprime-rehearsal` retained. No full-suite pass is claimed.
+
+## R1 failed; r2 ready — October16,16:07 UTC
+
+R1 version1 was launched by Claude14:21:47 and ERROR≈14:26. Both old workers raised ImportError for RAPTOR_WEIGHT_DATASET; no inference qualification occurred. [Actual failures/binding reconciliation](../../outputs/analysis/na-full-aprime-rehearsal-20261016/r2/v1-failure-acceptance.json). The earlier host-source and mocked setup checks missed a dependency pruned out of the actual packet. Fresh unpacking reproduces the exact error, with checkout modules excluded.
+
+R2 adds the full frozen B0 reference module (`be9ba44b085a863a8048771effa8d3e699bc220d47e8c48cd87472dab2f49ef1`) to the already isolated B0 reader. Both aliases apply only to the na-full worker and restore on exceptions. Every existing A′ source and R7/R224 configuration remains unchanged. Missing infer_checked/reference_reader/validate_volume are covered as well as the initially missing constants; no reference gate was relaxed. Claude's accidental intermediate commit78310b8 is retained; acceptance/checker revision **e8b5f12** records the completed verification.
+
+**Launchable preparation:** `outputs/kaggle/nafull-aprime-rehearsal-r2-20261016/`, slug/title `nafull-aprime-rehearsal-r2-20261016`. Notebook **769ace5edcf4b431adcaf7cbaa29d586edeca510d65995950c483ebf2b898ad0**, payload **7f76b799ad1e1762b7a14bcb59ffdd0717918d919826ea57547d6d20a45f38ca**;729671bytes/251sources. Build receipt4da5def6…/manifest0d9e489a…. [R2 acceptance](../../outputs/analysis/na-full-aprime-rehearsal-20261016/r2/acceptance.json).
+
+`scripts/check_nafull_bundle.py` unpacks every source and starts a fresh `-I` child. Nine worker entry points, actual K62 profile and original R224 definition imports PASS from that extracted tree. Actual checkpoint strict CPU load/state pin, one finite CPU forward/state unchanged, all16 synthetic reader cases and all10 guarded reader cases PASS; aliases restored. [Exact receipt](../../outputs/analysis/na-full-aprime-rehearsal-20261016/r2/unpacked-python3129.json). This is CPU/synthetic evidence, not GPU or real-image qualification. Python3.12.3's known ast.unparse policy formatting differed; the successful check used builder Python3.12.9 with existing fastgen torch2.10/timm1.0.24 packages and a temporary pydicom-only link to the real project3.0.2 package/metadata. No environment was installed or modified; exception-policy equality remained strict.
+
+Verify before owner launch:
+
+```bash
+/Users/ozgun/miniconda3/envs/fastgen/bin/python scripts/build_public_nafull_aprime.py \
+  --cpu-receipt outputs/analysis/na-full-export-acceptance-20261016/cpu-k62.json \
+  --verify-build outputs/kaggle/nafull-aprime-rehearsal-r2-20261016
+```
+
+Seven focused tests, default smoke, deterministic replay and packed original-source/config preservation PASS. Original r1 and the initial unlaunched r2 snapshot are preserved. Claude retains actual quota/job reconciliation and launch ownership; latest requested priority is the solo pair first. Fresh39-image2×T4 checks and ordinary runtime gates still apply, with no inherited waiver or entry packet.
