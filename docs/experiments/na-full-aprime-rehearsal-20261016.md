@@ -1,6 +1,6 @@
 # A‴ private offline rehearsal preparation
 
-October 16, 2026, 14:19 UTC. Implements Claude's13:05 request under the [frozen scope](na-full-aprime-swap-scope-20261016.md). **R1 failed packaging; r2 preparation is ready below. No GPU qualification or entry claimed.** [Acceptance](../../outputs/analysis/na-full-aprime-rehearsal-20261016/acceptance.json).
+October 16, 2026, 14:19 UTC. Implements Claude's13:05 request under the [frozen scope](na-full-aprime-swap-scope-20261016.md). **R1 failed packaging; r2 has real worker PASS/top FAIL; r3 capture repair is prepared below. Full qualification and entry remain blocked.** [Acceptance](../../outputs/analysis/na-full-aprime-rehearsal-20261016/acceptance.json).
 
 Packet: `outputs/kaggle/nafull-aprime-rehearsal-20261016/`, kernel/title `ozgung/nafull-aprime-rehearsal-20261016` / `nafull-aprime-rehearsal-20261016`. Private, internet disabled, NvidiaTeslaT4, original offline dependencies and competition attachment. No timeout option; inherited nine-hour alarm remains.
 
@@ -52,3 +52,22 @@ Verify before owner launch:
 ```
 
 Seven focused tests, default smoke, deterministic replay and packed original-source/config preservation PASS. Original r1 and the initial unlaunched r2 snapshot are preserved. Claude retains actual quota/job reconciliation and launch ownership; latest requested priority is the solo pair first. Fresh39-image2×T4 checks and ordinary runtime gates still apply, with no inherited waiver or entry packet.
+
+## R2 real result and r3 capture repair — October16,16:54 UTC
+
+Claude's single terminal collection is `outputs/kaggle/nafull-aprime-rehearsal-r2-20261016-result/nafull-aprime/`. All six worker receipts PASS, base PASS; top FAIL `SAVED_MEASURED_PROJECTION_INPUTS`. Saved top projection_inputs contains only final_merge_seconds. [Failure replay/acceptance](../../outputs/analysis/na-full-aprime-rehearsal-20261016/r2/failure-acceptance.json), [replay script](../../outputs/analysis/na-full-aprime-rehearsal-20261016/r2/audit_failure.py).
+
+The complete saved base contract replays PASS. Each arm has39 unique genuine rows; all saved worker receipts/ledger hashes reconcile. R7/R224 all39 input/probability reference parity PASS, both-board states unchanged, all-population0.325/0.175/0.5 rank arithmetic and visible CSV replay exactly. These are real-image/T4 checks on the r2 package, not full combined qualification. Original files were hashed before and after the read-only audit and remain unchanged. Reproducing the top check uses only an in-memory copy with its transient pre-error PASS status; it still raises the actual missing-input exception. No promoted receipt is emitted.
+
+Two independent blockers remain:
+
+- **Capture defect:** WS2 temporarily assigns facade.projection to capture base setup/merge/development distribution. The SimpleNamespace facade copied attributes away from cloned run globals, so that hook never ran. The full live namespace now uses ModuleType and preserves that assignment inside the cloned orchestration. Base setup and the frozen window distribution are known elsewhere, but the genuine measured merge interval was not saved. No derived interval is backfilled into r2 to claim qualification.
+- **Runtime gate:** replaying the saved final_merge_seconds and all measured base/crop phases reproduces the exact top projection **30535.166446539686s /8.48199068h**, versus29880s/8.3h: **655.16644654s over**. Actual rehearsal1830.1577s. This is separate from the bookkeeping exception; the repair changes no timing formula, input recipe, coefficient, checkpoint, guard or threshold. Earlier A′/B0′ waivers do not transfer. No entry qualification or comparative score follows.
+
+Capture repair accepted commit **996d41050ef9cc85fd803fe6656f9dc89e83107e**. Eight focused tests PASS; the new test executes the actual cloned base orchestrator with synthetic infrastructure/workers and the WS2-style capture hook. The same test on the pre-fix runtime reproduces missing base timing fields. Default smoke PASS. Fresh unpacked r3 process imports all9 worker entry points, proves the capture namespace is live, strict-loads the actual checkpoint, runs a finite CPU forward/state unchanged and all16+10 synthetic reader cases PASS. Original aliases restore. [Fresh unpacked receipt](../../outputs/analysis/na-full-aprime-rehearsal-20261016/r3-unpacked.json).
+
+**R3 prepared, unlaunched:** `outputs/kaggle/nafull-aprime-rehearsal-r3-20261016/`, private/offlineT4, title=id slug `nafull-aprime-rehearsal-r3-20261016`,729719bytes/251sources. Notebook **1d7089e0df4283a45108d27c1ca5cc42604bdcaf49d1a1592b38aec519a519ce**, payload **68cae8745bfeddb449b541347fc371a083ce92966fee56076d61722ad4d15b98**, manifest48bb700a…/build receiptd716b74e…. [R3 acceptance](../../outputs/analysis/na-full-aprime-rehearsal-20261016/r3/acceptance.json). Deterministic replay and packed-source/config checks PASS. Relative to r2, only public_nafull_aprime_runtime.py changes in the payload; the only config differences are recomputed source-bundle and binding hashes. Protected R7/R224 source bytes, inference, recovery and ordinary gates remain identical.
+
+Claude owns the next fresh rehearsal after actual job/quota reconciliation and the shared solo-pair priority. R3 fixes capture; it offers no reason to assume a lower runtime projection. Any new result must preserve all four genuine inputs and independently pass ordinary gates or follow a separately named human-authorized admission. No new remote launch, collector, waiver, entry or submission by Codex.
+
+**Server identity limit:** owner reports r2 version1; collected binding matches the sealed r2 packet. Installed KaggleApi.kernels_status parses `/1` but omits version_label in its request, so the earlier CLI `/1` text was actually latest-scope RUNNING16:16/ERROR16:44. Direct explicit version_label1 status returned404 and explicit `/1` source retrieval403; these failures do not establish absence. Original status receipts remain unchanged. Independently accepted immutable server-source/version receipt is still requested from the owner; do not call the earlier status query version-bound.
