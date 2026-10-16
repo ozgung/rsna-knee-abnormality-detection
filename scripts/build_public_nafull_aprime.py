@@ -19,7 +19,7 @@ NEW=('knee/public_nafull_aprime.py','knee/public_nafull_aprime_runtime.py',
 'knee/public_nafull_aprime_recovery_adapter.py','knee/public_nafull_aprime_entry.py',
 'knee/public_nafull_aprime_rehearsal.py','knee/public_s6_recovery_b0.py',
 'knee/public_s6_recovery_b0prime.py','knee/public_s6_recovery_b0_rehearsal.py',
-'knee/public_s6_recovery_b0prime_rehearsal.py','knee/public_nafull_raptor_input.py')
+'knee/public_s6_recovery_b0prime_rehearsal.py','knee/public_nafull_raptor_input.py','knee/public_nafull_reference.py')
 DATASETS=['heliosli/rsna-knee-compact-r7cnxfsss/1','heliosli/rsna-orthofoundation-fold0-epoch7-20261004',
 'goodpjw2008/rsna-knee-2-5d-convnext-reader','nartaa/rsna-knee-publication-swa-weights-20261007',
 P.CHECKPOINT['dataset']+'/1']
@@ -66,6 +66,7 @@ def packet(cpu_receipt):
     for name,pin in B0BUILD.FROZEN.items():
         require(file_sha(PROJECT/name)==pin,'UNCHANGED_B0_SUPPORT_'+name)
     require(file_sha(PROJECT/'knee/public_nafull_raptor_input.py')==hashlib.sha256(b['sources']['knee/raptor_input.py'].encode()).hexdigest(),'EXACT_ISOLATED_B0_READER')
+    require(file_sha(PROJECT/'knee/public_nafull_reference.py')==hashlib.sha256(b['sources']['knee/reference.py'].encode()).hexdigest(),'EXACT_ISOLATED_B0_REFERENCE')
     cpu=PROFILE.checkpoint_manifest(cpu_receipt)
     bc=b['cfg']; ids=bc['probe_order']+bc['binding']['visible_ids']
     require(len(ids)==39 and len(set(ids))==39,'K62_39_ORDER')

@@ -146,6 +146,8 @@ class NaFullReaderIsolationTests(unittest.TestCase):
         from knee import public_nafull_aprime_runtime as runtime
         from knee import public_nafull_raptor_input as full_reader
         from knee import raptor_input as shared_reader
+        from knee import reference as shared_reference
+        from knee import public_nafull_reference as full_reference
         cfg={'arm':'old','control_state_sha256':A.CHECKPOINT['state_sha256'],
              'control_grid_sha256':A.CONSTRUCTOR_GRID_SHA256,
              'binding':{'qualified_state':{'old_grid':A.CONSTRUCTOR_GRID_SHA256}}}
@@ -153,6 +155,10 @@ class NaFullReaderIsolationTests(unittest.TestCase):
             from knee import raptor_input as active
             self.assertIs(active,full_reader)
             self.assertIs(sys.modules['knee.raptor_input'],full_reader)
+            from knee import reference as active_reference
+            self.assertIs(active_reference,full_reference)
+            self.assertTrue(callable(active_reference.infer_checked))
+            self.assertTrue(active_reference.RAPTOR_WEIGHT_DATASET)
             raise RuntimeError('synthetic worker failure')
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/'worker.json';path.write_text(json.dumps(cfg))
@@ -161,6 +167,8 @@ class NaFullReaderIsolationTests(unittest.TestCase):
                     runtime.run_worker(path,rehearsal=True)
         self.assertIs(knee.raptor_input,shared_reader)
         self.assertIs(sys.modules['knee.raptor_input'],shared_reader)
+        self.assertIs(knee.reference,shared_reference)
+        self.assertIs(sys.modules['knee.reference'],shared_reference)
 
     def test_new_recovery_receipt_is_json_serializable_like_archived_ws2(self):
         try:

@@ -5,6 +5,7 @@ worker, R224 worker, data staging, two-board launch and ordinary 9 h limits stay
 on their archived code paths.
 """
 import ast
+from contextlib import contextmanager
 import inspect
 import json
 import math
@@ -26,18 +27,41 @@ def _bind(function, namespace, name=None):
     return clone
 
 
+@contextmanager
+def old_source_modules():
+    """Isolate full B0 dependencies; other workers retain A′'s pruned modules."""
+    import knee
+    import sys
+    from knee import public_nafull_raptor_input, public_nafull_reference
+    originals=[]
+    for name,replacement in [('raptor_input',public_nafull_raptor_input),
+                             ('reference',public_nafull_reference)]:
+        module_name='knee.'+name
+        originals.append((name,getattr(knee,name,None),sys.modules.get(module_name)))
+        setattr(knee,name,replacement)
+        sys.modules[module_name]=replacement
+    try:
+        yield
+    finally:
+        for name,attribute,module in reversed(originals):
+            if attribute is None:delattr(knee,name)
+            else:setattr(knee,name,attribute)
+            if module is None:sys.modules.pop('knee.'+name,None)
+            else:sys.modules['knee.'+name]=module
+
+
 def nafull_profile_gate(public, manifest):
     """Require exact Raptor62 recipe and na-full export identity."""
     require(manifest.get('checkpoint_sha256') == PROFILE.CHECKPOINT['sha256']
             and manifest.get('checkpoint_file') == PROFILE.CHECKPOINT['file']
             and manifest.get('weight_dataset') == PROFILE.CHECKPOINT['dataset'], 'NAFULL_CHECKPOINT_MANIFEST')
     recipe = manifest.get('recipe', {})
-    from knee.reference import RAPTOR_RECIPE, RAPTOR_WEIGHT_DATASET, RAPTOR_WEIGHT_NAME
-    original = {**manifest, 'checkpoint_sha256': B0.DREAD_CHECKPOINT_SHA256,
-        'checkpoint_file': RAPTOR_WEIGHT_NAME, 'weight_dataset': RAPTOR_WEIGHT_DATASET,
-        'recipe': recipe}
-    # This proves the public source constants still match the exact frozen B0 recipe.
-    B0.raptor_profile_gate(public, original)
+    with old_source_modules():
+        from knee.reference import RAPTOR_WEIGHT_DATASET, RAPTOR_WEIGHT_NAME
+        original = {**manifest, 'checkpoint_sha256': B0.DREAD_CHECKPOINT_SHA256,
+            'checkpoint_file': RAPTOR_WEIGHT_NAME, 'weight_dataset': RAPTOR_WEIGHT_DATASET,
+            'recipe': recipe}
+        B0.raptor_profile_gate(public, original)
     return {**B0.OLD_PROFILE, 'checkpoint_sha256': PROFILE.CHECKPOINT['sha256'],
             'checkpoint_bytes': PROFILE.CHECKPOINT['bytes']}
 
@@ -263,21 +287,8 @@ def run_worker(config_path, *, rehearsal):
         require(cfg['control_grid_sha256'] == cfg['binding']['qualified_state']['old_grid'], 'NAFULL_WORKER_GRID_BINDING')
         NA_WORKER_GLOBALS['DREAD_GRID_SHA256'] = cfg['control_grid_sha256']
         NA_WORKER_GLOBALS['rehearsal_hook'] = injection_hook if rehearsal else None
-        # This process runs only the na-full old worker. Preserve the original
-        # pruned reader for R224/R7 in their separate processes and the parent.
-        import knee
-        import sys
-        from knee import public_nafull_raptor_input as full_reader
-        from knee import raptor_input as original_reader
-        original_module=sys.modules.get('knee.raptor_input')
-        knee.raptor_input=full_reader
-        sys.modules['knee.raptor_input']=full_reader
-        try:
+        with old_source_modules():
             NA_OLD_WORKER(config_path)
-        finally:
-            knee.raptor_input=original_reader
-            if original_module is None:sys.modules.pop('knee.raptor_input',None)
-            else:sys.modules['knee.raptor_input']=original_module
     else:
         facade.r7_worker(config_path)
 
