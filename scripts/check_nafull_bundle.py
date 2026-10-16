@@ -19,10 +19,10 @@ import importlib,importlib.util,json,sys
 from pathlib import Path
 project=Path(sys.argv[1]).resolve();cfg=json.loads(Path(sys.argv[2]).read_text())
 sys.path.insert(0,str(project))
+if sys.argv[6]:sys.path.insert(1,sys.argv[6])
 if sys.argv[4]:
-    origin=Path(sys.argv[4])
-    spec=importlib.util.spec_from_file_location('pydicom',origin,submodule_search_locations=[str(origin.parent)])
-    package=importlib.util.module_from_spec(spec);sys.modules['pydicom']=package;spec.loader.exec_module(package)
+    sys.path.insert(1,sys.argv[4])  # Only the selected package and its real metadata.
+    import pydicom
 modules=['knee.public_nafull_aprime_entry','knee.public_nafull_aprime_rehearsal',
  'knee.public_ws2_entry','knee.public_r7_recovery_entry','knee.public_r7_recovery_rehearsal',
  'knee.public_s6_recovery_b0','knee.public_s6_recovery_b0prime',
@@ -79,7 +79,7 @@ print(json.dumps(result))
 '''
 
 
-def check(notebook, checkpoint=None, pydicom_source=None, reader_checks=False):
+def check(notebook, checkpoint=None, pydicom_source=None, reader_checks=False, dependency_path=None):
     nb=json.loads(Path(notebook).read_bytes());tree=ast.parse(''.join(nb['cells'][0]['source']))
     values={n.targets[0].id:ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign)
             and len(n.targets)==1 and isinstance(n.targets[0],ast.Name) and n.targets[0].id in ('encoded','expected_payload')}
@@ -95,13 +95,22 @@ def check(notebook, checkpoint=None, pydicom_source=None, reader_checks=False):
             path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(content.encode())
         config=root/'config.json';config.write_text(json.dumps(pack['cfg']))
         child=root/'check.py';child.write_text(CHILD)
+        borrowed=''
+        if pydicom_source:
+            origin=Path(pydicom_source).resolve()
+            deps=root/'pydicom-only';deps.mkdir()
+            (deps/'pydicom').symlink_to(origin.parent,target_is_directory=True)
+            metadata=list(origin.parent.parent.glob('pydicom-*.dist-info'))
+            if len(metadata)!=1:raise ValueError('PYDICOM_METADATA_COVERAGE')
+            (deps/metadata[0].name).symlink_to(metadata[0],target_is_directory=True)
+            borrowed=str(deps)
         proc=subprocess.run([sys.executable,'-I',str(child),str(project),str(config),
             str(Path(checkpoint).resolve()) if checkpoint else '',
-            str(Path(pydicom_source).resolve()) if pydicom_source else '',
-            'yes' if reader_checks else 'no'],cwd=root,capture_output=True,text=True)
+            borrowed,
+            'yes' if reader_checks else 'no',str(Path(dependency_path).resolve()) if dependency_path else ''],cwd=root,capture_output=True,text=True)
     result={'status':'PASS' if proc.returncode==0 else 'FAIL','payload_sha256':payload_sha,
             'notebook_sha256':hashlib.sha256(Path(notebook).read_bytes()).hexdigest(),
-            'fresh_isolated_process':True,'gpu_exercised':False,'uses_real_images':False}
+            'fresh_isolated_process':True,'python':sys.version.split()[0],'explicit_dependency_path':str(dependency_path) if dependency_path else None,'gpu_exercised':False,'uses_real_images':False}
     if proc.returncode==0:result['checks']=json.loads(proc.stdout.splitlines()[-1])
     else:result['failure']=proc.stderr[-4000:]
     return result
@@ -111,10 +120,11 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--notebook',required=True);parser.add_argument('--checkpoint')
     parser.add_argument('--pydicom-source');parser.add_argument('--reader-checks',action='store_true')
+    parser.add_argument('--dependency-path',help='Explicit installed third-party packages; unpacked project retains priority')
     parser.add_argument('--out',required=True);args=parser.parse_args()
     output=Path(args.out)
     if output.exists():raise ValueError('FRESH_RECEIPT')
-    result=check(args.notebook,args.checkpoint,args.pydicom_source,args.reader_checks)
+    result=check(args.notebook,args.checkpoint,args.pydicom_source,args.reader_checks,args.dependency_path)
     with output.open('x') as handle:handle.write(json.dumps(result,indent=2)+'\n')
     print(json.dumps(result))
     raise SystemExit(0 if result['status']=='PASS' else 1)
