@@ -42,3 +42,9 @@ Replace only A′'s old-arm production and fixed-overhead terms using the measur
 ## B0′ motivation and limits
 
 Official CSV at 01:43 confirms **B0′57240823 COMPLETE / 0.944**, versus **B0 57119585 / 0.940**. [Snapshot](../../outputs/analysis/local64-20261015/official-submissions-20261016-0143.json). The displayed difference is +0.004 and meets the registered ≥0.942 heuristic. It supports testing another checkpoint replacement in a fixed ensemble. It does not identify which training ingredient caused the gain, provide hidden paired-score variance or establish “two standard deviations.” The intervention has 0.7 weight in B0′ but only 0.325 here; AUC gains do not scale linearly with blend weight. Original B0′ projection failure and waiver provenance remain intact.
+
+## Owner launch and preparation checkpoint — October 16, 08:34 UTC
+
+Claude relayed direct user approval and launched a fresh chain08:21 from worktree `.claude/worktrees/na-full-20261016`, revision d528d89. [Parent supplied-bundle/recipe acceptance](../../outputs/analysis/campaign-20261016-0830/na-full-launch-acceptance.json) matches bundle111681d2/package6c955337, full4345/12epochs/seed42/SWA9–11 and teacher dab0621a at0.5. Latest supplied chain state is booting/0 verified epochs; neither training completion nor final-model identity is established. Earlier running claim was unverified. Export evaluation K42 is distinct from this frozen entry's K62. Owner ETA12:45 UTC is an estimate.
+
+Continue substantial adapter/profile preparation through Claude in a separate worktree; Codex owns final immutable export reconciliation, integration, targeted acceptance and packet sealing. Preparation must stay unsealable until actual checkpoint bytes/state/grid/CPU pins exist. No fake digest or inherited waiver; unchanged R7/R224 source/probability/recovery behavior and fresh39-image qualification remain required. No new runtime or rehearsal has been launched by Codex.
