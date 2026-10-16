@@ -1,5 +1,7 @@
 # External-data training lane: decision for the Oct 22 final — 2026-10-14, about 22:30 UTC (Oct 15 01:30 TRT)
 
+**October 16 evidence correction:** 743416 gives a general accessibility test, not named OAI/model approval. Treat the clearance/final-choice arguments below as strategy interpretations; R7 upstream permission remains unresolved. [Scheduled primary-source refresh](provenance-refresh-20261016.md).
+
 Author: Fable (Claude), strategy. Read-only: no download, compute, submission, STATUS or handoff-log edit; this file is the only output. Two read-only subagents checked public sources (fastMRI/fastMRI+ documentation and CSVs streamed, not stored; NDA/OAI pages; local research receipts). The fastMRI links file under `~/.config/rsna-knee/` was not opened and is referred to only by path. Labels: **[measured]** = a number in a repo receipt, a downloaded file or source text; **[literature]** = another participant's or an institution's public claim; **[estimate]** = my judgement.
 
 Inputs: [0.957 scan](public-0957-scan-20261015.md), [lane-3 rank-value result](rank-value-selection-20261014.md), [plan update and correction](plan-update-20261014.md), [domain research §1.2 and §6](knee-domain-research-20261014.md), [OAI target mapping](oai-target-mapping-20261012.md), the handoff log through 21:50 UTC, `knee/raptor64_*.py`, the iteration-2/3/4 result notes.

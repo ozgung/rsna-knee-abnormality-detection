@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-16 01:48 UTC**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: [AGENTS.md](AGENTS.md); setup: [README.md](README.md). [Previous detailed snapshot/recovery](docs/status-archive/status-before-20261015-local64-r2.md).
+Updated **2026-10-16 02:34 UTC**. Read this snapshot, then [shared handoff](docs/claude-astra-handoff.md). Rules: [AGENTS.md](AGENTS.md); setup: [README.md](README.md). [Previous detailed snapshot/recovery](docs/status-archive/status-before-20261015-local64-r2.md).
 
 ## Current snapshot
 
@@ -13,6 +13,8 @@ Updated **2026-10-16 01:48 UTC**. Read this snapshot, then [shared handoff](docs
 - **Na-orig secondary control complete, owner-reported:** exposed fold-0 K42 macro 0.94088; exported, VM stopped, branch merged as 53aaa7d. R1 global-view control for na-local; pretrained exposure prevents generalization claims. [Result](docs/experiments/na-orig-fold0-result-20261015.md).
 - **Best verified A remains 0.956**,57157384 COMPLETE. B1 retry 57168064 owner-reported 0.949; R384+S6 57096002 scored 0.954. No new final selection. Sagittal/axial/iterations2–3 closed; M4 anatomy FAIL after full 868-depth screen, no paired fit; P2 speed failure retained. [A result](docs/experiments/r7-recovery-entry-20261013.md), [M4](docs/experiments/same-series-extent-roi-qualification-20261014.md). Prior lost R224 Colab session 2647d8 remains closed; new main-lane/na-orig sessions are separate and not independently verified.
 
+- **Oct16 provenance check complete.** Rules body unchanged from Oct13; no new named clearance/prohibition found in bounded threads. General host accessibility guidance is not blanket OAI approval; R7 upstream permission remains unresolved. Older strategy annotated, no final-choice or running-job change. [Primary-source refresh](docs/research/provenance-refresh-20261016.md).
+
 ## Ready queue and ownership
 
 | Owner / task | State and concrete next action |
@@ -23,7 +25,7 @@ Updated **2026-10-16 01:48 UTC**. Read this snapshot, then [shared handoff](docs
 | Codex — local64 acceptance | Match accepted r3b bytes/settings and inspect first real CPU failures/results after owner collection. All-four mechanics, real32-study K0 signoff and full immutable loader/stage integration gate fit; collector always leaves promotion false. |
 | Claude — B0′ result / A′ candidate | B0′ COMPLETE0.944, fixed-frame result recorded; A′ COMPLETE0.956 remains final-1 candidate. Preserve terminal receipts; no new selection or duplicate jobs/submissions. |
 | Codex — v3 GPU rescue | CLOSED after official A′ COMPLETE0.956. No r4 or mirror rescue. |
-| Claude + Codex — provenance/finals | Oct 16/20 provenance checks; Oct 21 proposed final selection. Preserve best A and scientific limits. No paid provisioning/new terms. |
+| Claude + Codex — provenance/finals | Oct16 check DONE; Oct20 recheck and Oct21 proposed selection remain. Keep host-access and upstream-permission distinctions; no final action yet. No paid provisioning/new terms. |
 
 One implementation task at a time; main-lane substantial work belongs to Claude. Local64 helper completed/integrated, managed worktree **archived**. Existing heartbeat ACTIVE at saved 45 min cadence; no new schedule or collector. Actual GPU quota is stale (owner 8.45 h before B0′ visible launch); reconcile platform/account limits and all jobs before new launches, no assistant reserve/time cap.
 
@@ -45,4 +47,4 @@ Local64 current 18 focused ML checks PASS; last bare focused 18 OK/12 optional s
 
 Keep patient/study grouping limitations explicit, fit statistics on actual training folds, preserve masks, image-only inference, checkpoint/source binding and official schema/coverage. Synthetic mechanics, real-reader qualification, exposed development and competitive results are distinct. Final deadline last officially verified **Oct 22 23:59 UTC / Oct 23 02:59 TRT**; stop, preserve recovery and pause heartbeat then or on explicit user stop.
 
-**Latest: 2026-10-16 01:48 UTC — Codex.** S6 reporting source equals tested patch; actual two-arm config/membership/package/code receipts reconcile, no new pair metrics. Officially verified B0′0.944 vs B00.940; preserve exposed intervention and failed projection/waiver distinctions. Scoped requested A‴ before na-full score: K62 one-view replacement at effective0.325, R2240.175/R70.5 unchanged. Proxy7.52–7.78h actual-reference /8.51–8.78h conservative is not qualification; no mirror or transferred waiver. Next: receive na-full actual run/export/CPU pins for integration and read completed S6 pair when ready. No new run, collector, submission, browser action or automation.
+**Latest: 2026-10-16 02:34 UTC — Codex.** No new S6/na-full result or export on shared handoff; ready implementation still awaits outputs/pins. Completed scheduled Oct16 provenance refresh instead: normalized official rules unchanged, bounded threads/card inspected, general host guidance distinguished from named approval and upstream rights. R7 permission question remains unresolved; annotated old strategy, no authorization/eligibility prohibition inferred and no running-job/final-choice change. Next: accept new exports/results when posted; preserve next planned provenance review. No terms, contact, download of weights/images, live run, collector, submission or automation change.
