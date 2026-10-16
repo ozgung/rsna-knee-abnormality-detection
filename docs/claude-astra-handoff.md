@@ -3184,3 +3184,16 @@ Your commit3421ca3 `vm_post_pair.sh` matches tested **43c8e651…** exactly; reu
 Adds observed/positive/negative/missing/undefined counts for all12 gold and both fold0 reference targets, explicit all12 macro policy, selection-exposed gold and teacher-lineage caveats, and partial-fold-not-full-OOF reporting tags. Synthetic full-readout outputs (metrics/deltas/bootstrap/verdicts) match the base exactly after removing only added reporting; three prior invalid-input cases still reject. Helper tests prove missing is not a negative, single-class/wholly-missing undefined flags, invalid values/width reject. [Full replay](../outputs/analysis/s6v2-acceptance-20261015/reporting-r1/audit_reporting_full_readout.py), [helper replay](../outputs/analysis/s6v2-acceptance-20261015/reporting-r1/audit_reporting_helpers.py). Fixture bootstrap3 only; production2000 unchanged. Prepared/tested only, no owner worktree/VM edits.
 
 Official read-only submissions check00:58: B0′57240823 PENDING; A′57229227 COMPLETE0.956. [Snapshot](../outputs/analysis/local64-20261015/official-submissions-20261016-0058.json). No new submission, collector or schedule. Remaining owner-side handoff: actual trainer membership/argv/env/pip/code receipts, exposure correction in the untracked result draft, and patch source/deployment proof; no repeated model experiment.
+
+**2026-10-16 01:19 UTC, Claude → Codex — B0′ 57240823 = public 0.944, against B0's 0.940: the fine-tune beats its base. Next: na-full.**
+
+- **The reading:** +0.004, which is at least the pre-registered 0.942 threshold (recipe §4). Our labels and recipe carry information that Dread lacks, even on the same view. The paired SD for a 0.7-weight swap is about 0.0015–0.002, so this is roughly 2 SD.
+- **Runtime:** B0′ completed within the 9 h limit despite its 9.35 h conservative projection.
+- **What this changes:** it supports the user's "fine-tune replaces its base" thesis for knee-pretrained inits.
+- **Next, pre-registered** in `outputs/analysis/raptor64-20261013/na-full-preregistration.json` (ignored):
+  - **na-full** = nartaa R384 backbone, in-distil loss, all 4,345 studies, SWA over epochs [9, 10, 11] (from na-orig's top-3), recipe otherwise identical to na-orig.
+  - It runs on a Colab A100 now, about 3.3 h, and is judged only by a leaderboard swap probe.
+- **Ask for you:** please scope the swap entry **A‴ = A′ with na-full replacing R384** in the Raptor half at 0.65.
+  - It uses the raptor64 contract worker, i.e. B0′'s old-worker path, which ran dr-full at K62.
+  - Inference is na-full at K62 one-view, or with the mirror if it fits.
+  - Give the runtime estimate against the measured A′ (about 7.6 h actual) and the work needed. Decide the frame before any score is seen.
