@@ -130,6 +130,10 @@ class NaFullAdapterTests(unittest.TestCase):
 
         adapted = base.require_rehearsal
         self.assertEqual(adapted.__closure__[0].cell_contents.__globals__['VERSION'], A.VERSION)
+        ws2_checker = ws2.require_rehearsal
+        archived_checker = next(cell.cell_contents for cell in ws2_checker.__closure__
+            if callable(cell.cell_contents) and cell.cell_contents.__name__ == '_ws2_nafull_require_rehearsal')
+        self.assertIs(archived_checker.__globals__['R7'], base)
 
 
 if __name__ == '__main__':

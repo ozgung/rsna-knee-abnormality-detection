@@ -229,7 +229,7 @@ def make_ws2_facade(base_facade):
         for name,reports,folder,arm,reference,tolerance in (
             ('r7',base['workers']['s6'],base_path.parent,'s6',binding['r7_probability_reference'],R7.CROSS_BOARD_TOLERANCE['s6']),
             ('r224',r['crop224_workers'],Path(csv_path).parent,'crop224',binding['r224_probability_reference'],1e-6)):
-            values,missing=WS2.merged_arm(ids,reports,folder,arm)
+            values,missing=merged_arm(ids,reports,folder,arm)
             require(not missing.any() and set(reference)==set(ids),'APRIME_'+name.upper()+'_ALL39_REFERENCE_COVERAGE')
             expected=np.asarray([reference[sid] for sid in ids],dtype=np.float64)
             require(values.shape==expected.shape and np.isfinite(values).all() and np.isfinite(expected).all()
