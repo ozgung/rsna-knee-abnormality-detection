@@ -25,6 +25,23 @@ def per(y, p):
     return [float(roc_auc_score(y[:, j], p[:, j])) if 0 < y[:, j].sum() < len(y) else None for j in range(y.shape[1])]
 
 
+def endpoint_support(y):
+    """Aggregate observed binary-label support; missing labels never become negatives."""
+    y = np.asarray(y, float)
+    if y.ndim != 2 or y.shape[1] != len(LABELS):
+        raise ValueError("support array must have the canonical 12 target columns")
+    known = np.isfinite(y)
+    if not np.isin(y[known], [0., 1.]).all():
+        raise ValueError("support expects binary observed reference labels")
+    out = {}
+    for j, label in enumerate(LABELS):
+        positive = int(((y[:, j] == 1) & known[:, j]).sum())
+        negative = int(((y[:, j] == 0) & known[:, j]).sum())
+        out[label] = {"observed": positive + negative, "positive": positive, "negative": negative,
+                      "missing": int((~known[:, j]).sum()), "undefined": positive == 0 or negative == 0}
+    return out
+
+
 def idsha(ids):
     return hashlib.sha256("\n".join(sorted(ids)).encode()).hexdigest()
 
@@ -76,7 +93,13 @@ def main():
     root = Path(a.root)
     gold = gold_table(root / "data/raw/train.csv")
     runs = {"J0": load_run(a.j0), "V2": load_run(a.v2)}
-    res = {"labels": LABELS, "arms": {}}
+    res = {"labels": LABELS, "arms": {}, "reporting": {
+        "macro_policy": "Unweighted arithmetic mean of all 12 target AUCs; macro undefined unless every target has both observed classes.",
+        "prediction_export": "Partial fold-0 predictions; not full OOF.",
+        "gold58_selection_exposed": True,
+        "gold58_interpretation": "Selection-exposed development: V2 was chosen among about ten label variants using gold-58. Gradient-training exclusion does not restore independence.",
+        "fold0_interpretation": "Report-derived, descriptive development comparison; teacher fold lineage can expose fold-0 reference labels.",
+        "support": {}}}
     # ---- gold-58
     G = {}
     for arm, (pr, oof, pool) in runs.items():
@@ -103,6 +126,7 @@ def main():
         G[arm] = (m, src)
     order = sorted(gold)
     y = np.array([gold[u] for u in order])
+    res["reporting"]["support"]["gold58"] = endpoint_support(y)
     P = {arm: np.array([G[arm][0][u] for u in order]) for arm in G}
     for arm in P:
         mac, _ = macro(y, P[arm])
@@ -147,6 +171,7 @@ def main():
     res["fold0_studies"] = {"J0": len(oofs["J0"]), "V2": len(oofs["V2"]), "common": len(common)}
     for ref_name, ref in (("J0_targets_ge_0.5", tJ0), ("labels_v1_blend_ge_0.5", blend)):
         yr = np.array([[1.0 if v >= 0.5 else 0.0 for v in ref[u]] for u in common])
+        res["reporting"]["support"]["fold0_" + ref_name] = endpoint_support(yr)
         for arm in oofs:
             po = np.array([oofs[arm][u] for u in common])
             mac, _ = macro(yr, po)
