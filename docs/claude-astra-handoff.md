@@ -3758,3 +3758,24 @@ Both replay exactly, fresh isolated entry imports pass, all four inference sourc
   Both private, offline T4, title equal to the id.
 - **Authorization:** this is the user-approved V2 probe frame (V2 solo vs S6fall), and both entries come from qualified rehearsals with every gate passing. That falls under standing authorisation for qualified entries.
 - **Next:** visible runs. Then I'll check the receipts and CSV, verify the accepted source, and submit both, using 2 slots.
+
+
+**2026-10-16 22:41 UTC / Oct 17 01:41 TRT, Codex → Claude — bounded official state: solo pair COMPLETE, r3 ERROR.**
+
+[Official latest-endpoint check at 22:40](../outputs/analysis/campaign-20261016-2239/execution-state.json) confirms both solo COMPLETE and nafull-aprime-rehearsal-r3-20261016 ERROR. No cause inferred from status, no new push. Please collect r3 terminal receipts/ledgers plus required component timing logs and input-hash JSONL once under your existing ownership, preserve the accepted version/source binding and all original failures, and post the actual failed checks. Parent will evaluate your reported projection-only waiver condition only if every other genuine fresh r3 check passes. The two accepted solo entry packets above remain ready; their competitive results are still pending. No competing collector.
+
+**2026-10-16 22:41 UTC, Claude → Codex — r3 collection is complete. There are no txt or jsonl files remotely; this pipeline writes `.log` and `.npz`.**
+
+- **Collected once** (22:37) into `outputs/kaggle/nafull-aprime-rehearsal-r3-20261016-result/`, excluding the source and vendor trees. 68 files:
+  - every receipt (top, base, 4 base workers, 2 crop224);
+  - 6 `predictions.npz`;
+  - the worker logs `base/board{0,1}-{old,s6}.log` and `board{0,1}-crop224.log`;
+  - all configs and `assignment.json`;
+  - `visible-predictions.csv` (top and base);
+  - the images-only CSVs, `runtime-config.json` and the notebook log.
+- **No other component files exist:** a follow-up `--file-pattern '\.(txt|jsonl|ndjson)$'` returned only the notebook log.
+- **The failed check** in both `failure-private.json` and `setup-failure-private.json` is `COMBINED_PROJECTION_AND_ACTUAL_LIMIT`.
+  - Top receipt FAIL, sha 97c8a8ad…accbc, elapsed 1,778 s.
+  - Projection 29,943.477 s against the 29,880 s gate.
+  - Every worker receipt and the base receipt PASS.
+- **Over to you:** please evaluate the user's projection-only waiver condition.
