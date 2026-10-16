@@ -445,8 +445,39 @@ class ARunnerTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 A.run(run, root)                    # the real A hash is required by default
 
+    @unittest.skipUnless((MAIN / 'outputs/analysis/s6solo-pair-20261016/embedded-a.py').is_file(),
+                         'embedded A reference source is absent')
+    def test_a_observer_preserves_forward_output_on_synthetic_model(self):
+        import torch
+        from knee import s6_solo_a_runner as A
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.tensor([2.0]))
+                self.register_buffer('mean', torch.tensor([0.0]))
+        source = MAIN / 'outputs/analysis/s6solo-pair-20261016/embedded-a.py'
+        m = types.SimpleNamespace(__file__=str(source), ARMS=[{'arch': 'fixture'}])
+        def load_model(*args, **kwargs): return Model(), 320
+        def infer_pair_probs(model, plain, mirrored, device):
+            return (plain.sum() + mirrored.sum()) * model.weight
+        m.load_model, m.infer_pair_probs = load_model, infer_pair_probs
+        with tempfile.TemporaryDirectory() as d:
+            ck = write(Path(d) / 'weights.pt', b'synthetic checkpoint')
+            result_path = Path(d) / 'model-qualification.json'
+            A._install_model_observer(m, result_path)
+            model, _ = m.load_model(ck, 'fixture', 320, 'cuda:0')
+            plain, mirrored = torch.ones(2), torch.full((2,), 3.0)
+            with mock.patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, '0, GPU-A\n', '')):
+                observed = m.infer_pair_probs(model, plain, mirrored, 'cuda:0')
+            expected = infer_pair_probs(model, plain, mirrored, 'cuda:0')
+            receipt = json.loads(result_path.read_text())
+            self.assertTrue(torch.equal(observed, expected))
+            self.assertEqual(receipt['source'], 'runtime_observer')
+            self.assertEqual(receipt['boards'][0]['gpu_uuid'], 'GPU-A')
+            self.assertTrue(receipt['boards'][0]['a']['strict_reload'])
 
-def synthetic_result(tmp, cfg, k1, slow=False, payload='p' * 64, board_names=('Tesla T4', 'Tesla T4')):
+
+def synthetic_result(tmp, cfg, k1, slow=False, payload='p' * 64, board_names=('Tesla T4', 'Tesla T4'), elapsed=712.0):
     """Write a complete /kaggle/working-like result tree the way the runtime would, then assemble it."""
     import numpy as np
     from knee import s6_solo_rehearsal as R
@@ -504,7 +535,7 @@ def synthetic_result(tmp, cfg, k1, slow=False, payload='p' * 64, board_names=('T
                  'samples': [{'t': t0 + k * 10, 'host_used_bytes': 5e9 + k, 'host_total_bytes': 31e9, 'gpu_used_mib': [1000, 900],
                               'disk_free_bytes': {'/kaggle/working': 10e9, '/tmp': 50e9}} for k in range(60)]}
     timing = {'notebook_started': t0 - 12, 'fixture_started': t0 - 8, 'fixture_seconds': 2.0, 'controller_t0': t0,
-              'controller_end': t0 + 500, 'finished': t0 + 700}
+              'controller_end': t0 + 500, 'finished': t0 - 12 + elapsed}
     sentinel_run = {'seconds': 90.0, 'runs': [['sentinel.board1', 0, 80.0, ''], ['sentinel.board0', 0, 85.0, '']]}
     receipt, ledger = R.assemble(k1, cfg, k1d, s / 'rehearsal-final.csv', timing, sentinel_run, resources)
     RT.save(s / 'resources.json', resources)
@@ -529,17 +560,18 @@ class AssembleVerifyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             cfg = self.cfg()
             root, receipt = synthetic_result(d, cfg, k1)
-            self.assertEqual(receipt['status'], 'PASS', receipt['failed_checks'])
+            self.assertEqual(receipt['status'], 'FAIL')
+            self.assertIn('qualified_model_state_and_reload', receipt['failed_checks'])
             p = receipt['projection']
             self.assertTrue(p['passes'] and 0 < p['conservative_seconds'] < 29880)
             # A: 60 s fixed, 60 s production over 39 -> 1300 at 1.25 x 1.15
             self.assertAlmostEqual(p['conservative']['A_seconds'], 60 + 60 / 39 * 1300 * 1.25 * 1.15, places=6)
-            again = R.verify_result(root, cfg, k1)
-            self.assertEqual(again['ledger_sha256'], receipt['ledger_sha256'])
+            with self.assertRaisesRegex(ValueError, 'PASSING_BOUND_REHEARSAL'):
+                R.verify_result(root, cfg, k1)
             led = json.loads((root / 's6solo' / 'ledger.json').read_text())
             led['rows'][0]['b_probability'][0] += 1e-9
             RT.save(root / 's6solo' / 'ledger.json', led)
-            with self.assertRaisesRegex(ValueError, 'SAVED_FILE_BINDINGS'):
+            with self.assertRaisesRegex(ValueError, 'PASSING_BOUND_REHEARSAL'):
                 R.verify_result(root, cfg, k1)
             other = copy.deepcopy(cfg); other['arm']['b_model']['sha256'] = 'c' * 64
             with self.assertRaisesRegex(ValueError, 'PASSING_BOUND_REHEARSAL'):
@@ -551,8 +583,39 @@ class AssembleVerifyTests(unittest.TestCase):
             _, slow = synthetic_result(Path(d) / 'a', self.cfg(), k1, slow=True)
             self.assertEqual(slow['status'], 'FAIL')
             self.assertIn('projection_8_3h_and_inherited_guards', slow['failed_checks'])
+            self.assertIn('qualified_model_state_and_reload', slow['failed_checks'])
             _, odd = synthetic_result(Path(d) / 'b', self.cfg(), k1, board_names=('Tesla T4', 'Tesla P100'))
-            self.assertEqual(odd['failed_checks'], ['two_physical_t4'])
+            self.assertIn('two_physical_t4', odd['failed_checks'])
+            self.assertIn('qualified_model_state_and_reload', odd['failed_checks'])
+
+    def test_actual_elapsed_requires_finite_strictly_under_nine_hours(self):
+        k1 = load()
+        with tempfile.TemporaryDirectory() as d:
+            _, under = synthetic_result(Path(d) / 'under', self.cfg(), k1, elapsed=32399.0)
+            _, exact = synthetic_result(Path(d) / 'exact', self.cfg(), k1, elapsed=32400.0)
+            _, over = synthetic_result(Path(d) / 'over', self.cfg(), k1, elapsed=32401.0)
+            self.assertNotIn('actual_notebook_elapsed_under_9h', under['failed_checks'])
+            self.assertIn('actual_notebook_elapsed_under_9h', exact['failed_checks'])
+            self.assertIn('actual_notebook_elapsed_under_9h', over['failed_checks'])
+            self.assertEqual(exact['elapsed_seconds'], 32400.0)
+            self.assertEqual(over['elapsed_seconds'], 32401.0)
+            root, _ = synthetic_result(Path(d) / 'nan', self.cfg(), k1)
+            k1d = root / 'k1'
+            resources = json.loads((root / 's6solo' / 'resources.json').read_text())
+            timing = json.loads((root / 's6solo' / 'receipt.json').read_text())['timing']
+            timing['finished'] = float('nan')
+            receipt, _ = __import__('knee.s6_solo_rehearsal', fromlist=['assemble']).assemble(
+                k1, self.cfg(), k1d, root / 's6solo' / 'rehearsal-final.csv', timing,
+                json.loads((root / 's6solo' / 'receipt.json').read_text())['sentinel']['run'], resources)
+            self.assertIn('actual_notebook_elapsed_under_9h', receipt['failed_checks'])
+
+    def test_model_qualification_rejects_missing_or_wrong_board_and_reload(self):
+        from knee.s6_solo_rehearsal import _valid_model_receipt
+        boards = [{'uuid': 'GPU-A'}, {'uuid': 'GPU-B'}]
+        expected = {'a': {'checkpoint_sha256': 'a' * 64}, 'b': {'checkpoint_sha256': 'b' * 64}}
+        self.assertFalse(_valid_model_receipt(None, boards, expected))
+        synthetic = {'source': 'synthetic_fixture', 'boards': [], 'overhead_seconds': 0}
+        self.assertFalse(_valid_model_receipt(synthetic, boards, expected))
 
 
 class FakeGroups:
@@ -595,7 +658,7 @@ class RehearsalIntegrationTests(unittest.TestCase):
             s = synthetic(d, 'v2')
             project = Path(d) / 'project'
             for n in ('knee/__init__.py', 'knee/s6_solo_pair.py', 'knee/s6_solo_runtime.py', 'knee/s6_solo_rehearsal.py',
-                      'knee/s6_solo_a_runner.py'):
+                      'knee/s6_solo_a_runner.py', 'knee/s6_solo_b_observer.py'):
                 write(project / n, (PROJECT / n).read_bytes())
             write(project / RT.CAPTURED, CAPTURED.read_bytes())
             ids, splits = ['T1', 'T2', 'T3', 'T4', 'S1'], ['train'] * 4 + ['test']
@@ -624,9 +687,11 @@ class RehearsalIntegrationTests(unittest.TestCase):
                     mock.patch.object(R, 'INPUT_ROOT', s['kroot'] / 'input'), mock.patch.object(R, 'FIXTURE_ROOT', Path(d) / 'fx'), \
                     mock.patch.object(RT, 'bind', bind), mock.patch.object(RT, 'gpu_query', lambda: boards), \
                     mock.patch.object(RT, 'meminfo', lambda: {'MemTotal': 31 << 30, 'MemAvailable': 25 << 30}):
-                receipt = RT.run(cfg, project)
+                with self.assertRaisesRegex(RuntimeError, 'S6 solo rehearsal did not pass'):
+                    RT.run(cfg, project)
             k1 = seen['k1']
-            self.assertEqual(receipt['status'], 'PASS', receipt['failed_checks'])
+            failure = json.loads((work / 's6solo' / 'failure.json').read_text())
+            self.assertIn('did not pass', failure['detail'])
             self.assertFalse((work / 'submission.csv').exists())
             self.assertTrue((work / 's6solo' / 'rehearsal-final.csv').is_file())
             whats = [w for w, _ in k1.run_group.calls]
@@ -639,8 +704,8 @@ class RehearsalIntegrationTests(unittest.TestCase):
             self.assertEqual(sorted(json.loads((work / 'k1/B/px_hashes.json').read_text())), sorted(ids))
             led = json.loads((work / 's6solo' / 'ledger.json').read_text())
             self.assertEqual([r['id'] for r in led['rows']], ids)
-            again = R.verify_result(work, cfg, k1)
-            self.assertEqual(again['ledger_sha256'], receipt['ledger_sha256'])
+            with self.assertRaisesRegex(ValueError, 'PASSING_BOUND_REHEARSAL'):
+                R.verify_result(work, cfg, k1)
             self.assertEqual(os.environ.get('K1_KAGGLE_ROOT'), str(Path(d) / 'fx'))
         os.environ.pop('K1_KAGGLE_ROOT', None)
 
@@ -712,6 +777,11 @@ class BuilderPairTests(unittest.TestCase):
         B = self.B
         B.build_rehearsal(self.out / 'kaggle')
         roots = {v: self.out / 'kaggle' / B.SLUGS[v] for v in ('v2', 'control')}
+        from scripts.check_s6_solo_pair import pair_difference, probe
+        for root in roots.values():
+            pack, _ = B.unpack(root / 'notebook.ipynb')
+            probe(pack)
+        self.assertEqual(pair_difference(roots)['identical_sources'], len(B.COMMON_SOURCES) + len(B.REHEARSAL_SOURCES) + 1)
         for v, root in roots.items():
             B.verify_build(root, v)
             meta = json.loads((root / 'kernel-metadata.json').read_text())
@@ -757,16 +827,12 @@ class BuilderPairTests(unittest.TestCase):
         cfg = B.packet('v2')['cfg']
         k1 = load()
         root, receipt = synthetic_result(Path(self.tmp.name) / 'res', cfg, k1, payload=prepared['payload_sha256'])
-        self.assertEqual(receipt['status'], 'PASS', receipt['failed_checks'])
-        r = B.build_entry('v2', build, root, destination=self.out / 'kaggle' / 'entry-v2', slug='s6solo-v2-entry-20261016')
-        self.assertEqual((r['status'], r['mode']), ('QUALIFIED_ENTRY_BUILD', 'entry'))
-        pack, _ = B.unpack(self.out / 'kaggle' / 'entry-v2' / 'notebook.ipynb')
-        self.assertEqual(pack['cfg']['mode'], 'entry')
-        self.assertNotIn('rehearsal', pack['cfg'])
-        self.assertFalse(set(pack['sources']) & set(B.REHEARSAL_SOURCES))
-        self.assertEqual(pack['cfg']['qualified_rehearsal']['payload_sha256'], prepared['payload_sha256'])
+        self.assertEqual(receipt['status'], 'FAIL', receipt['failed_checks'])
+        self.assertIn('qualified_model_state_and_reload', receipt['failed_checks'])
+        with self.assertRaisesRegex(ValueError, 'PASSING_BOUND_REHEARSAL'):
+            B.build_entry('v2', build, root, destination=self.out / 'kaggle' / 'entry-v2', slug='s6solo-v2-entry-20261016')
         root2, _ = synthetic_result(Path(self.tmp.name) / 'res2', cfg, k1, payload='0' * 64)
-        with self.assertRaisesRegex(ValueError, 'RESULT_FROM_THIS_REHEARSAL_PACKET'):
+        with self.assertRaisesRegex(ValueError, 'PASSING_BOUND_REHEARSAL|RESULT_FROM_THIS_REHEARSAL_PACKET'):
             B.build_entry('v2', build, root2, destination=self.out / 'kaggle' / 'entry-v2b')
         root3, _ = synthetic_result(Path(self.tmp.name) / 'res3', cfg, k1, slow=True, payload=prepared['payload_sha256'])
         with self.assertRaisesRegex(ValueError, 'PASSING_BOUND_REHEARSAL'):

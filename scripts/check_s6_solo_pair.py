@@ -26,7 +26,7 @@ root = os.path.realpath(sys.argv[1]); sys.path.insert(0, root)
 cfg = json.loads(Path(root, 'runtime-config.json').read_text())
 names = ['knee', 'knee.s6_solo_pair', 'knee.s6_solo_runtime']
 if cfg['mode'] == 'rehearsal':
-    names += ['knee.s6_solo_rehearsal', 'knee.s6_solo_a_runner']
+    names += ['knee.s6_solo_rehearsal', 'knee.s6_solo_a_runner', 'knee.s6_solo_b_observer']
 mods = {n: importlib.import_module(n) for n in names}
 for n, m in mods.items():
     assert os.path.realpath(m.__file__).startswith(root + os.sep), (n, m.__file__)
@@ -50,6 +50,7 @@ if cfg['mode'] == 'rehearsal':
     R, A = mods['knee.s6_solo_rehearsal'], mods['knee.s6_solo_a_runner']
     assert all(callable(getattr(R, n)) for n in ('prepare', 'install', 'finish', 'assemble', 'projection', 'verify_result'))
     assert A.A_SOURCE_SHA256 == a_sha and callable(A.run)
+    assert callable(mods['knee.s6_solo_b_observer'].install)
     out['fixture'] = {'studies': len(cfg['rehearsal']['fixture']['ids']), 'train': cfg['rehearsal']['fixture']['splits'].count('train')}
 print('S6SOLO_PROBE ' + json.dumps(out, sort_keys=True))
 '''

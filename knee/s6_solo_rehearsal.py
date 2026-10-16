@@ -135,6 +135,46 @@ def install(k1, cfg, state):
         state['I'] = I
         return I
     k1.prepare_inputs = keep_inputs
+    # The B source and its arithmetic remain byte-identical. A Python startup hook
+    # observes the already-imported CT.Net at the worker's constructor/load/forward boundary.
+    project = Path(runner).parent.parent
+    hook_dir = Path(k1.TMP) / 's6solo-observer'
+    hook_dir.mkdir(parents=True, exist_ok=True)
+    (hook_dir / 'sitecustomize.py').write_text(
+        'from knee.s6_solo_b_observer import install\ninstall()\n')
+    original_b_env = k1.b_env
+
+    def observed_b_env(gi, px):
+        env = original_b_env(gi, px)
+        env = dict(env)
+        env['S6SOLO_MODE'] = 'rehearsal'
+        env['S6SOLO_MODEL_RECEIPT'] = str(Path(px).parent / 'model-qualification.json')
+        env['PYTHONPATH'] = str(hook_dir) + os.pathsep + str(project) + os.pathsep + env.get('PYTHONPATH', '')
+        return env
+    k1.b_env = observed_b_env
+
+    original_b_done = k1.b_done
+    def observer_complete(pdir):
+        return original_b_done(pdir) and (Path(pdir) / 'model-qualification.json').is_file()
+    k1.b_done = observer_complete
+
+    original_run_b = k1.run_b
+
+    def run_b_with_qualification(I, tag, ids, split, budget_s, px=False):
+        result = original_run_b(I, tag, ids, split, budget_s, px=px)
+        if tag == 'B':
+            records = []
+            for gi in range(2):
+                p = Path(k1.OUT) / 'B' / ('part%d' % gi) / 'model-qualification.json'
+                if p.is_file():
+                    records.extend(json.loads(p.read_text()).get('boards', []))
+            receipts = [Path(k1.OUT) / 'B' / ('part%d' % gi) / 'model-qualification.json' for gi in range(2)]
+            if all(p.is_file() for p in receipts):
+                overhead = sum(float(json.loads(p.read_text()).get('overhead_seconds', 0)) for p in receipts)
+                save(Path(k1.OUT) / 'B' / 'model-qualification.json',
+                     {'source': 'runtime_observer', 'boards': records, 'overhead_seconds': overhead})
+        return result
+    k1.run_b = run_b_with_qualification
     state['controller_t0'] = k1.T0
 
 
@@ -261,6 +301,69 @@ def _csv_matrix(path, labels):
     return [r[UID] for r in rows], [[float(r[l]) for l in labels] for r in rows], (list(rows[0].keys()) if rows else [])
 
 
+def _valid_model_receipt(model_receipt, expected_boards, expected_models):
+    """Require observed per-board model identity, unchanged state and strict reload sentinel."""
+    if not isinstance(model_receipt, dict) or model_receipt.get('source') != 'runtime_observer':
+        return False
+    records = model_receipt.get('boards')
+    if not isinstance(records, list) or len(records) != 2:
+        return False
+    if (model_receipt.get('component_a_source_sha256') != expected_models['a'].get('component_source_sha256')
+            or model_receipt.get('inference_source_sha256') != expected_models['b'].get('inference_source_sha256')):
+        return False
+    want = {b.get('uuid') for b in expected_boards}
+    got = set()
+    for r in records:
+        if not isinstance(r, dict):
+            return False
+        got.add(r.get('gpu_uuid'))
+        for component, expected in expected_models.items():
+            expected_sha = expected['checkpoint_sha256']
+            m = r.get(component)
+            hashes = ('checkpoint_sha256', 'constructor_sha256', 'buffers_before_sha256', 'buffers_after_sha256',
+                      'state_before_sha256', 'state_after_sha256', 'reload_state_sha256', 'input_sha256',
+                      'reload_constructor_sha256', 'reload_buffers_sha256', 'reload_input_sha256')
+            if not isinstance(m, dict) or any(not isinstance(m.get(k), str) or len(m[k]) != 64 for k in hashes):
+                return False
+            if (m.get('state_before_sha256') != m.get('state_after_sha256')
+                    or m.get('buffers_before_sha256') != m.get('buffers_after_sha256')
+                    or m.get('state_before_sha256') != m.get('reload_state_sha256')
+                    or m.get('constructor_sha256') != m.get('reload_constructor_sha256')
+                    or m.get('buffers_before_sha256') != m.get('reload_buffers_sha256')
+                    or m.get('input_sha256') != m.get('reload_input_sha256')
+                    or m.get('strict_reload') is not True
+                    or m.get('sentinel_same_input') is not True
+                    or m.get('sentinel_max_abs') != 0.0
+                    or m.get('state_unchanged_from_load') is not True
+                    or m.get('buffers_unchanged_from_load') is not True
+                    or m.get('checkpoint_sha256') != expected_sha
+                    or m.get('state_before_sha256') != expected.get('state_sha256')
+                    or m.get('buffers_before_sha256') != expected.get('buffers_sha256')
+                    or m.get('constructor_source_sha256') != expected.get('constructor_source_sha256')
+                    or (expected.get('constructor_spec') is not None
+                        and m.get('constructor_spec') != expected['constructor_spec'])
+                    or (expected.get('buffer_inventory') is not None and m.get('buffer_inventory') != expected['buffer_inventory'])):
+                return False
+    return got == want and None not in got
+
+
+def _collect_model_qualification(k1_dir):
+    """Join separately written A and B observer receipts by the physical GPU UUID."""
+    a_path, b_path = Path(k1_dir) / 'A' / 'model-qualification.json', Path(k1_dir) / 'B' / 'model-qualification.json'
+    try:
+        a, b = json.loads(a_path.read_text()), json.loads(b_path.read_text())
+        amap = {r['gpu_uuid']: r['a'] for r in a['boards']}
+        bmap = {r['gpu_uuid']: r['b'] for r in b['boards']}
+        boards = [{'gpu_uuid': uid, 'a': amap[uid], 'b': bmap[uid]} for uid in sorted(set(amap) & set(bmap))]
+        return {'source': 'runtime_observer' if a.get('source') == b.get('source') == 'runtime_observer' else 'invalid',
+                'boards': boards, 'overhead_seconds': float(a['overhead_seconds']) + float(b['overhead_seconds']),
+                'component_a_source_sha256': a.get('component_a_source_sha256'),
+                'inference_source_sha256': b.get('inference_source_sha256'),
+                'a_receipt_sha256': file_sha(a_path), 'b_receipt_sha256': file_sha(b_path)}
+    except (OSError, KeyError, TypeError, ValueError):
+        return None
+
+
 def assemble(k1, cfg, k1_dir, final_csv, timing, sentinel_run, resources):
     """Ledger, gates and projection from saved files only (replayed by verify_result)."""
     import numpy as np
@@ -269,11 +372,29 @@ def assemble(k1, cfg, k1_dir, final_csv, timing, sentinel_run, resources):
     ids = fx['ids']
     k1_dir = Path(k1_dir)
     kr = json.loads((k1_dir / 'k1_receipt.json').read_text())
+    model_qualification = _collect_model_qualification(k1_dir)
     checks = {}
     env = kr.get('env', {})
     boards = resources.get('boards', [])
     checks['two_physical_t4'] = (env.get('n_gpu') == 2 and env.get('gpus') == ['Tesla T4', 'Tesla T4'] and len(boards) == 2
                                  and len({b['uuid'] for b in boards}) == 2 and all(b['name'] == 'Tesla T4' for b in boards))
+    code_files = cfg['common'].get('code_mount', {}).get('files', {})
+    b_cpu = cfg['arm'].get('cpu', {})
+    a_weight = cfg['common'].get('a_weight', {})
+    checks['qualified_model_state_and_reload'] = _valid_model_receipt(
+        model_qualification, boards,
+        {'a': {'checkpoint_sha256': a_weight.get('sha256'),
+               'state_sha256': '1d8594d77f7dd592bd1ef1b2090d74eb8ea09580fe689f78dbab273c8ae8a219',
+               'buffers_sha256': 'ecc59528d4a2a8b357169948626a542109a34473449003d3fa51bad9717739ca',
+               'constructor_source_sha256': cfg['common'].get('embedded_a_sha256'),
+               'component_source_sha256': cfg['common'].get('embedded_a_sha256'),
+               'buffer_inventory': None},
+         'b': {'checkpoint_sha256': cfg['arm']['b_model']['sha256'],
+               'state_sha256': b_cpu.get('state_sha256'),
+               'constructor_source_sha256': code_files.get('compact_train.py', {}).get('sha256'),
+               'inference_source_sha256': code_files.get('compact_infer.py', {}).get('sha256'),
+               'constructor_spec': b_cpu.get('constructor'),
+               'buffer_inventory': b_cpu.get('buffer_inventory')}})
     checks['bound_variant'] = (kr.get('solo', {}).get('binding_sha256') == binding_digest(cfg)
                                and kr['inputs']['model']['sha256'] == cfg['arm']['b_model']['sha256']
                                and kr.get('solo_stage', {}).get('alias_sha256') == cfg['arm']['b_model']['sha256'])
@@ -343,6 +464,8 @@ def assemble(k1, cfg, k1_dir, final_csv, timing, sentinel_run, resources):
          'b_parts': [b_timing(k1, p['dir'], len(p['ids'])) for p in parts]}
     proj = projection(m, k1)
     checks['projection_8_3h_and_inherited_guards'] = bool(proj['passes'])
+    actual_elapsed = timing.get('finished', math.inf) - timing.get('notebook_started', 0)
+    checks['actual_notebook_elapsed_under_9h'] = (math.isfinite(actual_elapsed) and 0 <= actual_elapsed < 32400)
     t0 = timing['controller_t0']
     windows = {name: (t0 + v['start_s'], t0 + v['start_s'] + v['seconds']) for name, v in kr['stages'].items()}
     res = peaks(resources, windows)
@@ -371,7 +494,9 @@ def assemble(k1, cfg, k1_dir, final_csv, timing, sentinel_run, resources):
                                'retry_seconds': 0.0, 'attempts': a['attempts']},
                          'B': {'fixed_seconds': proj['fixed_seconds']['B'], 'parts': m['b_parts'], 'retry': b['retry']}},
                'k1_receipt_sha256': file_sha(k1_dir / 'k1_receipt.json'),
-               'elapsed_seconds': round(timing['finished'] - timing['notebook_started'], 1),
+               'elapsed_seconds': round(actual_elapsed, 1),
+               'qualification_overhead_seconds': model_qualification.get('overhead_seconds') if model_qualification else None,
+               'model_qualification': model_qualification,
                'scope': 'Private offline 2xT4 qualification on the frozen 39 (36 train + 3 test); no labels read; '
                         'not a score, not hidden-population evidence.'}
     return receipt, ledger

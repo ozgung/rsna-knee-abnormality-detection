@@ -62,7 +62,7 @@ REHEARSAL = {'mounts': [[CODE_MOUNT, 'checkpoint-manifest.json'], [HELIOS.split(
              'sentinel_per_board': 2, 'sentinel_timeout_s': 1800, 'sentinel_probability_atol': 1e-3,
              'projection_studies': 1300, 'gate_seconds': 29880, 'post_controller_allowance_seconds': 60}
 COMMON_SOURCES = ('knee/__init__.py', 'knee/s6_solo_pair.py', 'knee/s6_solo_runtime.py')
-REHEARSAL_SOURCES = ('knee/s6_solo_rehearsal.py', 'knee/s6_solo_a_runner.py')
+REHEARSAL_SOURCES = ('knee/s6_solo_rehearsal.py', 'knee/s6_solo_a_runner.py', 'knee/s6_solo_b_observer.py')
 DEVIATIONS = [
     'Control checkpoint is read from nartaa/rsna-knee-s6fall-weights version 3 (the captured solo layout, which carries the '
     'publisher code extras) instead of the accepted version-1 download; identical full SHA256/size is required at runtime. '
@@ -150,7 +150,10 @@ def arms(captured_bytes):
         'receipts': dict(CONTROL_RECEIPTS),
         'json_expect': {'E_prior_s42_fall.run_config.json': c_run, 'E_prior_s42_fall.DONE.json': c_done},
         'text_expect': {},
-        'cpu': {'receipt_sha256': CPU_SHA, 'state_sha256': cpu['checkpoints']['control']['state_sha256'], 'strict_load': True},
+        'cpu': {'receipt_sha256': CPU_SHA, 'state_sha256': cpu['checkpoints']['control']['state_sha256'],
+                'constructor_buffers_sha256': cpu['checkpoints']['control']['constructor_buffers_sha256'],
+                'buffer_inventory': cpu['checkpoints']['control']['buffer_inventory'],
+                'constructor': cpu['constructor'], 'strict_load': True},
         'provenance': 'Public nartaa S6fall all-data checkpoint, publisher-reported 4263 training studies/16 epochs; '
                       'public 0.950 is attributed historical context, not our verified control score.'}
     v = desc['v2']
@@ -181,7 +184,10 @@ def arms(captured_bytes):
                     'descriptor_dataset_version': v['dataset_version'], 'mount': v['dataset_slug'].split('/')[1]},
         'receipts': receipts, 'json_expect': {'run_config.json': v_run, 'membership_E_prior_s42_f0.json': v_mem},
         'text_expect': {'SHA256SUMS': line},
-        'cpu': {'receipt_sha256': CPU_SHA, 'state_sha256': cpu['checkpoints']['v2']['state_sha256'], 'strict_load': True},
+        'cpu': {'receipt_sha256': CPU_SHA, 'state_sha256': cpu['checkpoints']['v2']['state_sha256'],
+                'constructor_buffers_sha256': cpu['checkpoints']['v2']['constructor_buffers_sha256'],
+                'buffer_inventory': cpu['checkpoints']['v2']['buffer_inventory'],
+                'constructor': cpu['constructor'], 'strict_load': True},
         'provenance': 'Own post-hoc V2-all ConvNeXt-small S6, all 4345 studies, seed 42, 16 epochs; gold-58 selection-exposed, '
                       'teacher/report exposure retained; original fold-0 BLOCKED verdict unchanged.'}
     for arm in out.values():
