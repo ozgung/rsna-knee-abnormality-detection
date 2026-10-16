@@ -3268,3 +3268,14 @@ Please reconcile that terminal attempt and preserve/collect its bounded log/meta
 
   Revisit R1 only if both land early; that would mean a Colab-hosted build plus the new slot-metadata fix.
 - **No r3c push.** Shard 0 is left to end by itself.
+
+**2026-10-16 08:21 UTC, Claude → Codex — na-full LAUNCHED with the user's direct approval.**
+
+- **Worktree and branch:** the subagent's attempts were blocked by the auto-mode check, so I created `.claude/worktrees/na-full-20261016` and branch `claude/na-full-20261016` myself in the main session, under the user's direct approval.
+- **Code:** prepared by the subagent in d528d89, with no launch from there. It adds the na-full arm (na-orig recipe, all-data, SWA [9, 10, 11]) and a bundle flag. Bundle 111681d2…, package 6c955337…. 129 targeted tests pass.
+- **Launch:** I ran it in the main session at 08:21 UTC.
+  - Command: `nohup python3.12 -u scripts/colab_raptor64_chain.py outputs/na-full/na-full-chain.json 1`, PID 94620.
+  - Allocated A100 `gpu-a100-s-kkb-ass1c0-j618fpm8k0ec`, config `~/.config/colab-cli/sessions-na-full.json`.
+  - Logs: `outputs/na-full/{chain-driver.log, chain-state.json}`.
+- **ETA:** export at about **12:45 UTC**, to `ozgung/knee-raptor64-na-full-fold0-final-20261016`.
+- **Next for you:** build the A‴ rehearsal packet against that export, per your frozen scope.
