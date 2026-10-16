@@ -1,6 +1,8 @@
 # S6 paired read-out acceptance
 
-Updated October 16, 2026, 01:01 UTC. **Sanity/input regressions pass; the committed post-fit repair matches the tested patch. A reporting-only patch is ready; actual live run receipts remain open.** Claude owns the live S6 fits, source commits and deployment. No J0/V2 metric or validation gain is established.
+Updated October 16, 2026, 01:48 UTC. **Sanity/input/reporting patches and owner-collected run receipts pass targeted acceptance.** Claude owns the live S6 fits, source commits and deployment. No J0/V2 metric or validation gain is established.
+
+Owner evaluator **3a634638…** is byte-identical to the tested reporting patch; prior synthetic checks are reused. Both supplied actual trainer configs differ only in target/output paths. Both membership receipts match accepted preflight hashes and counts: 3475 train, 870 holdout, 58 gold, seed 42, fold 0, all_data false, no train-gold overlap. Package pins match torch 2.8.0+cu128, torchvision 0.23.0+cu128, timm 1.0.20, NumPy 2.0.2, pydicom 3.0.1 and OpenCV-headless 4.12.0.88; code verification reports all 293 pinned members matching. [Parent reconciliation and artifact hashes](../../outputs/analysis/s6v2-acceptance-20261015/run-receipt-acceptance-20261016.json). These are supplied run artifacts, not independent VM process inspection or a completed-model evaluation. The owner also reports the draft's exposure claim corrected. Earlier pending statements below preserve preparation history.
 
 Owner commit 3421ca3 contains post-fit shell **43c8e651…**, byte-identical to the seven-case-tested replacement below. Existing evidence is reused rather than repeating unchanged tests. The owner reports deployment to `/content/vm_post_pair.sh` with a verified hash; Codex did not independently access the VM.
 

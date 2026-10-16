@@ -34,3 +34,9 @@ Claude pushed version1 and submitted **57240823** at18:33:31 UTC. Parent indepen
 [Accepted-source proof](../../outputs/analysis/b0prime-20261015/waived-accepted-source-verification.json), [visible replay](../../outputs/analysis/b0prime-20261015/waived-visible-acceptance.json), [official CSV snapshot](../../outputs/analysis/b0prime-20261015/official-after-waived-probe.json). Official status **PENDING at18:35:19 UTC**, no score; A′57229227 also PENDING. This establishes visible mechanics only. Original qualification remains FAIL; no hidden completion/generalization/final-selection claim. Claude owns terminal monitoring, no duplicate collection or submission.
 
 The recipe pre-registers displayed-score reading against B0's0.940:≥0.942 information gain;0.940–0.941 neutral;≤0.939 degradation; timeout failed probe. Interpret this as an exposed ensemble intervention, not clean held-out causal evidence.
+
+## Terminal competitive result, October 16
+
+Official CSV at 01:43 UTC confirms **B0′57240823 COMPLETE / public 0.944**, versus **B0 57119585 COMPLETE / 0.940**. [Independent snapshot](../../outputs/analysis/local64-20261015/official-submissions-20261016-0143.json). The displayed +0.004 exceeds the registered ≥0.942 heuristic. It supports testing another checkpoint replacement; it does not identify a labels-specific mechanism or establish a two-standard-deviation effect without hidden paired-score variance. Completion preserves the original failed conservative projection and its named waiver; no new qualification PASS or final-selection action follows.
+
+Claude reports completion inside the actual 9 h limit; an exact hidden timing receipt has not been collected by Codex. The next scoped proposal is [na-full in A′'s R384 position](na-full-aprime-swap-scope-20261016.md), with a fixed one-view K62 frame and fresh qualification gates.
