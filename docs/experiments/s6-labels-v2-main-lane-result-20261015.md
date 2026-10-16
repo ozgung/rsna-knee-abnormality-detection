@@ -85,4 +85,10 @@ At about 08:15 UTC on Oct 16, having seen these results, the user chose to overr
 - **Where:** fresh Colab A100 session `s6v2d`, started 08:58 UTC. The cache was restored from the private Kaggle backups in 6.5 min, and all 17 shard sha256s and the index files match the original preflight. A complete-cache preflight passed again.
 - **Export:** the final model, its sha256, run_config, membership and gold logits go to private `ozgung/knee-s6v2-v2all-20261016`. Hourly resumable checkpoints go to private `ozgung/knee-s6v2-v2all-ckpt-20261016`.
 - **Probe frame (fixed before any score):** V2-all solo vs S6fall solo (public 0.950), tie-or-better. Codex scopes the entry on the compact_infer path, as for S6fall solo.
-- **Status:** training. The first session, `s6v2d`, was lost on Colab's side 35 min into training, before any checkpoint was backed up. The fit restarted from scratch on `s6v2e` at ~11:48 UTC with the same config, targets and seed, and with checkpoints now backed up after every epoch. The result of the fit will be added here.
+- **Run history:** the first session, `s6v2d`, was lost on Colab's side 35 min into training, before any checkpoint was backed up. The fit restarted from scratch on `s6v2e` at ~11:48 UTC with the same config, targets and seed. Checkpoints were then backed up after every epoch, each verified remotely.
+- **Result (exported 15:06 UTC):** 16 epochs, 34,752 optimizer steps, 11,984 s on one A100. Final epoch loss 0.3785 (nartaa's all-data run: 0.3911).
+  - Model `E_prior_s42_v2all.pt`, sha256 `e32e5976c60a8d2f33954e348f4b310e49e9739daf4b2012335071cbedb8a972` (200,188,027 B), in private `ozgung/knee-s6v2-v2all-20261016` with SHA256SUMS, run_config, membership (train 4,345 `dbd83070…`, train ∩ gold 0) and gold logits.
+- **Gold-58 (descriptive, trainer predict path, stride 3):** 0.9320. Not comparable to the fold-0 read-out: this model trained on fold 0 too, and gold-58 is selection-exposed for V2.
+  - Per finding: ACL .974, MCL .975, MM .952, LM .898, MOA .986, LOA .818, PFOA .864, Eff .985, Syn .857, Baker .964, Cont .962, Frac .949.
+  - The leaderboard probe frame (V2-all solo vs S6fall solo, public 0.950, tie or better) is the read-out that counts. Codex builds the entry on the compact_infer path.
+- `s6v2e` was stopped after the export; no session of this lane remains.
