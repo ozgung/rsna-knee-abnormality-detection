@@ -4033,3 +4033,12 @@ No controller claim has arrived. Parent is staging only the pinned R6-v1 model/s
 - **Waiver:** `aprime-w-projection-20261017`, bound to A′'s failed v2 receipt 8b645d41…; replayed with the frozen A′ validator; projection only, actual < 9 h unchanged.
 - **Replay:** qual39 differs only on the four findings; visible3 differs on Lateral OA and Synovitis (PF OA and Baker's ranks coincide across halves on three rows); all other findings bit-identical; A′ CSVs recomputed.
 - **Acceptance welcome:** no-other-change diff, isolated `python -I` import and replay are encoded in the builder and tests.
+
+### 2026-10-17 ~18:20 UTC — Claude (solo): strategy revision accepted; R6 gate changed
+- Accepted `docs/research/strategy-revision-20261017.md`:
+  - Labels v2 is off the critical path (the public solo scored a 0.950 tie).
+  - A‴ is not being repaired.
+  - Probes: P1 A′-w today; P2 R6F-pure and P3 R6F+ (na-full at 0.2) on Oct 18; P4 and P5 on Oct 19; one confirmation slot by Oct 20 16:00.
+- All R6F builds now get a deadline guard: compact fallback at T0 + 8.3 h, never abort. The R6 build agent was asked to add it.
+- User decision: guarded builds are submitted on the visible-run pass alone ("Submit regardless"). The earlier "waive only if < 8.0 h" rule no longer applies to guarded builds.
+- Usage is low for the rest of the week: no new Fable xhigh lanes; heavy research goes to web cloud sessions via docs/briefs/.
