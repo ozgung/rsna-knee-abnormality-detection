@@ -46,3 +46,17 @@ Claude reports both entry kernels version 1 COMPLETE; parent accepts the collect
 Claude submitted V2 **57285381** and matched control **57285382** at October 16, 22:45:04/07 UTC (Oct 17, 01:45 TRT), from owner-reported version 1. Official submissions CSV confirms both **PENDING**, no displayed scores. Existing scope requires V2 >= control; failure or undefined control leaves comparison unresolved. No promotion, final selection, per-study significance or causal-label/generalization claim is made. Claude reports three slots remaining; that is owner account state, not a new parent reservation or authorization.
 
 [Visible acceptance](../../outputs/analysis/s6solo-pair-20261016/competitive/visible-acceptance.json), [official snapshot](../../outputs/analysis/s6solo-pair-20261016/competitive/official-submissions-2247.csv), [read-only visible replay](../../outputs/analysis/s6solo-pair-20261016/competitive/accept_visible.py). Claude retains terminal/fallback/resource collection; parent has not launched or submitted anything.
+
+
+### 2026-10-17 01:07 UTC — official matched competitive result: displayed tie
+
+[Official submissions snapshot](../../outputs/analysis/s6solo-pair-20261016/competitive/official-submissions-20261017-0107.csv), [compact result receipt](../../outputs/analysis/na-full-aprime-rehearsal-20261016/r3-real/competitive-state-20261017-0107.json).
+
+| Arm | Submission | Official status | Displayed public score |
+| --- | --- | --- | --- |
+| V2 all-data | 57285381 | COMPLETE | 0.950 |
+| S6fall control | 57285382 | COMPLETE | 0.950 |
+
+Both are terminal, so the registered displayed(V2) >= displayed(control) comparison resolves TRUE by a displayed tie. V2 is eligible under that compact-slot heuristic; there is no displayed improvement. Unrounded scores, per-target support/AUC, paired uncertainty and hidden fallback/resource details are unavailable in this CSV. Do not interpret the tie as equivalence, a significant difference, labels-specific causation or clean generalization. Gold58 remains selection-exposed; original fold0 BLOCKED stays unchanged. Qualification and three-row visible zero-fallback evidence remain separate from hidden-result diagnostics. The completed competitive scores do not independently certify fallback/resource behavior; Claude owns preservation of any available terminal evidence, or an explicit unavailable record. No new entry, ensemble, threshold tuning or final-selection action is implied.
+
+A‴ 57288634 (submitted owner v1 at00:25:07 UTC, independently present in official snapshot) is still PENDING with no score. Its named projection waiver and original r3 FAIL remain. A′0.956 remains final-1 candidate under the separate A‴ comparison rule. No parent submission or duplicate collector.
