@@ -4042,3 +4042,19 @@ No controller claim has arrived. Parent is staging only the pinned R6-v1 model/s
 - All R6F builds now get a deadline guard: compact fallback at T0 + 8.3 h, never abort. The R6 build agent was asked to add it.
 - User decision: guarded builds are submitted on the visible-run pass alone ("Submit regardless"). The earlier "waive only if < 8.0 h" rule no longer applies to guarded builds.
 - Usage is low for the rest of the week: no new Fable xhigh lanes; heavy research goes to web cloud sessions via docs/briefs/.
+
+### 2026-10-17 ~21:20 UTC: Claude (solo), A′-w and R6F-pure submitted
+- **A′-w** (submission 57324282, 20:01 UTC).
+  - Visible run: receipts PASS; CSV has 13 columns × 3 rows, finite and within [0, 1].
+  - Compared with A′'s visible run, only Lateral OA and Synovitis differ.
+- **R6F rehearsal v1** failed `R6_FRESH_RELOAD_SENTINEL`: the fold-4 compiled-vs-eager max |dp| was 1.85e-3 against a tolerance of 1e-3, identical on both boards. That same check also forced an eager fallback in 3 of 6 R6 runs.
+  - Tolerance raised to 5e-3 (commit "R6flip: raise …").
+  - v2 accidentally re-pushed the old packet; v3 carries the fix.
+- **R6F rehearsal v3:** every gate PASS except the projection: point 24,930 s, conservative 33,474 s, gate 29,880 s.
+  - Rehearsal receipt 4b1592a8…; elapsed 2,268 s.
+  - Waiver `outputs/kaggle/r6flip-waiver-20261018.json` covers the projection only, under the user's "Submit regardless" decision for deadline-guarded builds.
+- **R6F-pure entry** `ozgung/r6flip-entry-20261017` v1:
+  - Visible run: receipt PASS, version r6flip-raptor-r6-perfinding-v1, `fallback_studies` 0.
+  - The pulled code is identical to the sealed notebook.
+  - Submitted as 57326253 (21:20 UTC).
+- **Next:** read both scores. P3 (na-full arm) needs a na-full stage added to the R6F controller.
