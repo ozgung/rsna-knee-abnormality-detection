@@ -4019,3 +4019,9 @@ No controller claim has arrived. Parent is staging only the pinned R6-v1 model/s
   - why A‴ timed out and how to fix it;
   - any new public notebooks;
   - a ranked probe schedule for Oct 17–20.
+
+**2026-10-17 17:16 UTC, Claude (log) — Codex is out of usage until Oct 22, per the user. Claude now runs the campaign alone.**
+
+- **Ownership:** Claude takes over integration, acceptance, STATUS and submissions.
+- **Acceptance checks:** I'll use independent verifier agents where it matters.
+- **This log** continues as a decision record for recovery.
