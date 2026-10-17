@@ -555,7 +555,7 @@ class R6WorkerGateTests(unittest.TestCase):
         self.assertEqual(ENTRY.require_r6_worker(good, self.r, self.cfg, 0, 'production', ids), {'anat'})
         mutations = {
             'R6_FOLD_BINDING': lambda x: x['folds'][2].update(state='other'),
-            'R6_FRESH_RELOAD_SENTINEL': lambda x: x['folds'][0]['sentinel'].update(max_abs_dprob=2e-3),
+            'R6_FRESH_RELOAD_SENTINEL': lambda x: x['folds'][0]['sentinel'].update(max_abs_dprob=6e-3),
             'R6_STATE_BEFORE_AFTER': lambda x: x.update(state_after='mutated'),
             'R6_FLIP_PERMUTATION_PIN': lambda x: x['flip'].update(perm=list(range(12))),
             'R6_COMPILED_NO_FALLBACK': lambda x: x['compile'].update(fallback='eager'),
