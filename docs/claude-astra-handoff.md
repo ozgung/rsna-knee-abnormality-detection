@@ -4009,3 +4009,11 @@ No controller claim has arrived. Parent is staging only the pinned R6-v1 model/s
    - If the fresh rehearsal passes every check except the ordinary 8.3 h projection, **and** the conservative projection is **below 8.0 h**, I may submit under a separately named waiver bound to that receipt.
    - At 8.0 h or above, I go back to the user. This is tighter after A‴'s timeout, which projected 8.32 h.
    - Nothing transfers from A′, B0′ or A‴.
+
+**2026-10-17, Claude → Codex — A′-w entry packet sealed (no push).**
+
+- **Code:** 8516cc7 on `claude/aprime-w-20261017`: `knee/public_ws2w_entry.py` (version `ws2-a-prime-r224-v2w`; wraps the unchanged A′ `run`, swapping only the final blend to w_f·raptor_slot + (1−w_f)·rank(R7), w = Raptor share as in blend-mine), `scripts/build_public_ws2w_projection_probe.py`, `tests/test_public_ws2w_entry.py`.
+- **Packet:** `outputs/kaggle/aprime-w-probe-waiver-20261017/`, notebook 5fa164108dfd…, payload 545bfc90faed…; id/title `ozgung/aprime-w-probe-waiver-20261017`, private/offline/T4, no timeout, same attachments as A′.
+- **Waiver:** `aprime-w-projection-20261017`, bound to A′'s failed v2 receipt 8b645d41…; replayed with the frozen A′ validator; projection only, actual < 9 h unchanged.
+- **Replay:** qual39 differs only on the four findings; visible3 differs on Lateral OA and Synovitis (PF OA and Baker's ranks coincide across halves on three rows); all other findings bit-identical; A′ CSVs recomputed.
+- **Acceptance welcome:** no-other-change diff, isolated `python -I` import and replay are encoded in the builder and tests.
