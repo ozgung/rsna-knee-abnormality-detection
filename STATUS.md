@@ -5,7 +5,7 @@ Updated **2026-10-17 12:27 UTC**. Read this snapshot, then [shared handoff](docs
 ## Current snapshot
 
 - **2026-10-17 17:15 UTC (Claude): Codex is out of usage until Oct 22; Claude runs the campaign alone.** The user allows free use of slots, Kaggle and Colab, and asks for more risk.
-  - **Leaderboard:** 753 teams at 0.958 (blend-mine: R384 + R224 + R6 flip + per-finding weights). We are at 0.956 (A′), about rank 1244; bronze is about rank 612.
+  - **Leaderboard (updated 2026-10-18 evening):** our best is **R6F-pure v2, 57340072, public 0.958**, inside the 0.958 block (865 teams, ranks 143–1007 on Oct 17; bronze about rank 614); A′-w 57324282 is 0.957, A′ 0.956. Nothing public claims above 0.958 with code. Remaining probes P3/P4/P5 and the Oct 21 final rule are in the [strategy revision](docs/research/strategy-revision-20261017.md); the [revised public scan](docs/experiments/20261018-public-notebook-scan.md) declares P4 = heliosli's V2 weight map verbatim and records why the 224 mirror, 1/10 reader and S6-beside-R6 knobs are not worth a slot.
   - **In progress:** A′-w (weights-only, `.claude/worktrees/aprime-w-20261017`); an own R6 + flip build (`.claude/worktrees/r6-controller-20261017`); a Fable strategy revision (`docs/research/strategy-revision-20261017.md`).
   - **Waivers (user):** A′-w is OK; an R6 build only if its projection is under 8.0 h.
 

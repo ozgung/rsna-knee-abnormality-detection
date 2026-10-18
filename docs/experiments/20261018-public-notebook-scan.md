@@ -1,5 +1,14 @@
 # Public notebook scan — 2026-10-18
 
+Revised 2026-10-18 evening after merging the live campaign branch: the first version was
+written from the stale October 9 `main` and assumed our best entry was 0.950. Our best is
+now **R6F-pure v2, submission 57340072, public 0.958** (our own controller around the
+public recipe), with A′-w at 0.957 and A′ at 0.956; see the
+[handoff log](../claude-astra-handoff.md) and the
+[October 17 strategy revision](../research/strategy-revision-20261017.md). The listing,
+provenance and measurement sections below are unchanged evidence; the consequences and
+queue sections are rewritten for the actual position.
+
 Read-only research from a cloud session without Kaggle CLI credentials. The score-sorted
 Code listing (300 entries, pages 1–6) and the competition metadata were read through
 Kaggle's anonymous web endpoints; eleven notebook sources were downloaded through the
@@ -29,9 +38,10 @@ side of the host's stated test, with the same unresolved geo caveat as OAI.
 ## Score-sorted public notebooks, October 18
 
 Counts over the 300 listed entries: 8 at 0.958, 7 at 0.957, 42 at 0.956, 4 at 0.955,
-24 at 0.954. Our best entry, 0.950, now ties 36 public notebooks and sits far below the
-public medal bands (a participant snapshot on October 6 put bronze at 0.944; the explainer
-notebook reports place 206 of 6,035 for 0.957 on October 15).
+24 at 0.954. Our R6F-pure v2 (0.958) sits inside the 0.958 block, which held 865 teams at
+ranks 143–1007 on October 17 17:06 UTC with bronze (top 10 %, about rank 614) inside it;
+A′-w (0.957) sits in the 224-team block below. The explainer notebook reports place 206
+of 6,035 for 0.957 on October 15, before the block grew.
 
 | Score | Notebook | Date | What it is |
 | --- | --- | --- | --- |
@@ -84,43 +94,53 @@ stage time, only that the 9 h limit was met.
 - Discussion 748111 shows a single-model 0.960 at the top of the board; the author says it
   is one model and gives no recipe. Not reproducible from public material.
 
-## Consequences for us
+## Where our R6F-pure v2 differs from the public 0.958 notebooks
 
-1. **A qualified 0.956–0.958 entry is a packaging task, not a modelling task.** Both
-   nartaa checkpoints are in a dataset we already attach, and heliosli's R6 stage runs
-   as published inside the same process model our Versia fusion already uses (separate
-   child processes, hard deadline, exact CSV parity checks). The 224 arm is the cheapest
-   addition (23 s visible, same reader as the mirror arm). R6 is the step that moves the
-   score and is the larger integration: two more datasets, an offline wheel install, a
-   worker with its own fallback policy, and no stated licence.
-2. **Provenance is the open risk, not runtime.** R6 and `anatomy.pt` carry no licence;
-   the host's test (registration-only external data) is met by SKM-TEA on paper, but our
-   October 9 rule stands: use only published inference code and weights, claim no
-   explicit host clearance, and record it. nartaa's S6 is the cleanest alternative
-   (CC BY-NC weights, Apache-2.0 training code, competition data only) at 0.950 alone,
-   but adding it beside R6 was measured negative, so it is a substitute for R6 only if the
-   licence question blocks R6.
-3. **Our ConvNeXt reader should drop to a small weight** if R6 enters; the reader's own
-   authors measured it as neutral-to-negative at full weight on these bases.
-4. **Do not tune per-finding weights on Gold-58 or the leaderboard.** Take heliosli's
-   declared weights as the fixed public recipe, as the 0.958 notebooks do, and declare
-   them before the run.
-5. **Time.** Four days remain, with five entries per day and two final selections. One
-   qualified rehearsal (67-study visible/stress protocol as before) plus one submission
-   fits; a second variant does not unless the first fails early.
+| Knob | Public 0.958 notebooks | Our R6F-pure v2 (57340072) | Public evidence on the difference |
+| --- | --- | --- | --- |
+| Raptor arms | nartaa's scripts run as published; goodpjw2008 v27 adds the anatomical mirror to the 224 arm | our own A′ ports: R384 two-view mirror, R224 one view, 0.65/0.35 | None isolated. goodpjw2008 v21–24 already had the 224 mirror at 0.957 and v25 reached 0.958 by the weights, so the mirror on 224 is unmeasured. Costs about +0.6 h (R224 3.3 s/study doubled). |
+| Per-finding Raptor share | V2: Synovitis 0.85, PF OA 0.65, Baker's 0.30, Lateral OA 0.15 (heliosli 0.9586 reported); v1: 0.8/0.6/0.35/0.2 (goodpjw2008 v25/26, 0.958) | v1 | Both display 0.958; the V2 claim is +0.0006 unrounded, inside public noise but what the block's rank is sorted by. Zero runtime cost, so P4 is the right place to take it. |
+| Compact slot | R6 `fe055406`, flip TTA, own stackers | same bundle, same worker v4c with flip, 2 loader workers | Identical by construction (manifest 6508ce69… pinned). |
+| Extra members | goodpjw2008 reader at 1/10 (reported "at no cost", never a measured gain); S6 beside R6 −0.001; R7 beside R6 no change | none | Adding a second compact-class model does not help. The only public precedent for a same-family Raptor-half member is the 224 checkpoint at 0.35: no display change, rank 233→156. That is the case closest to na-full at 0.2 (P3). |
+| Failure policy | mean-fill fallback inside compact stage; blend over each model's non-failed rows | deadline guard at T0 + 8.3 h, salvage of on-disk ledgers before any constant fill (the v1 0.500 was the pre-salvage path) | v2 scored 0.958, so the full pipeline ran within 9 h on the hidden host; no hidden timing is visible. |
 
-## Recommended queue for the remaining days
+## Consequences for the remaining days
 
-- **REF-07 (first):** fork our frozen fusion builder into a four-arm recipe: mirror 384
-  (unchanged) + 224 crop with mirror (nartaa's 0.945 script, stage 1b as in goodpjw2008
-  v27) + heliosli R6 with flip TTA (their stage cells unchanged, pinned bundle
-  `fe055406`, manifest SHA checked) + our ConvNeXt reader at the published 1/10 weights.
-  Blend exactly as heliosli's stage 3 (percentile ranks over each model's non-failed
-  rows, Raptor half 0.65/0.35, per-finding Raptor share 0.85/0.65/0.30/0.15/0.5), declared
-  before any run. Qualify on the existing 67-study protocol, then submit once.
-- **Fallback if R6 cannot be qualified by October 21:** mirror 384 + 224 mirror in the
-  Raptor slot at 0.65/0.35 with our current ConvNeXt weights. Expected effect is a better
-  rank inside the 0.950 block, not a new displayed score.
-- **Do not start:** S6 beside R6, Gold-58 weight refits, the 20-checkpoint community
-  stack, or new training. None is supported by the measurements above within the time
-  left.
+1. **The public recipe is exhausted at 0.958 and the block is the medal line.** Nothing
+   public claims 0.959 or better with code; the 0.960 single model has no recipe. Within
+   the block, rank follows the unrounded score and Kaggle orders exact ties by submission
+   time. Our predictions already differ from every copy (own Raptor ports, v1 weights), so
+   the question is not tie-breaking but which side of 0.9575–0.9585 we land on, which no
+   public measurement resolves. The public board's macro SD of about 0.003 on roughly 385
+   studies says the same: no 0.001 step on the board is evidence; the private 70 % has
+   SD about 0.002.
+2. **P4 (V2 weights) is free and consistent with the public evidence**: heliosli chose
+   them on the public board and every notebook that kept them displays 0.958 or reports
+   0.9586; the two attempts to refit weights elsewhere (Gold-58) lost 0.001–0.003. Take
+   V2 verbatim, declare before the run, change nothing else in that probe.
+3. **P3/P5 (na-full in the Raptor half) have no public analogue that lost.** The 224
+   checkpoint at 0.35 is the only same-family addition measured and it was neutral on
+   display with a better rank. Expect display 0.957–0.958 and treat P3 against P2 as the
+   one paired measurement we get; do not read 0.001 as a verdict either way.
+4. **Do not spend a slot on the 224 mirror, the 1/10 reader, S6/V2-S6 beside R6, or any
+   Gold-58-fitted weights.** Each is unmeasured or measured negative on the public
+   base, and the mirror also costs runtime against a controller that has already hit a
+   hidden exception once.
+5. **Provenance stands as decided on October 9 and rechecked October 16.** R6 and
+   `anatomy.pt` carry no licence; the host's October 14 test (registration-only external
+   data permitted, nothing named) is met on paper by SKM-TEA and fastMRI; the OAI
+   geo-restriction question is open. The October 20 recheck remains the only scheduled
+   action; P7 (all-ours compact slot with V2-all S6) is the hedge if that recheck turns
+   against heliosli's weights.
+6. **Final selection on October 21** follows the strategy revision's rule: final 1 = the
+   best na-full variant that displays at least P2's 0.958, else P2; final 2 = the best
+   remaining variant with a different knob. The public evidence above favours P4 as the
+   second knob if P3 wins final 1, because its only change is the one the public board
+   was tuned on.
+
+## Queue effect
+
+No new task. The first version's REF-07 was our R6F-pure, already scored; its fallback
+(224 mirror arm only) is withdrawn as unmeasured. Remaining probes P3, P4, P5 and the
+October 20 confirmation slot keep their order; this scan adds the V2 weight map and the
+na-full rationale as the declared content of P4 and P3.

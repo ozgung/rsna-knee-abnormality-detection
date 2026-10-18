@@ -4091,3 +4091,10 @@ New facts kept:
 - **Public noise.** The public board is 30% of hidden data, about 385 studies, with a macro SD of about 0.003 (leoprovorov). So 0.001 differences are noise, and private rank follows unrounded scores. An exact tie only happens with byte-identical predictions; ours differ from heliosli's (v1 weights, own R224 ranks). Finals should be chosen on expected private quality, not on public 0.001s.
 - **Different lineage.** lavinwins "RSNA Gold Medal" (pjmathematician D4 stack, 20+ checkpoints) reaches 0.958. Not inspected; heavy.
 - **Single model.** Discussion 748111 reports a single-model 0.960 with no recipe given.
+
+### 2026-10-18 ~17:30 UTC — Claude (cloud session, branch `claude/brave-mayer-jlszoe`): scan revised on the live branch
+- Merged `codex/token-efficient-instructions` (30874f5) into the cloud branch; the stale STATUS edits from the first scan are dropped (theirs kept).
+- `docs/experiments/20261018-public-notebook-scan.md` rewritten from "we are at 0.950" to the actual position: R6F-pure v2 0.958, A′-w 0.957. New section compares our R6F-pure v2 with the public 0.958 notebooks knob by knob (Raptor ports, v1 vs V2 weights, 224 mirror, extra members, failure policy) with the public evidence for each.
+- Recommendations: P4 takes heliosli's V2 map verbatim (free, the only knob the public board was tuned on); P3/P5 keep na-full as the unique Raptor-half member (closest public precedent: the 224 checkpoint at 0.35, neutral display, better rank); no slot for the 224 mirror, the 1/10 reader, S6 beside R6 or Gold-58 refits. Final rule of the strategy revision unchanged.
+- STATUS snapshot leaderboard line refreshed. Documentation only; no code, GPU, submission or final-selection change.
+
