@@ -4091,3 +4091,16 @@ New facts kept:
 - **Public noise.** The public board is 30% of hidden data, about 385 studies, with a macro SD of about 0.003 (leoprovorov). So 0.001 differences are noise, and private rank follows unrounded scores. An exact tie only happens with byte-identical predictions; ours differ from heliosli's (v1 weights, own R224 ranks). Finals should be chosen on expected private quality, not on public 0.001s.
 - **Different lineage.** lavinwins "RSNA Gold Medal" (pjmathematician D4 stack, 20+ checkpoints) reaches 0.958. Not inspected; heavy.
 - **Single model.** Discussion 748111 reports a single-model 0.960 with no recipe given.
+
+### 2026-10-18 ~14:40 UTC: Claude (solo), P3/P4/P5 variants in flight
+- Merged the Sonnet subagent's variant controller: commit 0fda5cd, merge 5a63b9a.
+  - Sealed-config blend arms and weights.
+  - na-full stage (A‴ r3 worker, pinned).
+  - p5 runs no crop224.
+  - 59 r6 tests pass.
+- My change: na-full now runs last, after r6. At the T0 + 8.3 h guard it is therefore na-full (0.1 of the blend) that gets cut, not R6 (0.5).
+  - Agent's point estimates: P3/P4 8.0 h, P5 7.3 h.
+- Chains (`~/.claude/jobs/74614526/tmp/vchain.sh`). Each runs rehearsal, verify, waiver, entry, visible check, then submit:
+  - p3 rehearsal → entries p3 and p4 (bg bd0hvzl15);
+  - p5 rehearsal → entry p5 (bg b5pvtefyj).
+- Old sealed P2 packets no longer replay under the new builder (bound to source revisions). That is fine: P2 is already scored (0.958).
