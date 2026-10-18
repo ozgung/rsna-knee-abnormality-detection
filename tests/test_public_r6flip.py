@@ -750,6 +750,17 @@ class NeverAbortTests(unittest.TestCase):
             (root / 'test.csv').write_text('StudyInstanceUID\nx1\nx2\n')
             (root / 'test_series.csv').write_text('StudyInstanceUID,SeriesInstanceUID,Fluid_Sensitive,Fat_Suppression,Anatomical_Plane\n'
                                                   'x1,s1,1,0,Sagittal\nx2,s2,0,0,Coronal\n')
+            # after an unexpected error: ledgers on disk beat the constant (57326253 scored 0.500)
+            (d / 'board0-old' / 'old' / 'predictions.npz').unlink()
+            save_ledger(d / 'board0-old' / 'old' / 'predictions.npz', ['x1', 'x2'],
+                        [np.linspace(.1, .9, 12), np.linspace(.9, .1, 12)], ['genuine', 'genuine'])
+            got = ENTRY.salvage_csv(root, d, ['x1', 'x2'], d / 'salvaged.csv', 'RuntimeError')
+            self.assertEqual(got['genuine_rows'], {'old320': 2, 'crop224': 0, 'r6': 0})
+            rows = list(csv.reader((d / 'salvaged.csv').open()))
+            self.assertEqual([r[0] for r in rows], ['StudyInstanceUID', 'x1', 'x2'])
+            self.assertNotEqual(rows[1][1:], rows[2][1:])
+            with self.assertRaisesRegex(ValueError, 'SALVAGE_NOTHING_GENUINE'):
+                ENTRY.salvage_csv(root, d, ['zz'], d / 'none.csv', 'RuntimeError')
             ENTRY.emergency_csv(root, d / 'submission.csv')
             rows = list(csv.reader((d / 'submission.csv').open()))
             self.assertEqual([r[0] for r in rows], ['StudyInstanceUID', 'x1', 'x2'])

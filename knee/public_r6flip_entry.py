@@ -279,6 +279,25 @@ def arm_table(ids, workers, out, entry):
     return arrays, statuses, notes
 
 
+
+SALVAGE_FOLDERS = {'old320': ('old', ['board0-old', 'board1-old']),
+                   'crop224': ('crop224', ['board0-crop224', 'board1-crop224']),
+                   'r6': ('r6', ['board0-r6-production', 'board1-r6-production'])}
+
+
+def salvage_csv(root, out, ids, csv_path, reason):
+    """Entry after an unexpected error: blend every genuine ledger row on disk (fallback ranks for the rest)."""
+    from knee.public_fullfield_entry import test_contract, write_csv
+    arrays, statuses = {}, {}
+    for name, (arm, names) in SALVAGE_FOLDERS.items():
+        arrays[name], statuses[name] = salvage(ids, Path(out), arm, names)
+    require(any(s == 'genuine' for st in statuses.values() for s in st), 'SALVAGE_NOTHING_GENUINE')
+    rec = R6F.recover_guarded(arrays, statuses)
+    columns, _, _ = test_contract(root, R6F.LABELS)
+    return {'csv_sha256': write_csv(csv_path, columns, ids, rec['blend']), 'fallback_studies': rec['fallback_studies'],
+            'arm_merge': {name: 'salvaged after %s' % reason for name in SALVAGE_FOLDERS},
+            'genuine_rows': {name: statuses[name].count('genuine') for name in SALVAGE_FOLDERS}}
+
 def emergency_csv(root, csv_path):
     """Last resort (entry only): a complete, valid constant submission in official order."""
     from knee.public_fullfield_entry import test_contract, write_csv
@@ -387,6 +406,11 @@ def run(root, cfg, out, *, started, started_epoch=None):
             r['status'] = 'INTERRUPTED' if isinstance(e, (KeyboardInterrupt, InterruptedError, TimeoutError)) else 'FAIL'
             save(out / 'receipt.json', r)
             raise
+        if not csv_path.exists() and r.get('visible_ids'):
+            try:   # salvage every arm ledger already on disk before the constant (57326253 scored 0.500)
+                r.update(status='SALVAGED_AFTER_ERROR', **salvage_csv(root, out, r['visible_ids'], csv_path, type(e).__name__))
+            except Exception as e3:
+                r['salvage_failure'] = type(e3).__name__
         if not csv_path.exists():
             try:
                 r.update(status='EMERGENCY_CONSTANT', csv_sha256=emergency_csv(root, csv_path), fallback_studies='all')
