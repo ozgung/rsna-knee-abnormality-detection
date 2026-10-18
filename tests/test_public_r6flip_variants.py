@@ -224,8 +224,8 @@ def run_entry(testcase, variant, *, nafull_error=False, out=None):
 @unittest.skipIf(np is None or pd is None or torch is None, 'numpy/pandas/torch not installed')
 class EntryStageTests(unittest.TestCase):
     def test_stage_plan_per_variant_and_default(self):
-        for variant, plan in ((None, ['old', 'crop224', 'r6']), ('p3', ['old', 'crop224', 'nafull', 'r6']),
-                              ('p4', ['old', 'crop224', 'nafull', 'r6']), ('p5', ['old', 'nafull', 'r6'])):
+        for variant, plan in ((None, ['old', 'crop224', 'r6']), ('p3', ['old', 'crop224', 'r6', 'nafull']),
+                              ('p4', ['old', 'crop224', 'r6', 'nafull']), ('p5', ['old', 'r6', 'nafull'])):
             report, calls, written = run_entry(self, variant)
             self.assertEqual(calls, plan, variant)
             self.assertIn(report['status'], ('PASS_WITH_FALLBACK',), variant)
@@ -242,14 +242,14 @@ class EntryStageTests(unittest.TestCase):
 
     def test_nafull_stage_failure_never_aborts_the_entry(self):
         report, calls, written = run_entry(self, 'p3', nafull_error=True)
-        self.assertEqual(calls, ['old', 'crop224', 'nafull', 'r6'])
+        self.assertEqual(calls, ['old', 'crop224', 'r6', 'nafull'])
         self.assertIn('nafull', report['skipped_stages'])
         self.assertEqual(report['phases']['nafull']['stage_error'], 'RuntimeError')
         self.assertEqual(report['status'], 'PASS_WITH_FALLBACK')
 
     def test_platform_interruption_in_the_nafull_stage_goes_to_the_outer_salvage_not_the_stage_fallback(self):
         report, calls, written = run_entry(self, 'p3', nafull_error=InterruptedError('platform interruption'))
-        self.assertEqual(calls, ['old', 'crop224', 'nafull'])          # the r6 stage is not reached
+        self.assertEqual(calls, ['old', 'crop224', 'r6', 'nafull'])    # na-full runs last, after r6
         self.assertEqual(report['failure_type'], 'InterruptedError')
         self.assertEqual(report['status'], 'EMERGENCY_CONSTANT')       # no ledgers on disk in this stub run
         self.assertNotIn('nafull', report['skipped_stages'])

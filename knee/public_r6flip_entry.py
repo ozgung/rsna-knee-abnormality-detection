@@ -415,7 +415,17 @@ def run(root, cfg, out, *, started, started_epoch=None):
             cfg['crop224_sentinels'] = crop_cfg_sentinels
             workers['crop224'], phases['crop224'] = stage_run('crop224', 'crop224')
             save(out / 'receipt.json', r)
-        if 'nafull' in arm_names:        # after crop224, before r6; entry: a failed or missing na-full only costs its rank
+        if rehearsal:
+            sentinels = list(cfg['s6_sentinels'])
+            workers['r6_sentinels'] = {}
+            for name in R6_PASSES[:2]:
+                rep, phase = launch_guarded(cfg, out, 'r6', deadline, pass_name=name, ids_by_board=[sentinels, sentinels],
+                                            inject_uid=sentinels[0] if name == 'sentinel1' else None)
+                workers['r6_sentinels'][name], phases['r6_' + name] = rep, phase
+                save(out / 'receipt.json', r)
+        workers['r6'], phases['r6'] = stage_run('r6', 'r6', pass_name='production', ids_by_board=cfg['assignment'])
+        save(out / 'receipt.json', r)
+        if 'nafull' in arm_names:        # last, after r6: at the T0+8.3 h guard it is the arm cut (0.1 of the blend), not R6 (0.5); entry: a failed or missing na-full only costs its rank
             try:
                 workers['nafull'], phases['nafull'] = stage_run('nafull', 'nafull')
             except InterruptedError:
@@ -429,16 +439,6 @@ def run(root, cfg, out, *, started, started_epoch=None):
                                     'peaks': {'host_rss_bytes': 0, 'output_disk_bytes': 0},
                                     'minimum_disk_free_bytes': shutil.disk_usage(out).free}
             save(out / 'receipt.json', r)
-        if rehearsal:
-            sentinels = list(cfg['s6_sentinels'])
-            workers['r6_sentinels'] = {}
-            for name in R6_PASSES[:2]:
-                rep, phase = launch_guarded(cfg, out, 'r6', deadline, pass_name=name, ids_by_board=[sentinels, sentinels],
-                                            inject_uid=sentinels[0] if name == 'sentinel1' else None)
-                workers['r6_sentinels'][name], phases['r6_' + name] = rep, phase
-                save(out / 'receipt.json', r)
-        workers['r6'], phases['r6'] = stage_run('r6', 'r6', pass_name='production', ids_by_board=cfg['assignment'])
-        save(out / 'receipt.json', r)
         merge_start = time.monotonic()
         arrays, statuses, notes = arm_table(ids, workers, out, entry=not rehearsal, blend=blend)
         rec = R6F.recover_guarded(arrays, statuses, blend=blend)
