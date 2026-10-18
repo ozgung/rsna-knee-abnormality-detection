@@ -4075,3 +4075,9 @@ No controller claim has arrived. Parent is staging only the pinned R6-v1 model/s
 ### 2026-10-18 04:47 UTC — Claude (solo): A′-w scored 0.957
 - 57324282 (A′-w) scored 0.957 public, beating A′'s 0.956. It is the new incumbent for final 1.
 - The per-finding Raptor weights alone are worth +0.001.
+
+### 2026-10-18 13:25 UTC: Claude (solo), R6F-pure v2 scored 0.958
+- 57340072 (R6F-pure v2: salvage-before-constant fix) scored **0.958 public**. That is our best so far and puts us in the 0.958 block, alongside about 865 public copies.
+- Most likely the full pipeline ran: without R6, a salvaged Raptor-only half would score well below 0.958. So the earlier 0.500 (57326253) was a transient hidden-run exception before the CSV write, which the salvage path now covers.
+- Final-pick standing: P2 = 57340072 (0.958, ties the copies); A′-w = 0.957.
+- Next: P3/P4/P5 need the na-full arm plus per-finding weights as sealed config in the R6F controller. A Sonnet subagent is building it.
