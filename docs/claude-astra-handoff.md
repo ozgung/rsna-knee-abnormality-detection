@@ -4081,3 +4081,13 @@ No controller claim has arrived. Parent is staging only the pinned R6-v1 model/s
 - Most likely the full pipeline ran: without R6, a salvaged Raptor-only half would score well below 0.958. So the earlier 0.500 (57326253) was a transient hidden-run exception before the CSV write, which the salvage path now covers.
 - Final-pick standing: P2 = 57340072 (0.958, ties the copies); A′-w = 0.957.
 - Next: P3/P4/P5 need the na-full arm plus per-finding weights as sealed config in the R6F controller. A Sonnet subagent is building it.
+
+### 2026-10-18 ~14:00 UTC: Claude (solo), imported the cloud public-notebook scan
+Imported `docs/experiments/20261018-public-notebook-scan.md` from cloud branch `claude/brave-mayer-jlszoe` (12aaaad). That session started from the stale `main` (ecf630d, Oct 9), so its STATUS edits and REF-07 queue are superseded and not merged. Our R6F-pure is REF-07, and it already scored 0.958.
+
+New facts kept:
+- **Per-finding weights.** The current 0.958 notebooks declare the V2 Raptor shares: Synovitis 0.85, PF OA 0.65, Baker's 0.30, Lateral OA 0.15. Our P2 used v1 (0.8/0.6/0.35/0.2) and also displays 0.958. P4 tests V2.
+- **R224 mirror.** goodpjw2008 v27 at 0.958 runs nartaa's R224 with the anatomical mirror; ours is plain. This is a candidate knob for a later variant.
+- **Public noise.** The public board is 30% of hidden data, about 385 studies, with a macro SD of about 0.003 (leoprovorov). So 0.001 differences are noise, and private rank follows unrounded scores. An exact tie only happens with byte-identical predictions; ours differ from heliosli's (v1 weights, own R224 ranks). Finals should be chosen on expected private quality, not on public 0.001s.
+- **Different lineage.** lavinwins "RSNA Gold Medal" (pjmathematician D4 stack, 20+ checkpoints) reaches 0.958. Not inspected; heavy.
+- **Single model.** Discussion 748111 reports a single-model 0.960 with no recipe given.
