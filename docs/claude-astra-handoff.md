@@ -4111,3 +4111,4 @@ New facts kept:
 - Entry visible runs: receipt PASS, `fallback_studies` 0, pulled code identical to the sealed notebook.
 - Submissions: **P3 57366765** (19:36 UTC), **P5 57368388** (20:41 UTC).
 - P4 is next in the p3 chain (bg bd0hvzl15): build, visible run, then auto-submit.
+- 20:59 UTC: **P4 submitted as 57368819.** Its visible run passed (receipt PASS, `fallback_studies` 0, code identical). Both chains have finished. All three variants are waiting on hidden scoring; there are no local jobs left.
