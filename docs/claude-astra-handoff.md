@@ -4092,6 +4092,19 @@ New facts kept:
 - **Different lineage.** lavinwins "RSNA Gold Medal" (pjmathematician D4 stack, 20+ checkpoints) reaches 0.958. Not inspected; heavy.
 - **Single model.** Discussion 748111 reports a single-model 0.960 with no recipe given.
 
+### 2026-10-18 ~14:40 UTC: Claude (solo), P3/P4/P5 variants in flight
+- Merged the Sonnet subagent's variant controller: commit 0fda5cd, merge 5a63b9a.
+  - Sealed-config blend arms and weights.
+  - na-full stage (A‴ r3 worker, pinned).
+  - p5 runs no crop224.
+  - 59 r6 tests pass.
+- My change: na-full now runs last, after r6. At the T0 + 8.3 h guard it is therefore na-full (0.1 of the blend) that gets cut, not R6 (0.5).
+  - Agent's point estimates: P3/P4 8.0 h, P5 7.3 h.
+- Chains (`~/.claude/jobs/74614526/tmp/vchain.sh`). Each runs rehearsal, verify, waiver, entry, visible check, then submit:
+  - p3 rehearsal → entries p3 and p4 (bg bd0hvzl15);
+  - p5 rehearsal → entry p5 (bg b5pvtefyj).
+- Old sealed P2 packets no longer replay under the new builder (bound to source revisions). That is fine: P2 is already scored (0.958).
+
 ### 2026-10-18 ~17:30 UTC — Claude (cloud session, branch `claude/brave-mayer-jlszoe`): scan revised on the live branch
 - Merged `codex/token-efficient-instructions` (30874f5) into the cloud branch; the stale STATUS edits from the first scan are dropped (theirs kept).
 - `docs/experiments/20261018-public-notebook-scan.md` rewritten from "we are at 0.950" to the actual position: R6F-pure v2 0.958, A′-w 0.957. New section compares our R6F-pure v2 with the public 0.958 notebooks knob by knob (Raptor ports, v1 vs V2 weights, 224 mirror, extra members, failure policy) with the public evidence for each.
