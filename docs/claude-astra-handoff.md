@@ -4071,3 +4071,7 @@ No controller claim has arrived. Parent is staging only the pinned R6-v1 model/s
   - about 0.958: 0.500 was transient;
   - 0.500: the crash happened before the old/crop224 ledgers existed.
 - Chain running: `~/.claude/jobs/74614526/tmp/r6chain.sh` (bg brj6y3u18) runs rehearsal v4, then verify, then waiver b, then entry v2, then the visible check, then auto-submit.
+
+### 2026-10-18 04:47 UTC — Claude (solo): A′-w scored 0.957
+- 57324282 (A′-w) scored 0.957 public, beating A′'s 0.956. It is the new incumbent for final 1.
+- The per-finding Raptor weights alone are worth +0.001.
