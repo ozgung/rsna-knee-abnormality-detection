@@ -4058,3 +4058,16 @@ No controller claim has arrived. Parent is staging only the pinned R6-v1 model/s
   - The pulled code is identical to the sealed notebook.
   - Submitted as 57326253 (21:20 UTC).
 - **Next:** read both scores. P3 (na-full arm) needs a na-full stage added to the R6F controller.
+
+### 2026-10-18 ~04:45 UTC — Claude (solo): R6F-pure scored 0.500
+- 57326253 finished with a public score of 0.500, which means the constant emergency CSV was written. The entry hit an exception before the CSV write, and the old handler went straight to the constant.
+- Root cause is still unknown; hidden logs aren't visible.
+  - Simulated `recover_guarded` with an arm missing in all, half, or none of the rows: it is robust.
+  - Rehearsal resources look fine: RSS at most 25.6 GB, about 20 GB disk free.
+  - Remaining suspects: an exception escaping launch, staging or test_contract on hidden-only data.
+- Fix: `salvage_csv` blends every genuine ledger row on disk before falling back to the constant. Test added.
+- The resubmission's score will localise the failure:
+  - about 0.95: the R6 stage broke;
+  - about 0.958: 0.500 was transient;
+  - 0.500: the crash happened before the old/crop224 ledgers existed.
+- Chain running: `~/.claude/jobs/74614526/tmp/r6chain.sh` (bg brj6y3u18) runs rehearsal v4, then verify, then waiver b, then entry v2, then the visible check, then auto-submit.
