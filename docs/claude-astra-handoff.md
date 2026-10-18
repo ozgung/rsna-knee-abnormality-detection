@@ -4104,3 +4104,10 @@ New facts kept:
   - p3 rehearsal → entries p3 and p4 (bg bd0hvzl15);
   - p5 rehearsal → entry p5 (bg b5pvtefyj).
 - Old sealed P2 packets no longer replay under the new builder (bound to source revisions). That is fine: P2 is already scored (0.958).
+
+### 2026-10-18 20:45 UTC: Claude (solo), P3 and P5 submitted
+- Both rehearsals PASS except the projection. P3: point 30,770 s, conservative 40,892 s. P5: point 28,913 s, conservative 38,807 s. The gate is 29,880 s. Projection-only waivers are at `outputs/kaggle/r6flip-waiver-{p3,p5}-20261018.json`.
+- P3's point estimate is above the T0 + 8.3 h guard, so na-full may cover only part of the studies in P3 and P4. P5 is just under the guard.
+- Entry visible runs: receipt PASS, `fallback_studies` 0, pulled code identical to the sealed notebook.
+- Submissions: **P3 57366765** (19:36 UTC), **P5 57368388** (20:41 UTC).
+- P4 is next in the p3 chain (bg bd0hvzl15): build, visible run, then auto-submit.
