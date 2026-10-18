@@ -54,16 +54,18 @@ def digest(value):
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
-def raptor_weight_vector(labels=LABELS):
-    """Per-finding Raptor-half weight in official target order (R6 gets 1 - w)."""
+def raptor_weight_vector(labels=LABELS, blend=None):
+    """Per-finding Raptor-half weight in official target order (R6 gets 1 - w). blend=None is the frozen v1 table;
+    otherwise the sealed cfg['blend'] (see resolve_blend)."""
     require(list(labels) == LABELS, 'OFFICIAL_TARGET_ORDER')
-    require(set(RAPTOR_WEIGHTS) <= set(LABELS), 'WEIGHT_TARGETS')
-    w = [float(RAPTOR_WEIGHTS.get(name, DEFAULT_RAPTOR_WEIGHT)) for name in labels]
+    _, weights, default = resolve_blend(blend)
+    require(set(weights) <= set(LABELS), 'WEIGHT_TARGETS')
+    w = [float(weights.get(name, default)) for name in labels]
     require(all(0.0 <= x <= 1.0 for x in w), 'WEIGHT_RANGE')
     return w
 
 
-def recover(old320, r6, crop224, old_missing, r6_missing, crop224_missing, *, fatal_errors=()):
+def recover(old320, r6, crop224, old_missing, r6_missing, crop224_missing, *, fatal_errors=(), blend=None):
     """A-prime's frozen three-arm fill/rank (knee.public_ws2_recovery), then the per-finding blend.
 
     The frozen function fills, quantizes the compact slot at '%.9g', round-trips R224 through the
@@ -72,8 +74,9 @@ def recover(old320, r6, crop224, old_missing, r6_missing, crop224_missing, *, fa
     """
     import numpy as np
     from knee import public_ws2_recovery as REC
+    require(resolve_blend(blend)[0] == RAPTOR_ARMS, 'RECOVER_FROZEN_RAPTOR_ARMS_ONLY')   # other arm sets: recover_arms
     rec = REC.recover(old320, r6, crop224, old_missing, r6_missing, crop224_missing, fatal_errors=fatal_errors)
-    w = np.asarray(raptor_weight_vector(), dtype=np.float64)
+    w = np.asarray(raptor_weight_vector(blend=blend), dtype=np.float64)
     raptor = rec['raptor_slot']
     r6_rank = rec['ranks']['r7']
     blend = np.empty_like(raptor)
@@ -95,9 +98,9 @@ def recovery_receipt(rec):
     import numpy as np
     keep = {k: rec[k] for k in ('recipe', 'frozen_fill_rank_recipe', 'population', 'cap', 'union_recovered', 'means',
                                 'raptor_weights', 'precision')}
-    keep['recovered_by_arm'] = {a: int(sum(s == 'recovered' for s in rec['statuses'][a])) for a in ARMS}
+    keep['recovered_by_arm'] = {a: int(sum(s == 'recovered' for s in rec['statuses'][a])) for a in rec['ranks']}
     keep['blend_sha256'] = hashlib.sha256(np.ascontiguousarray(rec['blend']).tobytes()).hexdigest()
-    keep['rank_sha256'] = {a: hashlib.sha256(np.ascontiguousarray(rec['ranks'][a]).tobytes()).hexdigest() for a in ARMS}
+    keep['rank_sha256'] = {a: hashlib.sha256(np.ascontiguousarray(rec['ranks'][a]).tobytes()).hexdigest() for a in rec['ranks']}
     return keep
 
 
@@ -260,21 +263,106 @@ def finite_unit(p):
 
 # ---- deadline guard (strategy revision 2026-10-17): never abort, always a complete submission ---------------------------
 DEADLINE_SECONDS = 8.3 * 3600          # from kernel start T0
-RAPTOR_ARMS = (('old320', R384_WEIGHT), ('crop224', R224_WEIGHT))   # frozen; a na-full arm may be added here by config later
+RAPTOR_ARMS = (('old320', R384_WEIGHT), ('crop224', R224_WEIGHT))   # frozen default; variants seal their own in cfg['blend']
 STATUSES = ('genuine', 'data_local_failure', 'unavailable')
+BLEND_ARM_NAMES = ('old320', 'crop224', 'nafull')    # stage order: R384 two-view, R224 one-view, na-full K62 one-view
+ALL_ARMS = ('old320', 'r6', 'crop224', 'nafull')
+RAPTOR_WEIGHTS_V2 = {'Lateral OA': .15, 'PF OA': .65, 'Synovitis': .85, "Baker's": .30}   # heliosli V2 table, others 0.5
+# Entry variants. None of these is the default: no variant means no cfg['blend'] key and the frozen v1 arithmetic.
+VARIANTS = {
+    'p3': {'raptor_arms': [['old320', .52], ['crop224', .28], ['nafull', .20]], 'weights': dict(RAPTOR_WEIGHTS),
+           'default_weight': DEFAULT_RAPTOR_WEIGHT},
+    'p4': {'raptor_arms': [['old320', .52], ['crop224', .28], ['nafull', .20]], 'weights': dict(RAPTOR_WEIGHTS_V2),
+           'default_weight': DEFAULT_RAPTOR_WEIGHT},
+    'p5': {'raptor_arms': [['old320', .65], ['nafull', .35]], 'weights': dict(RAPTOR_WEIGHTS),
+           'default_weight': DEFAULT_RAPTOR_WEIGHT},
+}
+PRECISION = {'old320': 'float64', 'r6': '%.9g', 'crop224': 'float32 CSV', 'nafull': 'float64'}
 
 
-def recover_guarded(arrays, statuses, raptor_arms=RAPTOR_ARMS):
+def resolve_blend(blend=None):
+    """(raptor arms, per-finding weights, default weight) from the sealed cfg['blend']; None is the frozen default."""
+    if blend is None:
+        return RAPTOR_ARMS, dict(RAPTOR_WEIGHTS), DEFAULT_RAPTOR_WEIGHT
+    require(set(blend) == {'raptor_arms', 'weights', 'default_weight'}, 'BLEND_SCHEMA')
+    arms = tuple((str(a), float(w)) for a, w in blend['raptor_arms'])
+    names = [a for a, _ in arms]
+    require(names and 'old320' in names and names == [x for x in BLEND_ARM_NAMES if x in names], 'BLEND_ARM_ORDER')
+    require(all(0.0 < w <= 1.0 for _, w in arms) and abs(sum(w for _, w in arms) - 1.0) <= 1e-12, 'BLEND_ARM_WEIGHTS_SUM_TO_ONE')
+    weights = {str(k): float(v) for k, v in blend['weights'].items()}
+    default = float(blend['default_weight'])
+    require(set(weights) <= set(LABELS) and all(0.0 <= v <= 1.0 for v in weights.values()) and 0.0 <= default <= 1.0, 'BLEND_WEIGHTS')
+    return arms, weights, default
+
+
+def blend_arm_names(blend=None):
+    """Raptor arm names enabled by the sealed blend, in stage order."""
+    return [a for a, _ in resolve_blend(blend)[0]]
+
+
+def recover_arms(arrays, missing, blend=None, *, fatal_errors=()):
+    """Complete-population recovery for sealed variants (A-prime's fill/rank rules on any subset of the Raptor arms).
+
+    Per arm: genuine rows only, global genuine mean for classified data-local rows (R6 values and mean at '%.9g'), union cap
+    floor(3% N), complete-population average percentile ranks (R224 through the public float32 CSV round trip), raptor slot =
+    sum of arm weights * ranks in stage order, then w_f * slot + (1 - w_f) * rank(R6) per finding.
+    """
+    import numpy as np
+    import pandas as pd
+    from knee.public_ws2_recovery import quantize9, source224_csv_values
+    require(not fatal_errors, 'FATAL_ERRORS_REQUIRE_ABORT')
+    arms = resolve_blend(blend)[0]
+    names = [a for a, _ in arms] + ['r6']
+    src = {a: np.asarray(arrays[a]) for a in names}
+    msk = {a: np.asarray(missing[a]) for a in names}
+    n = len(src['r6'])
+    require(n > 0 and all(src[a].shape == (n, 12) for a in names), 'ARM_SCHEMA')
+    require(all(msk[a].shape == (n,) and msk[a].dtype == bool for a in names), 'EXPLICIT_ROW_MASK_REQUIRED')
+    cap = math.floor(3 * n / 100)
+    union = int(np.logical_or.reduce([msk[a] for a in names]).sum())
+    require(union <= cap, 'UNION_RECOVERY_CAP')
+    means, statuses, ranks = {}, {}, {}
+    for a in names:
+        genuine = np.asarray(src[a][~msk[a]], dtype=np.float64)
+        require(len(genuine) > 0, 'GENUINE_SUCCESS_REQUIRED_' + a)
+        require(np.isfinite(genuine).all() and ((genuine >= 0) & (genuine <= 1)).all(), 'GENUINE_PROBABILITIES_' + a)
+        if a == 'r6':
+            genuine = quantize9(genuine)
+        mean = genuine.mean(axis=0, dtype=np.float64)
+        if a == 'r6':
+            mean = quantize9(mean[None])[0]
+        filled = np.empty((n, 12), dtype=np.float64)
+        filled[~msk[a]], filled[msk[a]] = genuine, mean
+        means[a] = mean.tolist()
+        statuses[a] = np.where(msk[a], 'recovered', 'genuine').tolist()
+        ranks[a] = pd.DataFrame(source224_csv_values(filled) if a == 'crop224' else filled).rank(method='average', pct=True).to_numpy()
+    slot = None
+    for a, weight in arms:
+        term = weight * ranks[a]
+        slot = term if slot is None else slot + term
+    w = np.asarray(raptor_weight_vector(blend=blend), dtype=np.float64)
+    out = np.empty_like(slot)
+    for j in range(len(LABELS)):
+        out[:, j] = w[j] * slot[:, j] + (1.0 - w[j]) * ranks['r6'][:, j]
+    require(np.isfinite(out).all() and ((out >= 0) & (out <= 1)).all(), 'BLEND_UNIT_INTERVAL')
+    return {'recipe': VERSION, 'frozen_fill_rank_recipe': 'A-prime fill/rank rules on the sealed arm set', 'population': n, 'cap': cap,
+            'union_recovered': union, 'means': means, 'statuses': statuses, 'ranks': ranks, 'raptor_slot': slot, 'blend': out,
+            'raptor_weights': dict(zip(LABELS, w.tolist())), 'precision': {a: PRECISION[a] for a in names}}
+
+
+def recover_guarded(arrays, statuses, raptor_arms=None, blend=None):
     """A-prime recovery when every arm is complete (genuine or data-local within the cap); otherwise the public
     fallback: each arm ranked over its own available rows, a Raptor arm missing takes the other Raptor arms' rank
     (weights renormalized), the compact arm missing takes the Raptor half and vice versa, nothing at all gives 0.5.
 
     arrays: {arm: [n, 12] probabilities}; statuses: {arm: [n] of STATUSES}. Never raises on missing work.
+    The Raptor arms and per-finding weights come from the sealed cfg['blend'] (None: the frozen default); an explicit
+    raptor_arms overrides only the arm list and always takes the fallback arithmetic unless it is the frozen one.
     """
     import numpy as np
     import pandas as pd
-    from knee import public_ws2_recovery as REC
-    names = [a for a, _ in raptor_arms] + ['r6']
+    arms = tuple(tuple(x) for x in raptor_arms) if raptor_arms is not None else resolve_blend(blend)[0]
+    names = [a for a, _ in arms] + ['r6']
     n = len(statuses['r6'])
     st = {a: np.asarray(statuses[a]) for a in names}
     require(all(len(st[a]) == n and set(st[a].tolist()) <= set(STATUSES) for a in names) and n > 0, 'GUARDED_STATUS_SCHEMA')
@@ -282,13 +370,20 @@ def recover_guarded(arrays, statuses, raptor_arms=RAPTOR_ARMS):
     data_local = {a: st[a] == 'data_local_failure' for a in names}
     cap = math.floor(3 * n / 100)
     union = np.logical_or.reduce([data_local[a] for a in names])
-    frozen = tuple(raptor_arms) == RAPTOR_ARMS
-    if frozen and not any(u.any() for u in unavailable.values()) and int(union.sum()) <= cap:
-        rec = recover(arrays['old320'], arrays['r6'], arrays['crop224'], data_local['old320'], data_local['r6'], data_local['crop224'])
-        rec.update(mode='aprime_complete_population', fallback_studies=0, fallback={'raptor_only': 0, 'r6_only': 0, 'constant': 0})
+    frozen = arms == RAPTOR_ARMS
+    complete = not any(u.any() for u in unavailable.values()) and int(union.sum()) <= cap
+    if complete and (frozen or raptor_arms is None):
+        if frozen:
+            rec = recover(arrays['old320'], arrays['r6'], arrays['crop224'], data_local['old320'], data_local['r6'], data_local['crop224'],
+                          blend=blend)
+            rec.update(mode='aprime_complete_population')
+        else:
+            rec = recover_arms(arrays, data_local, blend)
+            rec.update(mode='variant_complete_population')
+        rec.update(fallback_studies=0, fallback={'raptor_only': 0, 'r6_only': 0, 'constant': 0})
         return rec
     from knee.public_ws2_recovery import quantize9, source224_csv_values
-    w = np.asarray(raptor_weight_vector(), dtype=np.float64)
+    w = np.asarray(raptor_weight_vector(blend=blend), dtype=np.float64)
     ok = {a: st[a] == 'genuine' for a in names}
     ranks = {}
     for a in names:
@@ -300,7 +395,7 @@ def recover_guarded(arrays, statuses, raptor_arms=RAPTOR_ARMS):
         ranks[a] = r
     num = np.zeros((n, 12))
     den = np.zeros((n, 1))
-    for a, weight in raptor_arms:
+    for a, weight in arms:
         m = ok[a][:, None]
         num += np.where(m, weight * np.nan_to_num(ranks[a]), 0.)
         den += np.where(m, weight, 0.)
@@ -308,19 +403,19 @@ def recover_guarded(arrays, statuses, raptor_arms=RAPTOR_ARMS):
     rr = np.where(have_raptor[:, None], num / np.where(den > 0, den, 1.), np.nan)
     ro = ranks['r6']
     have_r6 = ok['r6']
-    blend = np.where(have_raptor[:, None] & have_r6[:, None], w * rr + (1. - w) * ro,
-                     np.where(have_raptor[:, None], rr, np.where(have_r6[:, None], ro, .5)))
-    require(np.isfinite(blend).all() and ((blend >= 0) & (blend <= 1)).all(), 'BLEND_UNIT_INTERVAL')
-    complete = np.logical_and.reduce([ok[a] for a in names])
+    out = np.where(have_raptor[:, None] & have_r6[:, None], w * rr + (1. - w) * ro,
+                   np.where(have_raptor[:, None], rr, np.where(have_r6[:, None], ro, .5)))
+    require(np.isfinite(out).all() and ((out >= 0) & (out <= 1)).all(), 'BLEND_UNIT_INTERVAL')
+    done = np.logical_and.reduce([ok[a] for a in names])
     return {'recipe': VERSION, 'mode': 'deadline_fallback_public_semantics', 'population': n, 'cap': cap,
-            'union_recovered': int((~complete).sum()), 'fallback_studies': int((~complete).sum()),
+            'union_recovered': int((~done).sum()), 'fallback_studies': int((~done).sum()),
             'fallback': {'raptor_only': int((have_raptor & ~have_r6).sum()), 'r6_only': int((~have_raptor & have_r6).sum()),
                          'constant': int((~have_raptor & ~have_r6).sum()),
-                         'partial_raptor': int((have_raptor & ~np.logical_and.reduce([ok[a] for a, _ in raptor_arms])).sum())},
+                         'partial_raptor': int((have_raptor & ~np.logical_and.reduce([ok[a] for a, _ in arms])).sum())},
             'unavailable_by_arm': {a: int(unavailable[a].sum()) for a in names},
             'data_local_by_arm': {a: int(data_local[a].sum()) for a in names},
-            'means': {}, 'statuses': {a: st[a].tolist() for a in names}, 'ranks': ranks, 'raptor_slot': rr, 'blend': blend,
-            'raptor_weights': dict(zip(LABELS, w.tolist())), 'precision': {'r6': '%.9g', 'crop224': 'float32 CSV', 'old320': 'float64'},
+            'means': {}, 'statuses': {a: st[a].tolist() for a in names}, 'ranks': ranks, 'raptor_slot': rr, 'blend': out,
+            'raptor_weights': dict(zip(LABELS, w.tolist())), 'precision': {a: PRECISION[a] for a in names},
             'frozen_fill_rank_recipe': 'public per-model available-row ranks'}
 
 

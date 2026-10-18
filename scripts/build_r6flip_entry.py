@@ -43,6 +43,25 @@ PUBLIC_RECIPE_NOTEBOOK_SHA = 'ad0b97aca3361f16e32b0836655dd68bc2a37ff0cc5a44f6d6
 OWNER = 'ozgung'
 COMP = 'rsna-knee-abnormality-detection'
 SLUGS = {'rehearsal': 'r6flip-rehearsal-20261017', 'entry': 'r6flip-entry-20261017'}
+VARIANT_DATE = '20261018'
+
+
+def slug_for(variant, mode):
+    """The kernel slug (the title must equal it). No variant keeps the existing R6F-pure slugs."""
+    R6F.require(variant is None or variant in R6F.VARIANTS, 'KNOWN_VARIANT')
+    return SLUGS[mode] if variant is None else 'r6flip-%s-%s-%s' % (variant, mode, VARIANT_DATE)
+
+
+# na-full K62 one-view Raptor: the A-triple-prime packet's worker, config and checkpoint binding, taken from its sealed r3 rehearsal.
+NAFULL_R3 = OUT / 'kaggle/nafull-aprime-rehearsal-r3-20261016'
+NAFULL_R3_NOTEBOOK_SHA = '1d7089e0df4283a45108d27c1ca5cc42604bdcaf49d1a1592b38aec519a519ce'
+NAFULL_R3_PAYLOAD_SHA = '68cae8745bfeddb449b541347fc371a083ce92966fee56076d61722ad4d15b98'
+NAFULL_SOURCES = ('knee/public_nafull_aprime.py', 'knee/public_nafull_aprime_runtime.py', 'knee/public_nafull_aprime_recovery_adapter.py',
+                  'knee/public_nafull_aprime_entry.py', 'knee/public_nafull_aprime_rehearsal.py', 'knee/public_s6_recovery_b0.py',
+                  'knee/public_s6_recovery_b0prime.py', 'knee/public_s6_recovery_b0_rehearsal.py',
+                  'knee/public_s6_recovery_b0prime_rehearsal.py', 'knee/public_nafull_raptor_input.py', 'knee/public_nafull_reference.py')
+NAFULL_WORKER_KEYS = ('public_source', 'decoder_source', 'public_manifest', 'control_checkpoint', 'control_state_sha256',
+                      'control_grid_sha256', 'old_sentinels', 'raptor62_reference')
 NEW_SOURCES = ('knee/public_r6_profile.py', 'knee/public_r6flip.py', 'knee/public_r6flip_worker.py', 'knee/public_r6flip_entry.py')
 R7_ONLY_CFG = ('manifest', 'asset_binding', 'pilot_state_sha256', 'heliosli_reference', 'heliosli_visible_atol', 'ws2_binding',
                'guard_source_sha256')
@@ -99,6 +118,50 @@ def archived():
     return pack
 
 
+def nafull_block():
+    """(cfg['nafull'] rehearsal block, extra shipped sources) replayed from the sealed A-triple-prime r3 rehearsal packet."""
+    from knee import public_nafull_aprime as NA
+    R6F.require(file_sha(NAFULL_R3 / 'notebook.ipynb') == NAFULL_R3_NOTEBOOK_SHA, 'EXACT_NAFULL_R3_NOTEBOOK')
+    r3, _ = unpack_notebook(NAFULL_R3 / 'notebook.ipynb')
+    R6F.require(R6F.digest(r3) == NAFULL_R3_PAYLOAD_SHA and r3['cfg']['mode'] == 'rehearsal', 'EXACT_NAFULL_R3_PAYLOAD')
+    sources = {}
+    for name in NAFULL_SOURCES:
+        text = (PROJECT / name).read_text()
+        R6F.require(text == r3['sources'][name], 'NAFULL_SOURCE_EQUALS_SEALED_R3_' + name)
+        compile(text, name, 'exec')
+        sources[name] = text
+    cfg = r3['cfg']
+    worker, base = cfg['nafull_worker_cfg'], cfg['nafull_base_binding']
+    state = {'old_state': base['qualified_state']['old_state'], 'old_grid': base['qualified_state']['old_grid']}
+    R6F.require(state == {'old_state': NA.CHECKPOINT['state_sha256'], 'old_grid': NA.CONSTRUCTOR_GRID_SHA256}
+                and worker['control_state_sha256'] == NA.CHECKPOINT['state_sha256']
+                and worker['control_grid_sha256'] == NA.CONSTRUCTOR_GRID_SHA256
+                and worker['public_manifest']['checkpoint_sha256'] == NA.CHECKPOINT['sha256']
+                and worker['control_checkpoint'] == NA.CHECKPOINT['file'], 'NAFULL_R3_CHECKPOINT_PINS')
+    w = {k: copy.deepcopy(worker[k]) for k in NAFULL_WORKER_KEYS}
+    w['probes'] = {sid: {'old': copy.deepcopy(p['old'])} for sid, p in worker['probes'].items()}
+    return ({'profile': NA.VERSION, 'checkpoint': dict(NA.CHECKPOINT), 'worker': w, 'qualified_state': state,
+             'reader_reference': copy.deepcopy(base['nafull_reader_reference']), 'cpu_binding': copy.deepcopy(base['nafull_cpu_binding']),
+             'final_export_verification_sha256': base['final_export_verification_sha256'],
+             'sealed_from': {'kernel': 'ozgung/nafull-aprime-rehearsal-r3-20261016', 'notebook_sha256': NAFULL_R3_NOTEBOOK_SHA,
+                             'payload_sha256': NAFULL_R3_PAYLOAD_SHA, 'role': 'worker modules, K62 profile, checkpoint binding and '
+                             'reader references of the A-triple-prime packet, unchanged; its R7/R224 parts are not used'}},
+            sources)
+
+
+def variant_frame(variant):
+    """The frozen frame with the variant's Raptor arms and weights (the default FRAME is untouched)."""
+    arms, weights, default = R6F.resolve_blend(R6F.VARIANTS[variant])
+    frame = copy.deepcopy(R6F.FRAME)
+    frame.update(frame_id='%s-%s' % (R6F.FRAME_ID, variant), version=R6F.VERSION + '+' + variant)
+    frame['raptor_half'] = {'arms': dict(arms), 'source': 'A-prime R384/R224 workers unchanged' + (
+        ' plus the A-triple-prime na-full K62 one-view worker' if any(a == 'nafull' for a, _ in arms) else '')}
+    frame['raptor_weight_per_finding'] = dict(weights)
+    frame['raptor_weight_default'] = default
+    frame['excluded'] = [x for x in frame['excluded'] if x != 'na-full']
+    return frame
+
+
 def aprime_r224_state():
     R6F.require(file_sha(APRIME_RESULT) == APRIME_RESULT_SHA, 'EXACT_APRIME_V2_RESULT')
     r = read(APRIME_RESULT)
@@ -127,13 +190,13 @@ def r6_manifest():
     return read(R6_ASSETS / 'manifest.json'), receipt
 
 
-def binding(pack, sources):
+def binding(pack, sources, variant=None):
     ab = pack['cfg']['binding']
     manifest, receipt = r6_manifest()
     r224, r224_receipt = aprime_r224_state()
     R6F.require(file_sha(ARCH / 'kernel-metadata.json') == ARCH_META_SHA, 'EXACT_APRIME_METADATA')
     meta = read(ARCH / 'kernel-metadata.json')
-    return {
+    b = {
         'version': R6F.VERSION, 'variant': 'R6flip: A-prime R384+R224 Raptor half, heliosli R6 fe055406 flip TTA, per-finding weights',
         'frame': R6F.FRAME, 'frame_digest': R6F.digest(R6F.FRAME), 'raptor_weight_vector': R6F.raptor_weight_vector(),
         'aprime': {'archive_notebook_sha256': ARCH_NOTEBOOK_SHA, 'archive_payload_sha256': ARCH_PAYLOAD_SHA,
@@ -159,10 +222,39 @@ def binding(pack, sources):
         'new_source_sha256': {n: hashlib.sha256(sources[n].encode()).hexdigest() for n in NEW_SOURCES},
         'source_bundle_sha256': R6F.digest({n: hashlib.sha256(s.encode()).hexdigest() for n, s in sorted(sources.items())}),
         'deviations': DEVIATIONS}
+    if variant is not None:
+        blend = R6F.VARIANTS[variant]
+        arms, weights, default = R6F.resolve_blend(blend)
+        frame = variant_frame(variant)
+        names = [a for a, _ in arms]
+        b.update(variant='R6flip-%s: %s Raptor half (%s), heliosli R6 fe055406 flip TTA, per-finding weights' % (
+                     variant.upper(), '+'.join(names), ', '.join('%s %g' % x for x in arms)),
+                 frame=frame, frame_digest=R6F.digest(frame), raptor_weight_vector=R6F.raptor_weight_vector(blend=blend),
+                 entry_variant={'name': variant, 'blend': blend, 'stages': names + ['r6'], 'crop224_stage': 'crop224' in names,
+                                'nafull_stage': 'nafull' in names, 'weights_digest': R6F.digest(blend),
+                                'default_unchanged': 'no --variant: no cfg[blend], no cfg[nafull], original slugs and sources shipped'})
+        b['deviations'] = DEVIATIONS + variant_deviations(variant)
+        if 'nafull' in names:
+            b['nafull_source_sha256'] = {n: hashlib.sha256(sources[n].encode()).hexdigest() for n in NAFULL_SOURCES}
+    return b
 
 
-def packet(mode='rehearsal', qualified=None):
+def variant_deviations(variant):
+    names = R6F.blend_arm_names(R6F.VARIANTS[variant])
+    out = ['Variant %s: Raptor arms and per-finding weights are sealed cfg[blend]; complete populations use A-prime fill/rank rules '
+           'generalized to the arm set (recover_arms), otherwise the public fallback ranks.' % variant]
+    if 'nafull' in names:
+        out.append('na-full Raptor K62 one-view arm: the A-triple-prime worker (public_nafull_aprime_*, B0prime old_worker) run through '
+                   'the same two-board deadline stage after crop224 and before r6; gates reuse its own K62 acceptance checks. '
+                   'Missing/failed na-full only costs its rank in the entry. Dataset ozgung/knee-raptor64-na-full-fold0-final-20261016 v1.')
+    if 'crop224' not in names:
+        out.append('No R224 stage: crop224 is not run and its gates are skipped.')
+    return out
+
+
+def packet(mode='rehearsal', qualified=None, variant=None):
     R6F.require(mode in ('rehearsal', 'entry'), 'MODE')
+    R6F.require(variant is None or variant in R6F.VARIANTS, 'KNOWN_VARIANT')
     pack = archived()
     sources = dict(pack['sources'])
     for name in NEW_SOURCES:
@@ -170,7 +262,13 @@ def packet(mode='rehearsal', qualified=None):
         compile(text, name, 'exec')
         sources[name] = text
     cfg = copy.deepcopy(pack['cfg'])
-    b = binding(pack, sources)
+    if variant is not None:
+        cfg['blend'] = copy.deepcopy(R6F.VARIANTS[variant])
+        if 'nafull' in R6F.blend_arm_names(cfg['blend']):
+            cfg['nafull'], extra = nafull_block()
+            R6F.require(not set(extra) & set(sources), 'NAFULL_SOURCES_DISJOINT')
+            sources.update(extra)
+    b = binding(pack, sources, variant)
     for key in R7_ONLY_CFG:
         cfg.pop(key)
     cfg['mode'] = mode
@@ -180,7 +278,11 @@ def packet(mode='rehearsal', qualified=None):
         for key in PRIVATE_CFG:
             cfg.pop(key)
         cfg['binding'] = {k: v for k, v in cfg['binding'].items() if k not in PRIVATE_BINDING}
-        cfg['r224_state_pin'] = qualified['r224_state']
+        if 'nafull' in cfg:
+            cfg['nafull'] = {k: v for k, v in cfg['nafull'].items() if k != 'reader_reference'}
+            cfg['nafull']['worker'] = {k: v for k, v in cfg['nafull']['worker'].items() if k not in ENTRY.NAFULL_WORKER_PRIVATE}
+        if variant is None or 'crop224' in R6F.blend_arm_names(cfg['blend']):
+            cfg['r224_state_pin'] = qualified['r224_state']
         cfg['qualified_rehearsal'] = qualified
     else:
         R6F.require(len(cfg['probes']) == 36 and len(cfg['probe_order']) == 36 and len(cfg['s6_sentinels']) == 4
@@ -250,9 +352,23 @@ finally:
 """
 
 
+NAFULL_MOUNT_SITE = "    save(project/'runtime-config.json',cfg)"
+NAFULL_MOUNT = """    naweights=mount({dataset!r},[{file!r}])
+    nafile=naweights/{file!r}
+    require(nafile.stat().st_size=={size} and file_sha(nafile)=={sha!r},'NAFULL_VERSION1_CHECKPOINT_BYTES')
+    cfg['nafull']['worker']['control_checkpoint']=str(nafile)
+"""
+
+
 def bootstrap(pack):
+    tail = BOOTSTRAP_TAIL
+    if 'nafull' in pack['cfg']:        # variants with the na-full arm only; the default tail is untouched
+        ck = pack['cfg']['nafull']['checkpoint']
+        R6F.require(tail.count(NAFULL_MOUNT_SITE) == 1, 'EXACT_NAFULL_MOUNT_SITE')
+        tail = tail.replace(NAFULL_MOUNT_SITE, NAFULL_MOUNT.format(dataset=ck['dataset'], file=ck['file'], size=ck['bytes'], sha=ck['sha256'])
+                            + NAFULL_MOUNT_SITE)
     encoded = base64.b64encode(lzma.compress(R6F.canonical(pack), preset=9)).decode()
-    script = BOOTSTRAP_HEAD + 'encoded=%r\nexpected_payload=%r\n' % (encoded, R6F.digest(pack)) + BOOTSTRAP_TAIL
+    script = BOOTSTRAP_HEAD + 'encoded=%r\nexpected_payload=%r\n' % (encoded, R6F.digest(pack)) + tail
     compile(script, '<r6flip-bootstrap>', 'exec')
     return script
 
@@ -266,29 +382,37 @@ def notebook(pack, mode):
     return raw
 
 
-def metadata(slug):
+def metadata(slug, variant=None):
+    R6F.require(variant is None or variant in R6F.VARIANTS, 'KNOWN_VARIANT')
     R6F.require(isinstance(slug, str) and 3 <= len(slug) <= 50 and all(c in 'abcdefghijklmnopqrstuvwxyz0123456789-' for c in slug), 'SAFE_SLUG')
     R6F.require(file_sha(ARCH / 'kernel-metadata.json') == ARCH_META_SHA, 'EXACT_APRIME_METADATA')
     arch = read(ARCH / 'kernel-metadata.json')
     R6F.require(arch['machine_shape'] == 'NvidiaTeslaT4' and arch['enable_internet'] is False and arch['is_private'] is True, 'APRIME_METADATA')
     return {'id': '%s/%s' % (OWNER, slug), 'title': slug, 'code_file': 'notebook.ipynb', 'language': 'python', 'kernel_type': 'notebook',
             'is_private': True, 'enable_gpu': True, 'enable_tpu': False, 'enable_internet': False, 'competition_sources': [COMP],
-            'dataset_sources': list(DATASETS), 'kernel_sources': [], 'model_sources': [], 'docker_image': arch['docker_image'],
-            'machine_shape': 'NvidiaTeslaT4'}
+            'dataset_sources': list(DATASETS) + (nafull_dataset_sources() if variant is not None
+                                                 and 'nafull' in R6F.blend_arm_names(R6F.VARIANTS[variant]) else []),
+            'kernel_sources': [], 'model_sources': [], 'docker_image': arch['docker_image'], 'machine_shape': 'NvidiaTeslaT4'}
+
+
+def nafull_dataset_sources():
+    from knee import public_nafull_aprime as NA
+    return ['%s/%d' % (NA.CHECKPOINT['dataset'], NA.CHECKPOINT['version'])]
 
 
 def save_json(path, value):
     Path(path).write_text(json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + '\n')
 
 
-def emit(dest, slug, pack, mode, extra=None):
+def emit(dest, slug, pack, mode, extra=None, variant=None):
     dest = Path(dest)
     R6F.require(not dest.exists() and dest.resolve().is_relative_to(OUT.resolve()), 'FRESH_IGNORED_OUTPUT')
+    R6F.require(variant is None or pack['cfg']['blend'] == R6F.VARIANTS[variant], 'PACKET_IS_THE_VARIANT')
     raw = notebook(pack, mode)
     dest.mkdir(parents=True)
     (dest / 'notebook.ipynb').write_text(raw)
-    save_json(dest / 'kernel-metadata.json', metadata(slug))
-    tracked = [*NEW_SOURCES, 'scripts/build_r6flip_entry.py', 'scripts/qualify_r6flip_cpu.py']
+    save_json(dest / 'kernel-metadata.json', metadata(slug, variant))
+    tracked = [*NEW_SOURCES, *(NAFULL_SOURCES if variant is not None else ()), 'scripts/build_r6flip_entry.py', 'scripts/qualify_r6flip_cpu.py']
     changed = subprocess.check_output(['git', 'status', '--porcelain', '--', *tracked], cwd=PROJECT, text=True).strip()
     receipt = {'status': 'PREPARATION_ONLY' if mode == 'rehearsal' else 'QUALIFIED_ENTRY_BUILD', 'mode': mode, 'slug': slug,
                'binding_sha256': R6F.digest(pack['cfg']['r6flip_binding']), 'payload_sha256': R6F.digest(pack),
@@ -297,7 +421,9 @@ def emit(dest, slug, pack, mode, extra=None):
                'source_revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=PROJECT, text=True).strip(),
                'source_state': ('uncommitted implementation' if changed else 'committed implementation') + '; exact file hashes bound',
                'builder_sha256': file_sha(__file__), 'files': {n: file_sha(dest / n) for n in ('notebook.ipynb', 'kernel-metadata.json')},
-               'notebook_bytes': len(raw.encode()), 'runtime_checks_exercised': False, 'deviations': DEVIATIONS, **(extra or {})}
+               'notebook_bytes': len(raw.encode()), 'runtime_checks_exercised': False,
+               'deviations': pack['cfg']['r6flip_binding']['deviations'], **({'variant': variant} if variant is not None else {}),
+               **(extra or {})}
     save_json(dest / 'build-receipt.json', receipt)
     save_json(dest / 'MANIFEST.json', {'mode': mode, 'payload_sha256': R6F.digest(pack), 'files': {
         n: {'sha256': file_sha(dest / n), 'bytes': (dest / n).stat().st_size} for n in ('notebook.ipynb', 'kernel-metadata.json', 'build-receipt.json')}})
@@ -307,14 +433,15 @@ def emit(dest, slug, pack, mode, extra=None):
 def verify_build(root, mode='rehearsal', qualified=None):
     root = Path(root)
     m, r, meta = read(root / 'MANIFEST.json'), read(root / 'build-receipt.json'), read(root / 'kernel-metadata.json')
+    variant = r.get('variant')          # absent for the default build; replayed below, so a tampered value fails the replay
     R6F.require(set(m['files']) == {'notebook.ipynb', 'kernel-metadata.json', 'build-receipt.json'}, 'MANIFEST_COVERAGE')
     for n, pin in m['files'].items():
         R6F.require(pin == {'sha256': file_sha(root / n), 'bytes': (root / n).stat().st_size}, 'IMMUTABLE_BUILD_' + n)
-    expected = packet(mode, qualified)
+    expected = packet(mode, qualified, variant)
     actual, code = unpack_notebook(root / 'notebook.ipynb')
     R6F.require(actual == expected and code == bootstrap(expected), 'EXACT_PACKET_REPLAY')
-    R6F.require(meta == metadata(meta['title']) and meta['id'] == '%s/%s' % (OWNER, meta['title']) and 'timeout' not in meta,
-                'PRIVATE_OFFLINE_T4_TITLE_ID')
+    R6F.require(meta == metadata(meta['title'], variant) and meta['id'] == '%s/%s' % (OWNER, meta['title']) and 'timeout' not in meta
+                and (variant is None or meta['title'] == slug_for(variant, mode)), 'PRIVATE_OFFLINE_T4_TITLE_ID')
     R6F.require(r['mode'] == mode and r['payload_sha256'] == R6F.digest(expected) == m['payload_sha256']
                 and r['files'] == {n: file_sha(root / n) for n in ('notebook.ipynb', 'kernel-metadata.json')}, 'BUILD_RECEIPT')
     return r, expected
@@ -327,21 +454,30 @@ def verify_result(result_root, rehearsal_cfg):
     q = ENTRY.require_rehearsal(r, rehearsal_cfg, root, root / 'visible-predictions.csv')
     R6F.require(r.get('qualification') == q, 'SAVED_QUALIFICATION_REPLAY')
     R6F.require(r['status'] == ('PASS' if q['projection_gate_pass'] else 'FAIL_PROJECTION_ONLY'), 'SAVED_STATUS')
-    crop = {w['state_before'] for w in r['workers']['crop224']}
+    crop = {w['state_before'] for w in r['workers'].get('crop224', [])}      # none in a no-R224 variant (p5)
     return {'status': r['status'], 'receipt_sha256': file_sha(root / 'receipt.json'),
-            'csv_sha256': file_sha(root / 'visible-predictions.csv'), 'r224_state': crop.pop(),
+            'csv_sha256': file_sha(root / 'visible-predictions.csv'), 'r224_state': crop.pop() if crop else None,
+            **({'nafull_state': r['workers']['nafull'][0]['state_before']['state']} if 'nafull' in r['workers'] else {}),
             'r6_state': r['workers']['r6'][0]['state_before'], 'anatomy_state': q['r6']['anatomy_state'],
             'projection': {k: r['projection'][k] for k in ('point_seconds', 'conservative_seconds', 'gate_seconds', 'gate_pass')},
             'elapsed_seconds': r['elapsed_seconds']}
 
 
-def build_rehearsal(dest=None):
-    slug = SLUGS['rehearsal']
-    return emit(Path(dest or OUT / 'kaggle' / slug), slug, packet('rehearsal'), 'rehearsal')
+def build_rehearsal(dest=None, variant=None):
+    slug = slug_for(variant, 'rehearsal')
+    return emit(Path(dest or OUT / 'kaggle' / slug), slug, packet('rehearsal', variant=variant), 'rehearsal', variant=variant)
 
 
-def build_entry(rehearsal_build, rehearsal_result, waiver=None, dest=None, slug=None):
+def same_stages(a, b):
+    """A rehearsal of variant a also qualifies variant b when only per-finding weights differ (same stages, same arm weights)."""
+    return a is not None and b is not None and R6F.VARIANTS[a]['raptor_arms'] == R6F.VARIANTS[b]['raptor_arms']
+
+
+def build_entry(rehearsal_build, rehearsal_result, waiver=None, dest=None, slug=None, variant=None):
     prepared, rehearsal_pack = verify_build(rehearsal_build)
+    rehearsed = prepared.get('variant')
+    variant = rehearsed if variant is None else variant
+    R6F.require(variant == rehearsed or same_stages(rehearsed, variant), 'REHEARSAL_QUALIFIES_THIS_VARIANT')
     checked = verify_result(rehearsal_result, rehearsal_pack['cfg'])
     if checked['status'] != 'PASS':
         R6F.require(waiver is not None, 'PROJECTION_GATE_FAILED_NAMED_WAIVER_REQUIRED')
@@ -351,31 +487,37 @@ def build_entry(rehearsal_build, rehearsal_result, waiver=None, dest=None, slug=
                     == checked['projection']['conservative_seconds'], 'NAMED_PROJECTION_WAIVER')
         checked['waiver'] = {'file_sha256': file_sha(waiver), **w}
     qualified = {**checked, 'rehearsal_build': {'slug': prepared['slug'], 'payload_sha256': prepared['payload_sha256'],
-                                                'files': prepared['files']}}
-    slug = slug or SLUGS['entry']
-    return emit(Path(dest or OUT / 'kaggle' / slug), slug, packet('entry', qualified), 'entry', {'qualified_rehearsal': qualified})
+                                                'files': prepared['files']},
+                 **({'rehearsal_variant': rehearsed} if rehearsed is not None else {})}
+    slug = slug or slug_for(variant, 'entry')
+    return emit(Path(dest or OUT / 'kaggle' / slug), slug, packet('entry', qualified, variant), 'entry',
+                {'qualified_rehearsal': qualified}, variant=variant)
 
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = p.add_subparsers(dest='command')
+    variants = sorted(R6F.VARIANTS)
     r = sub.add_parser('rehearsal')
     r.add_argument('--destination')
+    r.add_argument('--variant', choices=variants, help='no flag: the existing R6F-pure build (variant P2)')
     e = sub.add_parser('entry')
     e.add_argument('--rehearsal-build', required=True)
     e.add_argument('--rehearsal-result', required=True)
     e.add_argument('--waiver')
     e.add_argument('--destination')
     e.add_argument('--slug')
+    e.add_argument('--variant', choices=variants, help='default: the rehearsed build\'s variant; a rehearsal of p3 also qualifies p4')
     v = sub.add_parser('verify')
-    v.add_argument('--build', default=str(OUT / 'kaggle' / SLUGS['rehearsal']))
+    v.add_argument('--build')
+    v.add_argument('--variant', choices=variants, help='selects the default --build path; the variant itself is replayed from the build')
     a = p.parse_args(argv)
     if a.command in (None, 'rehearsal'):
-        out = build_rehearsal(getattr(a, 'destination', None))
+        out = build_rehearsal(getattr(a, 'destination', None), getattr(a, 'variant', None))
     elif a.command == 'entry':
-        out = build_entry(a.rehearsal_build, a.rehearsal_result, a.waiver, a.destination, a.slug)
+        out = build_entry(a.rehearsal_build, a.rehearsal_result, a.waiver, a.destination, a.slug, a.variant)
     else:
-        out, _ = verify_build(a.build)
+        out, _ = verify_build(a.build or str(OUT / 'kaggle' / slug_for(a.variant, 'rehearsal')))
     print(json.dumps({k: out[k] for k in ('status', 'slug', 'payload_sha256', 'files', 'notebook_bytes')}, indent=1))
     return 0
 
