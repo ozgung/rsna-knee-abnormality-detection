@@ -141,6 +141,8 @@ stage time, only that the 9 h limit was met.
 ## Queue effect
 
 No new task. The first version's REF-07 was our R6F-pure, already scored; its fallback
-(224 mirror arm only) is withdrawn as unmeasured. Remaining probes P3, P4, P5 and the
-October 20 confirmation slot keep their order; this scan adds the V2 weight map and the
-na-full rationale as the declared content of P4 and P3.
+(224 mirror arm only) is withdrawn as unmeasured. P3, P4 and P5 were sealed and launched on
+October 18 (handoff, 14:40 UTC) with exactly the content recommended here: P3 and P4 put
+na-full at 0.20 of the Raptor half (R384 0.52, R224 0.28), P4 with heliosli's V2 weight
+map, P5 drops R224 for na-full at 0.35; na-full runs last so the 8.3 h guard cuts it rather
+than R6. The October 20 confirmation slot and the October 21 final rule are unchanged.
