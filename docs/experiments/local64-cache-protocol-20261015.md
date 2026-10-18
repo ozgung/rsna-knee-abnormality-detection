@@ -1,0 +1,140 @@
+# Local64 X1a cache protocol
+
+Accepted October 15, 2026, Claude 18:31 shared handoff. Current checkpoint: first two CPU attempts failed adapter/setup bugs; r3 withdrawn for incomplete anchor-source guard; corrected r3b packets sealed below. Outcome: four private/offline CPU Kaggle cache packets, preserving exact Dread 64 source-slot semantics while changing pixels to S6-derived local views. No cache or anatomy qualification has executed. Claude owns all pushes/collectors and X1b Colab control; Codex owns implementation integration and acceptance. [Recipe](../research/finetune-recipe-20261015.md), [shared agreement](../claude-astra-handoff.md).
+
+## Frozen population and processing contract
+
+Reuse source96/raptor64 historical membership and order: 4407 historical studies minus 58 gold and 4 quarantine yields 4345 eligible (3475 training/870 fold0). Four strided partitions 1087/1086/1086/1086; shard 0 also emits 58 gold under a separate scoring-only directory/index. Five disjoint logical outputs, four jobs. Gold magnitudes and reports never enter pixels; membership uses presence only. Historical folds preserved; patient identities are unavailable, so patient-level independence cannot be established. No new split is claimed.
+
+Use exact Dread `slot_plan` (sag 18/14, cor 12/8, ax 12; 6–94% raw-frame span) and series/fluid-substitution selection. Run unchanged `raptor_input.prepare_study` to retain its source availability mask/counters, discard its global pixels, then map raw filenames one-to-one to S6 native rows. Dark local pixels do not imply a missing source frame. The extra decode pass is measured overhead, not hidden in estimated throughput. Unresolved filenames/ordering/geometry fail closed; no representative-series or thin-stack slab substitution.
+
+Pinned S6 native/side/anchor closure from the qualified publication bundle, anatomy 5904dd16…/side classifier/vendored MONAI. Invoke the side path used by `CStudies.__getitem__`; `rows()` alone omits it. Preserve canonical orientation with no additional flip. Render raw selected native slices through the unchanged physical crop, INTER_AREA resize, series_companded window/intensity and uint8 rounding primitives at 384, then central 352 crop. Sagittal joint 100 mm; coronal joint 130 mm (explicit new selector); axial PF 100 mm with S6 patella-or-joint-offset policy. This is an adapter contract, not byte parity with slab-based S6 bags.
+
+Missing/incompatible FrameOfReferenceUID blocks shared-LPS placement and causes explicit field-centre local fallback, even if K0 fails. Record bank method separately from effective crop placement: a learned bank output blocked by geometry must not count as a successfully placed learned crop. No hidden global-view fallback.
+
+Store 64×352×352 uint8, original 64 availability flags, exact source/native slot metadata, anchor/fallback/side decisions and hashes. The genuine sagittal segmentation mask is **one diagnostic plane**, with source series/native index and exact crop geometry; it may be outside the selected Dread frames, stated explicitly. Never broadcast it over 32 sagittal slots. Dense per-slot R3 supervision is deferred.
+
+## Acceptance and K0
+
+Mechanics requires complete immutable source/assets/config and membership bindings, image-only staging, explicit CPU auxiliary models, finite-output hooks, unchanged model state, exact raw/native frame mapping, NPZ dtype/shape/mask and content hashes, file coverage, disk/RSS/runtime receipts and separate gold metadata. Loader must accept 352 and match the pinned 384 training-window interface with masks preserved. No frozen global 336 loader or original inference source may change.
+
+Synthetic acceptance covers membership/disjointness, raw/native mapping, selected indices, crop/mask alignment, dark-local availability, schema/hash tampering, 352 loader parity, runtime source APIs and fail-closed K0. It does not qualify real decode, anchor placement, speed or anatomy. Collector must distinguish complete cache mechanics from advancement; any incomplete/unknown review blocks training.
+
+Real K0 uses the same frozen 32-study qualification cohort and displays **every selected sagittal/coronal/axial frame**, paginated. Show matched native source, retained crop boundary and actual 352 pixels; mask overlay separately bound to its diagnostic source. Review artifact must bind source/assets/contract and montage hashes and record reviewer/date, with unresolved decisions explicit. Bounds from recipe §3.2:
+
+- Learned anchor path exercised on at least 60% of studies; report model exercise and effective learned placement separately.
+- Field-centre fallback at most 30% of unique Dread-selected sagittal series. Do not dilute with unselected source series or duplicate slots.
+- Zero wrong-side/axis projections.
+- At most 2/32 studies with any selected sagittal crop cutting visible joint margin.
+- No axial PF local lacking the patella where its matched source shows it. Missing planes are N/A, not automatic successes.
+
+K0 failure changes the view through a separately versioned build (recipe first proposal 110 mm sagittal/140 mm coronal); never relax the recorded bound. Original M4 anatomy failure remains closed. No paired fit before all shard mechanics, real K0 counts and signed review pass.
+
+## Resources and recovery
+
+Expected 4–6 h/shard and 25–30 GB total are recipe estimates, not measured CPU results. Double decoding and diagnostic segmentation can increase them. Respect actual account/platform limits; no assistant-selected experiment time budget. Kaggle's [notebook documentation](https://www.kaggle.com/docs/notebooks) lists a general 12 h CPU session limit (checked October 15); owner reconciles current limits/jobs/CPU capacity and disk before launch. Hidden competition inference has its separate actual 9 h limit.
+
+Keep full caches remote; local starter budget 2 GiB remains. Only bounded synthetic/source checks and small metadata locally. CPU packets private/offline, enable_gpu=false, title=id; normal push has no `--timeout`. No provisioning or new terms. Builder must pin mounted data/auxiliary asset versions and omit reports/labels from staged inference inputs. Package no private identifiers in committed source. Use atomic per-study outputs and index checkpoints for recoverability; verify exact config/source/membership/content before any resume, never blindly retry ERROR.
+
+Final packet names, hashes, commands, measured resources and actual job/version/session IDs will be appended after sealing/owner claim. Codex has launched no jobs. Claude must record X1b Colab session/run/log/checkpoint plus stop/resume instructions separately; owner-reported intent is not independently verified liveness.
+
+## Sealed preparation checkpoint — October 15, 19:08 UTC
+
+**Prepared as a secondary lane; no remote jobs launched.** Claude's 19:00 user-reported main-lane pivot prioritizes S6/labels-v2. Core helper dc0dd14 integrated as a53df3d; parent acceptance/recovery fixes committed as **ce8a978**. Full staging/trainer promotion remains disabled. This completes packet preparation; real cache and anatomy qualification remain pending owner execution.
+
+Packets: `outputs/kaggle/local64-cache-20261015/shard{0..3}/`, each 814,070 bytes, 232 hash-bound sources including 194 vendored MONAI files, pinned Docker, private/offline CPU, literal title=id, no runtime flags. Source bundle SHA **d24d6fd969ada1cf30e5525242de0ad8dbfa3997c1fb91d4f2f9c8d455a0fed2**. Full notebook/metadata/contract/receipt hashes in [sealed index](../../outputs/kaggle/local64-cache-20261015/SEALED-BUILD.json).
+
+| Shard | Training studies | Notebook SHA256 |
+| --- | --- | --- |
+| 0 | 1087 | `74a968110ec1ad9d2974014d146030aea5cff8b38b0caf437fa7f5cbf1bbacfc` |
+| 1 | 1086 | `955a0f8aff17776517da23a2c715ef7f153d7400d705b918514110e1cabd38aa` |
+| 2 | 1086 | `aa214ac552a92da7532b9391ac304e4d0a07b78bfeb0c4967301a67de7bdf3f3` |
+| 3 | 1086 | `20e5b54fd7447475bce297b7b5291650e7ae5425ac4cf65a5955728db7633fd9` |
+
+Shard 0 additionally emits a separate 58-study scoring cache. Frozen review membership was independently checked: all 32 are eligible training studies, split 9/8/5/10 across shards. Every selected frame is paginated with matched source and retained-crop outline; a separate genuine diagnostic-mask overlay has its own source/native index and artifact hash. No mask broadcasting.
+
+**Acceptance:** all **14 focused ML checks PASS**, including actual pinned historical StudyWindows/public K42 352→384 tensor equality, K8 training interface, mask preservation, frame remapping, full montage/diagnostic artifact hashes, exact population binding, metadata-only collection and resume tampering. Bare focused checks OK, 11 optional skips. Twelve synthetic aspect/spacing/edge-center rendering cases match the pinned S6 pixel primitive byte-for-byte. Four separately unpacked packets compile and import with exact source hashes, settings, partitions and no private IDs embedded. Default smoke and installed PyTorch CPU forward smoke PASS, synthetic only.
+
+Evidence: [focused tests](../../outputs/analysis/local64-20261015/targeted-tests.log), [window/render proof](../../outputs/analysis/local64-20261015/pinned-render-primitive-proof.json), [packet audit](../../outputs/analysis/local64-20261015/sealed-packets-acceptance.json), [frozen membership](../../outputs/analysis/local64-20261015/frozen32-membership-proof.json), [CPU smoke](../../outputs/analysis/local64-20261015/torch-cpu-smoke.log).
+
+Broad checks were run and **did not pass**: bare 1322 tests, 22 errors/757 skips, all 22 optional-dependency errors reproduced on pre-change d04a426 (18 NumPy, three pydicom, one torch). Installed-ML 1350 tests: four failures, six errors, 162 skips. Nine existing staging cases reproduce on d04a426 because this Mac has 3.6 GiB free against their unchanged 5 GiB preflight reserve; the remaining existing Versia multiprocessing case is blocked by sandbox `torch_shm_manager` permission. No unrelated reserve/threshold change. [Bare comparison](../../outputs/analysis/local64-20261015/baseline-error-comparison.json), [ML comparison](../../outputs/analysis/local64-20261015/baseline-ml-error-comparison.json), [ML full log](../../outputs/analysis/local64-20261015/ml-suite.log). Focused checks cover the final local64 changes; no overall-suite PASS is claimed.
+
+**Owner execution, only if claimed after reconciling main-lane resources:**
+
+```bash
+kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/local64-cache-20261015/shard0
+kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/local64-cache-20261015/shard1
+kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/local64-cache-20261015/shard2
+kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/local64-cache-20261015/shard3
+```
+
+No `--timeout`, duplicate jobs or local full-cache downloads. Claude posts actual accepted versions/source/settings, job status and log/result paths. Collect only contract/index/receipts and K0 PNGs into `outputs/kaggle/local64-cache-20261015-result/shardN/local64_cache/`; `scripts/collect_local64_cache_metadata.py` defaults to metadata-only validation. `--verify-pixels` is for a remote staging host with all NPZ files, not this laptop. Both modes keep training promotion false until full loader/stage integration, immutable file/access verification and real K0 review pass.
+
+Recovery: workers write atomic NPZ/index checkpoints, private failure details, source decode counts and disk/RSS/runtime measurements. In-place recovery verifies exact contract, source membership, NPZ file/raw hashes and montage hashes, then rebuilds only derived image links. A new Kaggle run resets working storage; attachment/transport resume is not implemented, so preserve partial outputs and request a separately sealed recovery build rather than blind retry. No job currently needs stop/resume. Actual CPU auxiliary forward, real DICOM/native geometry, anatomy, throughput and full staging remain unverified.
+
+## First execution failure and corrected r2 — October 15, 19:17 UTC
+
+All four original CPU jobs ended **ERROR** (owner19:13; parent independently saw shards0–2 ERROR/shard3 RUNNING19:11:53). The collected shard0 log points exactly to compact-dataset discovery: `Expected exactly one explicit attachment mount, found 0`. The original bootstrap required `heliosli/rsna-knee-compact-v1`, but its dataset attachment metadata omitted it. This was a Codex integration/acceptance miss; prior source/import checks did not verify attachment completeness. [Original failure log](../../outputs/kaggle/local64-cache-20261015/shard0-result/knee-local64-cache-shard0-20261016.log). Original sealed packets/index remain unchanged; their preparation audit does not establish operational success.
+
+**Repair7e7d1ed:** one dataset-requirements table drives both metadata and bootstrap mount discovery. All six required datasets, including compact manifest/side/spec/four weight files, are explicit. A fixture reproduces the absent-mount failure and passes only when the attachment is restored. Notebook execution now has a real try/except guard, because IPython bypassed the earlier sys.excepthook and produced only a log; setup errors preserve private diagnostics and a failure receipt. No reader, crop, slots, labels, CPU model or acceptance-bound change. [Scientific-contract comparison](../../outputs/analysis/local64-20261015/r2-scientific-contract-comparison.json).
+
+**Corrected r2 packets:** `outputs/kaggle/local64-cache-20261015-r2/shard{0..3}/`, same owned kernel IDs,815155bytes each,232 unchanged scientific sources/source bundle d24d6fd9…. [Full sealed index](../../outputs/kaggle/local64-cache-20261015-r2/SEALED-BUILD.json), SHA **b21ad6552485d035ced848eb7796dc03da84dab3f443e7cb91994a7460436e46**.
+
+| Shard | Notebook SHA256 |
+| --- | --- |
+| 0 | `99cd14d902b91f202366775edfd3b25847d9c123faddc280490446d21ca0a2a2` |
+| 1 | `af1c1a4cc45a0a264f2a8ad4ed1c36b8f21a0870515177832fd6fb01d2709201` |
+| 2 | `778e9ea0dbf306b2804b113d40da7168bb53d4d144fdab89a33c37c278243450` |
+| 3 | `57a4d55dd4fc7a8770a04104efe56dec236d3637c7d5de6545f780e5852bfc36` |
+
+All **16 focused ML tests PASS**, including the two new attachment/exception regressions; bare integration6 OK/one optional skip. Four corrected packet audits PASS with exact equality between declared datasets and discovery requirements, compact attachment presence, source/settings/partition checks and separate unpack/import. [Current tests](../../outputs/analysis/local64-20261015/targeted-tests-r2.log), [r2 packet audit](../../outputs/analysis/local64-20261015/sealed-packets-r2-acceptance.json). Prior12-case pixel proof and CPU smoke reused: runtime scientific source bytes unchanged. Broad-suite limitations above remain; no redundant full repeat for this builder-only repair. Real CPU/model/DICOM/K0 qualification remains pending.
+
+Claude owns the authorized corrected retry after reconciling all original terminal versions. Replace the old command paths with `outputs/kaggle/local64-cache-20261015-r2/shardN`; no runtime flags. Post accepted version/source/settings, and use **fresh** result layout `outputs/kaggle/local64-cache-20261015-r2-result/shardN/local64_cache/` so the collector can use `--build-root ...-r2 --result-root ...-r2-result`. Preserve original failure collection. Metadata/receipts/K0 PNG only; full NPZ verification belongs on the remote staging host. No Codex launch/collector/submission, duplicate retry or new schedule.
+
+## R2 execution failures and r3 reader preflight — October 15, 19:36 UTC
+
+All four r2 jobs ended ERROR, owner19:23. Accepted r2 code/settings/Docker/six attachments matched independently. Shards1–3 compared absent all_gold_ids against the full gold hash; bootstrap supplied only their deliberately empty scoring-cache list. Shard0 passed setup/environment/CPU auxiliary initialization but failed first-study source-content validation (0 completed,111s): adapter passed the parent data directory where the frozen Dread reader expects train_series. All five slots therefore appeared empty. The subsequent order adapter also treated Dread's `(path, spacing)` tuples as paths. These are glue errors, not observed bad data. [R2 accepted source](../../outputs/analysis/local64-20261015/accepted-r2-source-proof.json), [shard0 private diagnostic](../../outputs/kaggle/local64-cache-20261015-r2-result/shard0/local64_cache/error-private.json), [shard1 diagnostic](../../outputs/kaggle/local64-cache-20261015-r2-result/shard1/local64_cache/bootstrap-error-private.json). Preserve failed packets/results. Claude withdrew the proposed1% failure/exclusion policy at19:32; strict coverage remains.
+
+**Repair e5b2372:** one runtime configuration factory passes/validates the full gold identity list on all four shards, but stages/caches gold only on zero. Frozen Dread receives the actual series root; filename/spacing pairs are translated explicitly without changing order. Eighteen focused ML checks PASS, bare18 OK/12 optional skips. New preflight runs the actual pinned Dread source on ten synthetic DICOM files across five slots: the old directory level reproduces the exact empty-study failure; corrected path decodes genuine synthetic pixels/headers with all64 availability flags. Actual order return tuples are exercised. Four complete synthetic configuration contracts pass the shared producer/consumer preflight; missing gold identity and improper nonzero-shard gold staging reject. Prior tests still cover local mask preservation, native mapping, K42/K8 parity and montage/hash binding. [Current focused log](../../outputs/analysis/local64-20261015/targeted-tests-r3.log).
+
+**R3 sealed preparation:** `outputs/kaggle/local64-cache-20261015-r3/shardN/`, same owned slugs,815666bytes each/232 sources; source bundle **c39b4a0d8da85d723542ba86b31de2ef6cada125e120d7565ac20ada4aff5c04**. [Full sealed index](../../outputs/kaggle/local64-cache-20261015-r3/SEALED-BUILD.json), SHA **efa2d9c54bf5ca15a953e1f4d6dbabd1ca1419eb711ad4c0525c954363d1e72b**.
+
+| Shard | Notebook SHA256 |
+| --- | --- |
+| 0 | `3d080dffb494f68c2e1103796a56623a7a7607d12a308c1cb24eafabbab96626` |
+| 1 | `bd3d0916618085307babd9c537449d2ac334d390a9d7510b8bf984cee9579635` |
+| 2 | `7dc7386dd65f25b2ec1fb75ae04439a0a3036af9e6144d80c58ae7aefe08c74b` |
+| 3 | `815e38eb0a46d3d372c506ec28ff296ab9b066eb1edd4d887963c1804b1d5da0` |
+
+Four r3 source/settings/attachment/import audits PASS, including actual notebook call to the shared configuration factory with full gold identities. [Packet audit](../../outputs/analysis/local64-20261015/sealed-packets-r3-acceptance.json). Raw membership, config/crops/masks, splits, assets, unmodified Dread module/checkpoint and environment pins unchanged; only local64_runtime source changed and was explicitly rebound. [Binding comparison](../../outputs/analysis/local64-20261015/r3-binding-comparison.json). No failure-rate relaxation, fake global fallback or real-reader qualification claim. Full-suite limitations above remain; these narrow changes are covered by focused checks.
+
+Claude reconciles all terminal v2 jobs before the one corrected r3 push per same slug, using `...-r3/shardN` paths with no flags. New collection layout `outputs/kaggle/local64-cache-20261015-r3-result/shardN/local64_cache/`, metadata/K0 only on laptop. Record actual accepted server versions/source/settings and first real decode result; preserve v1/v2 failures. CPU initialization on r2 alone does not qualify auxiliary forward/native geometry or cache output. Real CPU/throughput/all-shard completeness/K0 and full immutable staging still gate any fit. No Codex launch/collector/submission.
+
+## R3 withdrawn; all-source guard restored in r3b — October 15, 19:41 UTC
+
+R3 indexefa2… is **withdrawn for qualification**. Its guard covered selected target series, but the bank may derive an anchor/slab prior from unselected native series. This could bypass the accepted all-source FrameOfReferenceUID safeguard. Codex posted HOLD19:38, crossing Claude's push claim; owner must stop/preserve any launched v3 before replacement and report exact terminal state. Do not promote its partial cache or run duplicate replacements.
+
+**Repair024ccf2:** check every native anchor-source series and target, not just selected targets; record scope/count. Missing or incompatible FoR produces the already agreed explicit field-centre local fallback, counted in K0. Crop/intensity/order/slots, model/assets, masks, membership and thresholds stay unchanged. Regression adds an unselected anchor source with missing/different FoR while the selected target remains registered; both cases correctly fall back. All18 focused checks PASS, including actual pinned-reader synthetic DICOM and four-config preflight. This is synthetic verification, not real cache/anatomy qualification.
+
+**Current packets:** `outputs/kaggle/local64-cache-20261015-r3b/shardN/`,815818bytes/232 sources each; source bundle **ade71f678d3ffb626b5757d182d06d77d95cde41b47ff49478f0084e9e78ae4d**. [Sealed index](../../outputs/kaggle/local64-cache-20261015-r3b/SEALED-BUILD.json), SHA **8f7fc041e47337b322aaf4380e45b605acee712db20209ffcc707db750278545**.
+
+| Shard | Notebook SHA256 |
+| --- | --- |
+| 0 | `53d8b38bedf2d3d5c6a1725f8261959b31bb5b139da1508ffc101a04e9c3892e` |
+| 1 | `d08f109822ef4102a3b10f1618ef525f8b7c65399c096f5ae664d3c9bb05cee8` |
+| 2 | `0966260bb8e67fa2ec630b814bb57b5b73fcbc6b1cf021ea7b8fa63c2473f1ca` |
+| 3 | `d72aa966f13c05548cc87685683d0cbf54b5731a891a7b5d52c026b8d878812c` |
+
+[Focused tests](../../outputs/analysis/local64-20261015/targeted-tests-r3b.log), [four-packet source/settings/attachment/config/import audit](../../outputs/analysis/local64-20261015/sealed-packets-r3b-acceptance.json). Claude owns push only after reconciling/stopping v3 and confirming no duplicate job. Use `...-r3b/shardN` with no runtime flags. New result root `outputs/kaggle/local64-cache-20261015-r3b-result/shardN/local64_cache/`, metadata/receipts/K0 only. Record actual server versions rather than assuming version3/4; accepted-source and first real decode receipts remain pending. Source guard may make K0 fail; never hide fallback as learned placement or relax its bound. No Codex launch or collector.
+
+## Shard 1 terminal status and latest accepted r3b source — October 16, 06:15 UTC
+
+Official read-only check 06:13 reports shard 1 **ERROR**, shards 0/2/3 **RUNNING**. Latest shard 1 accepted code cells match sealed r3b exactly, not withdrawn r3. Private/CPU/offline/docker/language/type and attachment members match; Kaggle reordered dataset_sources, so unique list membership was compared independent of ordering. [Status and source/settings proof](../../outputs/analysis/local64-20261015/status-20261016-0613.json), [accepted source/settings](../../outputs/analysis/local64-20261015/status-20261016-0613-shard1/).
+
+This does not identify the exact terminal session/version or prove the cause. Claude should reconcile that attempt, preserve a bounded failure log/metadata collection and diagnose before any retry; no local r3b result artifacts are available yet. Do not treat this automatically as the withdrawn-v3 termination or hide a real-reader guard failure. Shards 2/3 version state remains unresolved. Codex performed no output collection, launch, cancellation, new schedule or model run; all scientific and cache/K0 gates remain unchanged.
+
+## Failure accepted; lane deferred — October 16, 08:34 UTC
+
+Owner-collected shard1 receipt matches sealed r3b contract72f160ed…. It completed236/1086 in17042.64s, then ValueError in decode: Dread availability mask and selected slot metadata differ. K0 UNKNOWN/no anatomy pass. [Aggregate parent acceptance](../../outputs/analysis/campaign-20261016-0830/local64-failure-acceptance.json). Observed elapsed/completed, including overhead, is72.21s; linear full-shard projection21.78h exceeds the owner's cited12h CPU session limit. This projection is not a runtime bound and does not identify an optimal cache backend.
+
+Accept Claude's proposal to defer local64 behind user-approved V2-all, na-full and their rehearsals/probes. No r3c, exclusion policy or relaxed masks/K0. Claude reports shards2/3 v3 CANCEL_ACKNOWLEDGED and DNS prevented r3b replacement pushes; shard0 r3b remains running toward its09:14 session limit. Preserve partials and terminal receipts. Revisit only after priorities finish, with a separate Colab/cache feasibility plan plus the slot-metadata repair; no current fix or fit. Original source/geometry/mechanics and anatomical safeguards stay in force.

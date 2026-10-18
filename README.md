@@ -60,7 +60,7 @@ The live official pages verified on October 8 record entry deadline **October 15
 | --- | --- | --- |
 | Mac MPS | CSV audit, DICOM decoding checks, a few studies, model debugging | Keep a small cache (initially <=2 GiB); inspect free disk before expansion. Shared RAM is not all available to the model. |
 | Kaggle | Full raw dataset access, preprocessing, validation, final offline inference | Attach competition data; stream selected series; store compact caches and weights. Benchmark full-study decoding as part of the 9-hour budget. |
-| Colab | Selected CUDA experiments | Use the user-authorized existing 350-credit allocation for bounded project runs before expiry; see STATUS for remaining-budget evidence and expiry. Transfer only compact authorized caches. Record each run and release idle runtimes; new credit purchases need separate authorization. |
+| Colab | Selected CUDA experiments | Use existing user-authorized credits and verify actual runtime/account availability before launching; see STATUS for current evidence. Do not assume credits expire with the subscription or impose an arbitrary reserve. Transfer authorized data directly to the remote runtime, record each run and release idle sessions; purchases require separate authorization. |
 
 The complete raw corpus cannot fit the current free disk. Compact multi-plane 2D/2.5D models are plausible for local experiments; no throughput, full training duration or score is promised without measured batches. Avoid starting with a full-volume 3D model.
 
@@ -101,7 +101,7 @@ Build a private training notebook with the competition, vanilla DINOv2-Small and
 
 ```bash
 python3.12 scripts/build_kaggle.py outputs/kaggle/train knee-dino-train-20261008 scripts/train_kaggle_entry.py --internet
-kaggle kernels push -p outputs/kaggle/train --timeout 7200
+kaggle kernels push -p outputs/kaggle/train
 ```
 
 The training entry downloads pinned Linux codec wheels once and saves them beside the feature cache and trained head. Kaggle/Colab preserve the host CUDA PyTorch; the local Mac lock is not installed there. Each run records actual package versions, code/source hash, data fingerprints, preprocessing, seed and metrics. See the [first experiment record](docs/experiments/20261008-first-baseline.md) for the exact bounds and label-provenance limitation.
@@ -110,15 +110,17 @@ After that version completes, build an independent offline rehearsal:
 
 ```bash
 python3.12 scripts/build_kaggle.py outputs/kaggle/rehearsal knee-dino-rehearsal-20261008 scripts/rehearse_kaggle_entry.py --no-weak-labels --kernel-source ozgung/knee-dino-train-20261008
-kaggle kernels push -p outputs/kaggle/rehearsal --timeout 1800
+kaggle kernels push -p outputs/kaggle/rehearsal
 ```
 
 It reprocesses all gold images and compares predictions against the saved cache-based evaluation, then checks the visible test twice. The final entry only reads the actual test metadata/images and checkpoint:
 
 ```bash
 python3.12 scripts/build_kaggle.py outputs/kaggle/submission knee-dino-submission-20261008 scripts/submit_kaggle_entry.py --no-weak-labels --kernel-source ozgung/knee-dino-train-20261008
-kaggle kernels push -p outputs/kaggle/submission --timeout 28800
+kaggle kernels push -p outputs/kaggle/submission
 ```
+
+`kaggle kernels push --timeout` sets the kernel’s execution limit; it is not a client request timeout. Omit it for normal runs and respect the actual platform and competition limits. After an ambiguous push response, reconcile the accepted server version/status before retrying.
 
 Only submit a completed, successfully rehearsed version. Inspect its actual version number and current quota first. `STATUS.md` records authorized submissions and their results. Do not overwrite an existing training notebook while a dependent submission is pending. Data, private linkage hashes, feature caches, outputs and weights stay out of Git.
 
@@ -143,3 +145,8 @@ The builder rejects incomplete or failed cache receipts. Inspect the private not
 
 
 For a selected ensemble, `scripts/build_ensemble_kaggle.py` builds the notebook and a separate **weights-only** asset directory. Supply `--assets-dir` and the private `--dataset-source`; use `--rehearsal` for cached-feature versus raw-image parity. Kaggle notebook source must be below1MB, so do not embed checkpoint bytes. Inspect the exact upload directory before creating its private dataset; the builder rejects unexpected files. Rehearsal computes reference predictions from the existing training notebook cache on Kaggle. The pure entry reads only its small heads and test images/metadata. Never upload gold prediction fixtures, reports or identifiers as part of the weights package.
+
+
+### Selected-checkpoint export provenance
+
+For resumed TrackA exports, `scripts/build_tracka_export_kaggle.py` requires an expected dataset version, source checkpoint SHA and training config JSON. Its runtime verifies source identity and every selected weight tensor before image inference, then records training and export settings separately. [Method, required CLI arguments and evidence](docs/experiments/selected-export-provenance-20261011.md). This qualification does not change existing training recipes or establish a competition score.

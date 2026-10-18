@@ -1,0 +1,27 @@
+# Corpus44 image-only parity diagnostic
+
+Build-only, private CPU diagnostic. Parent owns review and launch. This tests an explicit historical44 construction hypothesis; it has not established real-data parity.
+
+The public corpus metadata specifies five slots (12/10/8/6/8), 15–85% slice span, 140mm central crop,336 pixels and uint8. No construction script is attached. The archived public inference source uses64 slots and6–94%; source SHA859aae12ecea593b45ab0a5f6463fa573cd3083f340c161e920f10fbba29e81b. An attempt to retrieve public inference version1 returned403. Published metadata directs readers to that inference preprocessing. Only the three image-building functions are extracted. The slot/count globals become44 and the two span literals become0.15/0.85; all remaining source AST is preserved. Percentile normalization, rounding, per-series preference and missing-frame behavior are hypotheses until pixel comparison. No alternative tolerances or normalization changes are tried.
+
+Selection is the first five studies in the exact pinned40-study smoke order, reconstructed from its private identity attachment and manifest hash. No labels or gold values are read. Raw training DICOMs, corpus volumes and masks are read only from attached competition/public inputs, with corpus IDs/masks hash checked and volumes memory mapped. No MRI, report text or study IDs enter notebook code or output. Hash-pinned offline codec wheels use the existing reviewed Python3.12 container; no GPU or model runs. The codec dataset carries unused model files, which this runtime never opens.
+
+Acceptance: all25 slot uint8 hashes and masks agree exactly. Report includes per-slot dimensions, hash-match booleans, valid-frame counts, mask differences, pixel disagreement counts and absolute errors, runtime/RSS/environment and sanitized failure type/phase. A mismatch is a completed useful result. Exact match qualifies only these five studies. A whole empty study remains observable as zero volume/mask; no replacement input is fabricated. Existing guarded reader propagates fatal resource/invalid-pixel errors while preserving public missing-frame behavior; reader counters expose header defaults. No retries or salvage are added.
+
+Build invocation from the isolated worktree uses `scripts/build_corpus44_parity.py DESTINATION SLUG --public-source ARCHIVED_SOURCE --manifest PRIVATE_MANIFEST --smoke-contract COMPLETED_SMOKE_BUILD_CONTRACT`. Build directory must be new. Parent may launch the built private CPU notebook after review; no launch is performed by the builder. Retrieve only `corpus44_parity/parity-report.json`; remote arrays remain attached read-only.
+
+Synthetic checks: exact/mask-only mismatch, full uint8 error without overflow, shape/mask rejection, unpinned source rejection and inverse-AST comparison proving only the two span literals changed. Build-time privacy check rejects embedding any smoke study ID.
+
+## Parent integration and CPU launch
+
+Integrated as4073230. Parent5/5 focused checks passed with `CORPUS44_PUBLIC_SOURCE` supplied (zero skips); synthetic CPU smoke and diff checks passed. Built at `outputs/kaggle/corpus44-parity-20261009/` and pushed with `kaggle kernels push -p outputs/kaggle/corpus44-parity-20261009`. Kaggle derived the actual slug from the human title: **`ozgung/corpus44-image-only-parity-hypothesis` v1**, confirmed RUNNING. Do not retry the intended slug. Future builder titles now match requested slugs; the launched notebook remains unchanged.
+
+Notebook SHA `e370c8ce3059d6a4ba4f0c744bb9bbe380c80b05fbc30a60de97a20b5d62adf7`, contract `f3d2771f62b34c2075fbc7782bdfb2b26fa6187f0167817d44b4757be6a62dc1`. PrivateCPU/offline; retrieve `corpus44_parity/parity-report.json` to `outputs/kaggle/corpus44-parity-20261009-result/`. No checkpoint or resume/controller. Preserve mismatch/error and inspect it; no automatic retry. Real pixel parity remains unverified.
+
+### First result is operationally invalid; narrow repair
+
+V1 finished6.89seconds with a reported MISMATCH, but all5 decoder counters were empty and every reconstructed slot was zero. Parent inspection found the adapter incorrectly used `train_images`; the verified competition directory is `train_series`. This is **not evaluated scientific parity**, preserved in `outputs/analysis/corpus44-parity-20261009/parent-v1-review.json`. The repair changes only that input path and adds selected-study/series metadata/directory preflight plus nonzero header/pixel decoding requirements. Pixel transformations, span/count hypothesis and exact comparison remain unchanged. Parent verified actual metadata categories and decoder counter names. No training was affected.
+
+### Corrected result: exact bounded pixel parity
+
+`ozgung/knee-corpus44-parity-v2-20261009` v1 completed **EXACT_MATCH** in11.771seconds:5studies,25slots,600headers and214decoded frames. Every uint8 slot hash and mask matched the public44slice corpus exactly; all pixel errors are zero, including the naturally absent slot. Parent checked exact contract/report binding,5ordinals,25slots and nonzero real decode evidence. Receipt `outputs/analysis/corpus44-parity-20261009/parent-v2-review.json`; raw aggregate report in `outputs/kaggle/corpus44-parity-v2-20261009-result/corpus44_parity/parity-report.json`. This establishes bounded observed preprocessing parity, not full-corpus equality, model correctness or submission readiness. Next: qualify trained-model loading and image-only inference using this frozen reader.

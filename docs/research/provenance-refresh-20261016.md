@@ -1,0 +1,17 @@
+# Scheduled provenance refresh — October 16, 2026
+
+Checked 02:27–02:34 UTC, read-only. **No new prohibition or named model clearance found within this bounded check. Existing R7 permission uncertainty remains.** Training, entry frames, jobs and final selections are unchanged.
+
+The current official rules body matches the normalized October 13 capture exactly. External-model access and winner-delivery obligations remain separate from upstream permissions. [Rules](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/rules), [captured evidence and hashes](../../outputs/provenance-20261016/receipt-manifest.json).
+
+The October 14 host response gives an accessibility test and declines named approvals. Routine registration/terms acknowledgement is distinguished from institution-restricted access; training-data disclosure is requested. The older strategy's OAI-clearance claim is therefore an interpretation, not an explicit OAI/public-checkpoint ruling. Individual-access evidence may support that interpretation without settling upstream permissions. [Host comment 3538535](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/743416#3538535).
+
+The August 27 host response separately leaves dataset terms and intended model release with the team. Its comment body and the inspected downstream-checkpoint discussion remain unchanged from October 13. No new host response to the weight-only downstream question was found in those threads. [Host comment 3517696](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/733965#3517696), [downstream-checkpoint thread](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/737950).
+
+The current R7 publisher metadata still declares `other`; the short card describes the four-fold bundle and does not supply an identifiable weight-license grant. This is a limited card inspection, not proof that no permission exists anywhere in the archive or correspondence. The card's “Private” prose does not establish restricted access. [Publisher card](https://www.kaggle.com/datasets/heliosli/rsna-knee-compact-r7cnxfsss).
+
+NYU's current agreement retains research/education-purpose, individual-access and downstream-transfer conditions. It does not explicitly settle this public-checkpoint distribution/use case. We cannot infer categorical permission or prohibition for trained weights from that silence. Host eligibility guidance does not itself waive upstream terms. [NYU agreement, access section and clauses 2–5](https://fastmri.med.nyu.edu/).
+
+The recent-topic listing returned 20 entries despite the CLI page-size request. Relevant winner-license and enforcement threads were also read; neither supplied a host response resolving this issue. Coverage is not an exhaustive forum search. No terms were accepted, forms submitted, contacts made, assets downloaded or compute launched. This refresh does not reopen an external-data training lane or change authorized campaign work.
+
+Keep the distinction between public availability, host accessibility and upstream permissions in final documentation. Preserve the prior [R7 primary-source audit](../../outputs/analysis/r7-recovery-20261013/provenance-primary-sources.md); annotate the older [external-data strategy note](external-data-lane-20261015.md) accordingly. The next planned provenance check remains October 20, before final selection; no final-choice decision is made here.

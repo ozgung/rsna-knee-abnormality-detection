@@ -56,7 +56,7 @@ def build_reference(source_path, destination, slug, *, train_count=None, seed=20
              f"REFERENCE_MANIFEST={manifest!r}\nREFERENCE_CONTRACT={contract!r}\n"
              + Path(__file__).with_name("rehearse_reference_entry.py").read_text())
     digest = build(destination, slug, entry, internet=False, weak_labels=False,
-                   kernel_sources=[])
+                   kernel_sources=[], compress_sources=True)
     destination = Path(destination)
     path = destination / "kernel-metadata.json"
     metadata = json.loads(path.read_text())
