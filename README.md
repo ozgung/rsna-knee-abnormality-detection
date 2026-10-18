@@ -2,6 +2,8 @@
 
 Offline-first Python project for [the Kaggle competition](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection). It implements a bounded DICOM-to-study pipeline, frozen DINOv2 feature extraction, weak-label head training, and offline Kaggle inference. Current run results and completion state are in [STATUS.md](STATUS.md). Tracked files contain no competition data, labels, credentials, or weights.
 
+Private source repository: [ozgung/rsna-knee-abnormality-detection](https://github.com/ozgung/rsna-knee-abnormality-detection). `origin` points there and `main` tracks `origin/main`. Raw data, generated outputs, caches, and weights are excluded from Git.
+
 ## Project management and AI-assisted development
 
 [STATUS.md](STATUS.md) is the main handoff between sessions: verified state, tentative planning, prioritized tasks with acceptance criteria, blockers, decisions, test results, and the next action. [AGENTS.md](AGENTS.md) gives Codex the durable project instructions. Keep evolving status and planning in STATUS rather than duplicating them here.
