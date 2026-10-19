@@ -28,8 +28,10 @@ Owner: Claude (lane C agent). Plan: [final-push plan §2 Lane C](../research/fin
 |---|---|---|---|---|---|---|---|---|---|
 | v2-s43 (lost) | v2 | 43 | lanec1 | 2026-10-19 19:21 | 0.5083 (1,563 s) | — (VM lost after epoch 1) | | | |
 | v2-s44 (lost) | v2 | 44 | lanec1 | 2026-10-19 19:22 | 0.5105 (1,661 s) | — (VM lost after epoch 1) | | | |
-| v2-s43 | v2 | 43 | lanec2 | ≈ 2026-10-19 23:05 | | | | | |
-| v2-s44 | v2 | 44 | lanec2 | ≈ 2026-10-19 23:07 | | | | | |
+| v2-s43 | v2 | 43 | lanec2 | ≈ 2026-10-19 23:05 | 0.5083 (1,561 s) | paused after epoch 1 (resumable) | | | |
+| v2-s44 | v2 | 44 | lanec2 | ≈ 2026-10-19 23:07 | 0.5112 (1,659 s) | paused after epoch 1 (resumable) | | | |
+| v3-s42 | v3 | 42 | lanec2 | ≈ 2026-10-20 00:10 | | | | | |
+| v3-s43 | v3 | 43 | lanec2 | ≈ 2026-10-20 00:12 | | | | | |
 
 ## Recovery
 
@@ -83,3 +85,11 @@ Owner: Claude (lane C agent). Plan: [final-push plan §2 Lane C](../research/fin
 - Queued on lanec2 (`/content/after_pair.log`): when both exports exist, start seed 45 on v2 at once (GPU otherwise idle;
   if labels v3 is READY by 06:00 the v3 pair runs next and the pre-registered set is v3), then gold-58 read-out of
   s43+s44 (bf16, one decode) and the probe-36 fp16 reference of s42+s43+s44.
+- **Labels v3 READY** (Lane B marker created 22:09 Oct 19, seen 23:47): table 3ceafe5a…, targets_V3_all 8d2ef527…
+  (rebuilt here byte for byte with `build_targets_table.py`; `check_targets.py` OK: pool 4,345, gold blank, 4 quarantined).
+  Lane B's exposed gold-58 of the label table: v3 0.9254 vs v2 0.9202.
+- **Order changed (reversible):** v3 is READY 6 h before the 06:00 cut-off, so the pre-registered P7′ set is the v3 pair
+  (seeds 42, 43). The v2 pair had only restarted at 23:06 after the VM loss; it is paused after its epoch-1 checkpoints are
+  confirmed in the Model backups and resumes after the v3 pair as the fallback set. Running v3 first moves the primary path
+  (C1 and P7′) about six hours earlier at no loss of v2 work. Seed 45 (v2) is dropped: the rule runs it only when v3 is
+  not READY.
