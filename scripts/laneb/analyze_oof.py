@@ -178,8 +178,25 @@ def main():
                 rows.append({"model": k, "own_fold_n": int((fo == k).sum()), "own_fold_auc": own, "other_folds_n": int((fo != k).sum()),
                              "other_folds_auc": oth, "gap": oth - own})
             mc[tag] = rows
-        # agreement between fold models on a study: in-sample pairs vs a held-out member
-        mc["verdict"] = "CONFIRMED" if all(r["gap"] > 0.02 for t in ("R6 plain", "R7 plain") for r in mc[t]) else "NOT_CONFIRMED"
+        # paired form (same studies): AUC of model k on the fold-j studies; the held-out model j must be the worst on fold j
+        ok_all = True
+        for bundle, tag in (("r6", "R6 plain"), ("r7", "R7 plain")):
+            P = {k: np.stack([deployed(ok[u], bundle, [k], False) for u in allm]) for k in range(4)}
+            M = [[macro_auc(y[fo == j], P[k][fo == j])[0] for k in range(4)] for j in range(4)]
+            gaps = [float(np.mean([M[j][k] for k in range(4) if k != j]) - M[j][j]) for j in range(4)]
+            # pooled paired gap with a study bootstrap: held-out column vs the mean over the three in-sample models (AUC per draw)
+            cnt = resample_counts(allm, draws=DRAWS, seed=SEED)
+            held = np.stack([P[fo[i]][i] for i in range(len(allm))])
+            a_h = _auc_draws(y, held, cnt).mean(1)
+            a_in = np.mean([_auc_draws(y, np.stack([P[(fo[i] + s_) % 4][i] for i in range(len(allm))]), cnt).mean(1) for s_ in (1, 2, 3)], 0)
+            d = a_in - a_h
+            okd = np.isfinite(d)
+            mc[tag + " matrix"] = {"rows_study_fold_cols_model": M, "diagonal_is_row_min": [bool(int(np.argmin(M[j])) == j) for j in range(4)],
+                                   "paired_gap_per_fold": gaps, "pooled_paired_gap": float(np.nanmean(d)),
+                                   "pooled_paired_gap_ci95": np.quantile(d[okd], [.025, .975]).tolist()}
+            ok_all &= all(mc[tag + " matrix"]["diagonal_is_row_min"]) and mc[tag + " matrix"]["pooled_paired_gap_ci95"][0] > 0
+        mc["rule"] = "CONFIRMED when, for R6 and R7, the hash-fold model is the worst of the four on its own fold's studies (4/4 rows) and the pooled paired gap (in-sample mean minus held-out AUC) has a CI above 0"
+        mc["verdict"] = "CONFIRMED" if ok_all else "NOT_CONFIRMED"
     res["mapping_check"] = mc
 
     # ---- out-of-fold columns on the pool
@@ -218,6 +235,9 @@ def main():
         if "R7 flip" in cand:
             pairs.append((list(cand)[6], F))
         tab["paired_bootstrap"] = boot_table(y, cand, pairs, pool) if len(pool) >= 50 else None
+        fo_pool = np.asarray([ok[u]["fold"] for u in pool])
+        tab["per_fold_macro"] = {n: [macro_auc(y[fo_pool == k], p[fo_pool == k])[0] for k in range(4)] for n, p in cand.items()}
+        tab["per_fold_delta_dual_minus_flip"] = [tab["per_fold_macro"][D][k] - tab["per_fold_macro"][F][k] for k in range(4)]
         tab["bootstrap"] = {"draws": DRAWS, "seed": SEED, "unit": "study", "macro": "mean of 12 per-target AUCs; draws with an undefined target dropped"}
         dd = tab["paired_bootstrap"]["%s - %s" % (D, F)] if tab["paired_bootstrap"] else None
         if dd:
