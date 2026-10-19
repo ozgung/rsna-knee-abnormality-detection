@@ -29,26 +29,26 @@ _ORIGINAL_ARMS, _ORIGINAL_METADATA = B.arms, B.metadata
 
 def names(tag, seed):
     ck = 'E_prior_s%d_%sall.pt' % (seed, tag)
-    return {'dir': LANE / ('%s-s%d' % (tag, seed)), 'dataset': 'ozgung/knee-s6-%sall-s%d-20261019' % (tag, seed), 'checkpoint': ck,
+    return {'dir': LANE / ('%s-s%d' % (tag, seed)), 'dataset': 'ozgung/knee-s6-lanec-seeds-20261019/pyTorch/%s-s%d' % (tag, seed),
+            'checkpoint': ck,
             'alias': 'E_prior_s%d_f0.pt' % seed, 'membership': 'membership_E_prior_s%d_f0.json' % seed,
             'rehearsal_slug': 's6solo-%ss%d-qual-20261020' % (tag, seed), 'entry_slug': 's6solo-%ss%d-entry-20261020' % (tag, seed)}
 
 
-def accept(tag, seed, version=1, python=sys.executable):
+def accept(tag, seed, version, python=sys.executable):
     """Local acceptance of the exported seed (counts and hashes only)."""
     n = names(tag, seed)
     d = n['dir'] / 'dl'
     d.mkdir(parents=True, exist_ok=True)
     files = [n['checkpoint']] + [x % seed if '%d' in x else x for x in SEED_SOURCES]
-    for f in files:
-        if not (d / f).is_file():
-            subprocess.run(['kaggle', 'datasets', 'download', n['dataset'], '-f', f, '-p', str(d), '-q', '--force'], check=True)
-            z = d / (f + '.zip')
-            if z.exists():
-                import zipfile
-                with zipfile.ZipFile(z) as zf:
-                    zf.extract(f, d)
-                z.unlink()
+    if not all((d / f).is_file() for f in files):      # private Kaggle Model variation version (dataset quota exhausted)
+        subprocess.run(['kaggle', 'models', 'instances', 'versions', 'download', '%s/%d' % (n['dataset'], version), '-p', str(d),
+                        '--untar', '-q', '--force'], check=True)
+        for z in list(d.glob('*.tar.gz')) + list(d.glob('*.zip')):
+            import shutil
+            shutil.unpack_archive(str(z), str(d))
+            z.unlink()
+    require(all((d / f).is_file() for f in files), 'SEED_EXPORT_FILES')
     sums = {}
     for line in (d / 'SHA256SUMS').read_text().splitlines():
         sha, name = line.split(None, 1)
@@ -114,7 +114,7 @@ def seed_arm(tag, seed):
             'b_model': {'file': desc['runtime_alias'], 'source_file': desc['checkpoint_filename'], 'sha256': desc['checkpoint_sha256'],
                         'bytes': desc['checkpoint_size'], 'arm': 'E_prior', 'dataset': desc['dataset_slug'],
                         'dataset_version': desc['dataset_version'], 'descriptor_dataset_version': desc['dataset_version'],
-                        'mount': desc['dataset_slug'].split('/')[1]},
+                        'mount': 'models/ozgung/knee-s6-lanec-seeds-20261019/pytorch/%s-s%d/%d' % (tag, seed, desc['dataset_version'])},
             'receipts': dict(acc['receipts']), 'json_expect': {'run_config.json': acc['run_config_expect'], n['membership']: acc['membership_expect']},
             'text_expect': {'SHA256SUMS': line},
             'cpu': {'receipt_sha256': acc['cpu_receipt_sha256'], 'state_sha256': ck['state_sha256'],
@@ -129,10 +129,12 @@ def install(tag, seed):
     n = names(tag, seed)
     B.arms = lambda raw: {**_ORIGINAL_ARMS(raw), 'v2': seed_arm(tag, seed)}
 
+    version = json.loads((n['dir'] / 'seed-acceptance.json').read_text())['dataset_version']
+
     def metadata(slug, variant):
         meta = _ORIGINAL_METADATA(slug, 'control')
         if variant == 'v2':
-            meta['dataset_sources'] = meta['dataset_sources'] + ['%s/%d' % (n['dataset'], 1)]
+            meta['model_sources'] = ['%s/%d' % (n['dataset'], version)]
         return meta
     B.metadata = metadata
     B.SLUGS = {**B.SLUGS, 'v2': n['rehearsal_slug']}
@@ -147,9 +149,10 @@ def main(argv=None):
     p.add_argument('--seed', type=int, required=True)
     p.add_argument('--python', default=sys.executable, help='interpreter with torch/timm for the CPU check')
     p.add_argument('--rehearsal-result')
+    p.add_argument('--version', type=int, default=1, help='Kaggle Model variation version of the export')
     a = p.parse_args(argv)
     if a.command == 'accept':
-        print(json.dumps({k: v for k, v in accept(a.tag, a.seed, python=a.python).items() if k not in ('run_config_expect',)}, indent=1))
+        print(json.dumps({k: v for k, v in accept(a.tag, a.seed, a.version, python=a.python).items() if k not in ('run_config_expect',)}, indent=1))
         return 0
     n = install(a.tag, a.seed)
     root = B.OUT / 'kaggle'

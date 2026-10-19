@@ -425,7 +425,9 @@ S6C_MOUNT = """    s6c=cfg['s6c'];r6=None
     helios=mount('heliosli/rsna-orthofoundation-fold0-epoch7-20261004',['anatomy.pt']);anatomy=helios/'anatomy.pt'
     require(file_sha(anatomy)==s6c['anatomy_sha256'],'EXACT_ANATOMY')
     for m in s6c['models']:
-        md=mount(m['dataset'],[m['file']]);m['path']=str(md/m['file'])
+        parts=m['dataset'].split('/')
+        md=Path('/kaggle/input/models')/parts[0]/parts[1]/parts[2].lower()/parts[3]/str(m['dataset_version']) if len(parts)==4 else mount(m['dataset'],[m['file']])
+        m['path']=str(md/m['file'])
         require((md/m['file']).stat().st_size==m['bytes'] and file_sha(md/m['file'])==m['sha256'],'EXACT_S6C_SEED_BYTES')
     s6c.update(code_mount=str(cm),helios_mount=str(helios))
 """
@@ -466,7 +468,8 @@ def metadata(slug, variant=None):
     return {'id': '%s/%s' % (OWNER, slug), 'title': slug, 'code_file': 'notebook.ipynb', 'language': 'python', 'kernel_type': 'notebook',
             'is_private': True, 'enable_gpu': True, 'enable_tpu': False, 'enable_internet': False, 'competition_sources': [COMP],
             'dataset_sources': variant_datasets(variant),
-            'kernel_sources': [], 'model_sources': [], 'docker_image': arch['docker_image'], 'machine_shape': 'NvidiaTeslaT4'}
+            'kernel_sources': [], 'model_sources': S6C.model_sources(S6C.block(s6c_models())) if variant in R6F.COMPACT_VARIANTS else [],
+            'docker_image': arch['docker_image'], 'machine_shape': 'NvidiaTeslaT4'}
 
 
 def variant_datasets(variant):

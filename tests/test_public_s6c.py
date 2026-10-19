@@ -331,6 +331,15 @@ class PacketTests(unittest.TestCase):
         self.assertIn('nartaa/rsna-knee-s6fall-weights/3', meta['dataset_sources'])
         self.assertIn('ozgung/knee-s6-v2all-s44-20261019/1', meta['dataset_sources'])
         self.assertNotIn('timeout', meta)
+        self.assertEqual(meta['model_sources'], [])
+        kaggle_models = [dict(m, dataset='ozgung/knee-s6-lanec-seeds-20261019/pyTorch/v2-s%d' % m['seed'], dataset_version=1) for m in models()]
+        with mock.patch.object(self.B, 'S6C_MODELS', kaggle_models):
+            meta = self.B.metadata(self.B.slug_for('p7', 'rehearsal'), 'p7')
+            script = self.B.bootstrap(self.B.packet('rehearsal', variant='p7'))
+        self.assertEqual(meta['model_sources'], ['ozgung/knee-s6-lanec-seeds-20261019/pyTorch/v2-s%d/1' % s for s in (42, 43, 44)])
+        self.assertEqual(meta['dataset_sources'][-1], 'nartaa/rsna-knee-s6fall-weights/3')
+        self.assertIn("Path('/kaggle/input/models')", script)
+        self.assertEqual(S6C.model_mount(kaggle_models[0]['dataset'], 1), 'models/ozgung/knee-s6-lanec-seeds-20261019/pytorch/v2-s42/1')
 
     def test_bootstrap_mounts_our_seeds_not_r6(self):
         script = self.B.bootstrap(self.pack)

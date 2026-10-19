@@ -70,7 +70,8 @@ def validate_models(models):
         require(isinstance(m, dict) and set(m) - {'path'} == keys, 'S6C_MODEL_SCHEMA')     # 'path' is added by the notebook bootstrap
         require(type(m['seed']) is int and 0 <= m['seed'] < 10000 and m['labels'] in LABEL_TABLES, 'S6C_MODEL_SEED_LABELS')
         require(isinstance(m['sha256'], str) and len(m['sha256']) == 64 and type(m['bytes']) is int and m['bytes'] > 0, 'S6C_MODEL_IDENTITY')
-        require(isinstance(m['dataset'], str) and m['dataset'].split('/')[0] in SEED_OWNERS and type(m['dataset_version']) is int
+        require(isinstance(m['dataset'], str) and m['dataset'].split('/')[0] in SEED_OWNERS and len(m['dataset'].split('/')) in (2, 4)
+                and type(m['dataset_version']) is int
                 and m['dataset_version'] > 0 and isinstance(m['file'], str) and m['file'].endswith('.pt') and '/' not in m['file'],
                 'S6C_MODEL_DATASET')
     require(len({m['labels'] for m in models}) == 1, 'S6C_ONE_LABEL_TABLE_NO_MIXING')
@@ -97,8 +98,24 @@ def block(models, reference=None):
     return b
 
 
+def is_model_ref(ref):
+    """owner/model/framework/variation = a private Kaggle Model variation (mounted under /kaggle/input/models/...);
+    owner/slug = a dataset. Lane C seeds are Models because the private dataset quota is exhausted."""
+    return len(ref.split('/')) == 4
+
+
+def model_mount(ref, version):
+    owner, model, framework, variation = ref.split('/')
+    return 'models/%s/%s/%s/%s/%d' % (owner, model, framework.lower(), variation, version)
+
+
 def dataset_sources(s6c):
-    return list(dict.fromkeys(['%s/%d' % (CODE_DATASET, CODE_VERSION)] + ['%s/%d' % (m['dataset'], m['dataset_version']) for m in s6c['models']]))
+    return list(dict.fromkeys(['%s/%d' % (CODE_DATASET, CODE_VERSION)] + ['%s/%d' % (m['dataset'], m['dataset_version'])
+                                                                          for m in s6c['models'] if not is_model_ref(m['dataset'])]))
+
+
+def model_sources(s6c):
+    return list(dict.fromkeys('%s/%d' % (m['dataset'], m['dataset_version']) for m in s6c['models'] if is_model_ref(m['dataset'])))
 
 
 def sigmoid(z):
