@@ -292,7 +292,7 @@ class CompactGateTests(unittest.TestCase):
         r, cfg = valid_compact_rehearsal()
         sid = cfg['staged_ids'][10]
         p = [row['seed_probabilities'][1] for row in r['workers']['r6'][0]['records'] + r['workers']['r6'][1]['records'] if row['id'] == sid][0]
-        cfg['s6c'] = S6C.block(models(), {'source': 'A100 fp16', 'probabilities': {'E_prior_s43_f0.pt': {sid: [x + 0.01 for x in p]}}})
+        cfg['s6c'] = S6C.block(models(), {'source': 'A100 fp16', 'probabilities': {'E_prior_s43_f0.pt': {sid: [x + 0.005 for x in p]}}})
         self.assertEqual(S6C.require_compact(r, cfg)['reference_studies'], 1)
         cfg['s6c'] = S6C.block(models(), {'source': 'A100 fp16', 'probabilities': {'E_prior_s43_f0.pt': {sid: [min(x + 0.05, 1.0) for x in p]}}})
         with self.assertRaises(ValueError) as e:

@@ -38,7 +38,7 @@ AMP, LOADER_WORKERS = 'fp16', 2
 LABEL_TABLES = ('v2', 'v3')
 RECONSTRUCTION_ATOL = 2e-6       # CSV '%.6f' of sigmoid(mean seed logits) vs the dumped float32 seed logits
 CROSS_TOLERANCE = 1e-3           # fresh process / other board, per seed probability
-REFERENCE_ATOL = 0.02            # A100 reference read-out vs T4 fp16 (different GPU, torch and image)
+REFERENCE_ATOL = 0.01            # A100 fp16 reference vs T4 fp16; measured s42 A100 vs s6solo T4: max 0.0047 on 36 probes
 LABELS = ['ACL', 'MCL', 'Medial Meniscus', 'Lateral Meniscus', 'Medial OA', 'Lateral OA', 'PF OA', 'Effusion',
           'Synovitis', "Baker's", 'Contusion', 'Fracture']
 AGGREGATION = 'mean over seeds of per-seed average percentile ranks over the genuine rows of the scored population'

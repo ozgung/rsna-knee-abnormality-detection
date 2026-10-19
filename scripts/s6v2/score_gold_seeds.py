@@ -8,8 +8,38 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from evaluate_pair import LABELS, UID, endpoint_support, gold_table, macro, per  # noqa: E402
+LABELS = ["ACL", "MCL", "Medial Meniscus", "Lateral Meniscus", "Medial OA", "Lateral OA", "PF OA",
+          "Effusion", "Synovitis", "Baker's", "Contusion", "Fracture"]
+UID = "StudyInstanceUID"
+
+
+def auc(y, p):
+    """Binary ROC AUC = Mann-Whitney U with average ranks for ties (equals sklearn's roc_auc_score); None if one class."""
+    y = np.asarray(y, float); r = pd.Series(np.asarray(p, float)).rank(method="average").to_numpy()
+    n1 = int((y == 1).sum()); n0 = len(y) - n1
+    return None if n1 == 0 or n0 == 0 else float((r[y == 1].sum() - n1 * (n1 + 1) / 2) / (n1 * n0))
+
+
+def per(y, p):
+    return [auc(y[:, j], p[:, j]) for j in range(y.shape[1])]
+
+
+def macro(y, p):
+    a = per(y, p)
+    return (float(np.mean(a)) if all(x is not None for x in a) else float("nan")), a
+
+
+def gold_table(train_csv):
+    out = {}
+    with open(train_csv, encoding="utf-8", newline="") as fh:
+        for r in csv.DictReader(fh):
+            if all(r[L] != "" for L in LABELS):
+                out[r[UID]] = [float(r[L]) for L in LABELS]
+    return out
+
+
+def endpoint_support(y):
+    return {L: {"positive": int((y[:, j] == 1).sum()), "negative": int((y[:, j] == 0).sum())} for j, L in enumerate(LABELS)}
 
 
 def read_pred(d):
