@@ -67,7 +67,7 @@ def validate_models(models):
     require(isinstance(models, list) and 2 <= len(models) <= 6, 'S6C_TWO_TO_SIX_SEEDS')
     keys = {'seed', 'labels', 'file', 'sha256', 'bytes', 'dataset', 'dataset_version'}
     for m in models:
-        require(isinstance(m, dict) and set(m) == keys, 'S6C_MODEL_SCHEMA')
+        require(isinstance(m, dict) and set(m) - {'path'} == keys, 'S6C_MODEL_SCHEMA')     # 'path' is added by the notebook bootstrap
         require(type(m['seed']) is int and 0 <= m['seed'] < 10000 and m['labels'] in LABEL_TABLES, 'S6C_MODEL_SEED_LABELS')
         require(isinstance(m['sha256'], str) and len(m['sha256']) == 64 and type(m['bytes']) is int and m['bytes'] > 0, 'S6C_MODEL_IDENTITY')
         require(isinstance(m['dataset'], str) and m['dataset'].split('/')[0] in SEED_OWNERS and type(m['dataset_version']) is int

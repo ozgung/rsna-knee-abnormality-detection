@@ -49,6 +49,7 @@ class FrameTests(unittest.TestCase):
 
     def test_seed_set_rules(self):
         self.assertEqual(S6C.validate_models(models()), ['E_prior_s42_f0.pt', 'E_prior_s43_f0.pt', 'E_prior_s44_f0.pt'])
+        self.assertEqual(S6C.validate_models([dict(m, path='/kaggle/input/x/' + m['file']) for m in models()])[0], 'E_prior_s42_f0.pt')
         mixed = models() + models('v3', (45,))
         for bad, message in ((mixed, 'S6C_ONE_LABEL_TABLE_NO_MIXING'), (models(seeds=(42, 42)), 'S6C_DISTINCT_SEEDS'),
                              (models(seeds=(43, 42)), 'S6C_SEEDS_IN_LOADER_ORDER'), (models(seeds=(42,)), 'S6C_TWO_TO_SIX_SEEDS'),
