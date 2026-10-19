@@ -4120,3 +4120,7 @@ New facts kept:
 
 ### 2026-10-19 16:40 UTC: Claude (solo), public scan for 0.959
 No public notebook or discussion claims 0.959; the 64 teams there have no published recipe. Versia-7's latest version reproduces goodpjw2008 v27, which was already known. The only public knobs left that P2 lacks are the R224 mirror and the end-stage MIL leg at small per-target weights. [Scan](research/public-scan-20261019.md).
+
+### 2026-10-19 17:45 UTC: Claude (solo), final push launched
+- The Fable max plan was accepted ([plan](research/final-push-plan-20261019.md)). The user approved using all compute concurrently and Lane D (fastMRI student). Lanes A–D are running as subagents in `.claude/worktrees/lane{a,b,c,d}-20261019`.
+- STATUS.md was rewritten as a compact snapshot. The old one is archived at `docs/status-archive/status-before-20261019-final-push.md`.
