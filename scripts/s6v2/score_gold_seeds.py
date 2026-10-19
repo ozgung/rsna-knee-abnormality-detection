@@ -38,10 +38,19 @@ def main():
         name, d = a.split("=", 1)
         rows, rec = read_pred(d)
         assert set(rows) == set(ids) and not rec.get("fallback"), "gold coverage / fallback in %s" % name
-        p = np.array([rows[u] for u in ids]); preds[name] = p
-        m, _ = macro(y, p)
-        res["runs"][name] = {"macro": m, "per_target": dict(zip(LABELS, per(y, p))), "amp": rec.get("amp"), "models": rec.get("models"),
-                             "scored": rec.get("scored"), "seconds": rec.get("seconds")}
+        items = [(name, np.array([rows[u] for u in ids]))]
+        if len(rec.get("models") or []) > 1:          # one decode, several seeds: split the dumped per-model logits
+            z = json.load(open(Path(d) / "logits.json"))
+            zz = np.array([z[u] for u in ids], dtype=np.float64)          # [58, M, 12]
+            assert zz.shape == (58, len(rec["models"]), 12)
+            assert np.abs(1 / (1 + np.exp(-zz.mean(1))) - items[0][1]).max() < 2e-6, "CSV != sigmoid(mean logits)"
+            items += [(m.replace(".pt", ""), 1 / (1 + np.exp(-zz[:, k]))) for k, m in enumerate(rec["models"])]
+        for nm, p in items:
+            preds[nm] = p
+            mm, _ = macro(y, p)
+            res["runs"][nm] = {"macro": mm, "per_target": dict(zip(LABELS, per(y, p))), "amp": rec.get("amp"), "source": name,
+                               "models": rec.get("models") if nm == name else [nm + ".pt"], "scored": rec.get("scored"),
+                               "seconds": rec.get("seconds")}
     for group in ens:
         r = np.mean([pd.DataFrame(preds[g]).rank(method="average", pct=True).to_numpy() for g in group], axis=0)
         m, _ = macro(y, r)
