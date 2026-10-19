@@ -4124,3 +4124,9 @@ No public notebook or discussion claims 0.959; the 64 teams there have no publis
 ### 2026-10-19 17:45 UTC: Claude (solo), final push launched
 - The Fable max plan was accepted ([plan](research/final-push-plan-20261019.md)). The user approved using all compute concurrently and Lane D (fastMRI student). Lanes A–D are running as subagents in `.claude/worktrees/lane{a,b,c,d}-20261019`.
 - STATUS.md was rewritten as a compact snapshot. The old one is archived at `docs/status-archive/status-before-20261019-final-push.md`.
+
+### 2026-10-19 21:15 UTC: Claude (solo), Lane A stopped at the kill rule
+- P6 rehearsal `ozgung/r6flip-p6-rehearsal-20261019` v1: FAIL_PROJECTION_ONLY. The point estimate is 32,085 s (conservative 43,710 s). The P6′ replay without R224 gives 29,832 s. Both exceed the plan's 26,000 s limit, so no entry was built and no slot was used.
+- R6 plain costs about 70 % of R6 flip, not 50 %, because decoding dominates. The dual compact vs R6 flip has Spearman 0.990, and the P6 blend vs the P2 blend 0.994 (39 rehearsal studies), which is too close to P2 to be worth much as final 2.
+- Code merged (0c49b21): `p6`/`p6p` variants, `knee/public_r7_profile.py`, 22 new tests. 49 r6flip tests and smoke pass after the merge.
+- Final 2 now falls to P7′ (Lane C) or A′-w under the selection rule.

@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-19 17:45 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
+Updated **2026-10-19 21:15 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
 
 ## Current snapshot
 
@@ -29,7 +29,7 @@ Updated **2026-10-19 17:45 UTC** (Claude, solo; Codex unavailable until Oct 22).
 
 | Lane | Worktree / branch | Resource | Goal and deadline |
 |---|---|---|---|
-| A: P6 dual-compact | `.claude/worktrees/lanea-20261019`, claude/lanea-20261019 | Kaggle GPU | P2 with compact slot ½ R6 plain + ½ R7 plain (R7 last under the guard); submit by Oct 20 12:00 |
+| A: P6 dual-compact | merged 0c49b21 | Kaggle GPU | **STOPPED at the kill rule.** Rehearsal point 32,085 s (P6′ replay 29,832 s), above the 26,000 s limit. Spearman of P6 vs P2 is 0.994, so there is little diversity. No entry and no slot used. [Note](docs/experiments/lane-a-p6-20261019.md) |
 | B: R6/R7 out-of-fold columns | `.claude/worktrees/laneb-20261019` | Colab #1, `sessions-laneb-20261019.json` | decision table for A; labels v3 written to `outputs/laneb-20261019/labels_v3/READY.json`; target Oct 20 06:00 |
 | C: S6 seeds → solo → P7′ | `.claude/worktrees/lanec-20261019` | Colab #2, `sessions-lanec-20261019.json`; Kaggle | seeds 43/44 on labels v2 now, then v3 or seed 45; P7′ all-ours compact submitted by Oct 21 18:00 |
 | D: fastMRI noisy student | `.claude/worktrees/laned-20261019` | Colab #3, `sessions-laned-20261019.json` | go/no-go Oct 20 06:00; student export by Oct 21 20:00; P8 decision with the parent |
