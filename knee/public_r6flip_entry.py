@@ -66,7 +66,22 @@ def r6_worker_config(cfg, board, pass_name, ids, folder, inject_uid, arm='r6'):
         c['flip'] = False
     if arm == 'r7':
         c.update(profile='r7', compact_arm='r7')
+    if arm == 'r6' and pass_name == 'production' and R6F.compact_shared(cfg.get('blend')):
+        c['r7_shared'] = {'mount': cfg['r7_mount'], 'manifest': cfg['r6flip_binding']['r7']['manifest'],
+                          'cpu_pins': cfg['r6flip_binding']['r7']['cpu_pins'], 'deadline_epoch': cfg.get('deadline_epoch'),
+                          'out': str(Path(folder).parent / ('board%d-r7-production' % board))}
     return c
+
+
+def shared_r7_reports(out):
+    """P6s: the R7 receipts the shared R6 workers wrote next to their own (NO_RECEIPT when a board left none)."""
+    reports = []
+    for board in range(2):
+        try:
+            reports.append(json.loads((Path(out) / ('board%d-r7-production' % board) / 'r7' / 'receipt.json').read_bytes()))
+        except (OSError, ValueError):
+            reports.append({'status': 'NO_RECEIPT'})
+    return reports
 
 
 NAFULL_ENTRY_MODULE = 'knee.public_nafull_aprime_entry'
@@ -150,7 +165,7 @@ def projection(setup_seconds, phases, workers, merge_seconds, development_window
         studies[arm] = sum(len(w['records']) for w in workers[arm])
         require(0 < production[arm] <= phases[arm]['wall_seconds'] and studies[arm] > 0, 'MEASURED_PHASE_PRODUCTION_' + arm)
         overhead[arm] = phases[arm]['wall_seconds'] - production[arm]
-    compact = [arm for arm in ('r6', 'r7') if arm in workers]                  # r7: P6 only, after r6
+    compact = [arm for arm in ('r6', 'r7') if arm in workers and arm in phases]   # r7 stage: P6 only; P6s times R7 inside r6
     window_counts = {}
     for arm in compact:
         genuine = [[x for x in w['records'] if x['status'] == 'genuine'] for w in workers[arm]]
@@ -397,10 +412,11 @@ def run(root, cfg, out, *, started, started_epoch=None):
     csv_path = out / 'visible-predictions.csv' if rehearsal else Path('/kaggle/working/submission.csv')
     try:
         require(cfg['mode'] in ('rehearsal', 'entry'), 'MODE')
-        require(rehearsal or not any(k in cfg for k in ('probes', 'probe_order', 'old_sentinels', 's6_sentinels', 'r7_reference')),
-                'PURE_ENTRY_CFG')
-        require(('r7' in compact_names) == ('r7' in binding) and (not rehearsal or ('r7' in compact_names) == ('r7_reference' in cfg)),
-                'R7_STAGE_CONFIG_MATCHES_BLEND')
+        shared = R6F.compact_shared(blend)
+        require(rehearsal or not any(k in cfg for k in ('probes', 'probe_order', 'old_sentinels', 's6_sentinels', 'r7_reference',
+                                                         'p6_reference')), 'PURE_ENTRY_CFG')
+        require(('r7' in compact_names) == ('r7' in binding) and (not rehearsal or ('r7' in compact_names) == ('r7_reference' in cfg))
+                and (not rehearsal or shared == ('p6_reference' in cfg)), 'R7_STAGE_CONFIG_MATCHES_BLEND')
         require('raptor_arms' not in cfg, 'RAPTOR_ARMS_ONLY_VIA_SEALED_BLEND')
         require(('nafull' in arm_names) == ('nafull' in cfg), 'NAFULL_STAGE_CONFIG_MATCHES_BLEND')
         require(rehearsal or not any(k in cfg.get('nafull', {}).get('worker', {}) for k in NAFULL_WORKER_PRIVATE)
@@ -454,6 +470,8 @@ def run(root, cfg, out, *, started, started_epoch=None):
                 workers['r6_sentinels'][name], phases['r6_' + name] = rep, phase
                 save(out / 'receipt.json', r)
         workers['r6'], phases['r6'] = stage_run('r6', 'r6', pass_name='production', ids_by_board=cfg['assignment'])
+        if shared:                       # P6s: R7 was scored inside the R6 stage on the same windows
+            workers['r7'] = shared_r7_reports(out)
         save(out / 'receipt.json', r)
         if 'nafull' in arm_names:        # last, after r6: at the T0+8.3 h guard it is the arm cut (0.1 of the blend), not R6 (0.5); entry: a failed or missing na-full only costs its rank
             try:
@@ -469,7 +487,7 @@ def run(root, cfg, out, *, started, started_epoch=None):
                                     'peaks': {'host_rss_bytes': 0, 'output_disk_bytes': 0},
                                     'minimum_disk_free_bytes': shutil.disk_usage(out).free}
             save(out / 'receipt.json', r)
-        if 'r7' in compact_names:        # P6: last of all; at the guard R7 is cut and those studies keep rank(R6) as compact slot
+        if 'r7' in compact_names and not shared:   # P6: last of all; at the guard R7 is cut and those studies keep rank(R6)
             try:
                 workers['r7'], phases['r7'] = stage_run('r7', 'r7', pass_name='production', ids_by_board=cfg['assignment'])
             except InterruptedError:
@@ -785,6 +803,52 @@ def require_r7(r, cfg, anatomy_state):
             'reference_receipts_sha256': cfg['r7_reference']['receipts_sha256']}
 
 
+def require_r7_shared(r, cfg, anatomy_state):
+    """P6s R7 gates: pinned R7 folds compiled and checked, both boards, all 39 genuine with R6's own input (same windows), no
+    fp32 rescue / stacker fallback / mutation / cut; R6 and R7 within 1e-3 of the separate-pass P6 rehearsal (R6_CROSS_TOLERANCE,
+    the fresh-process sentinel tolerance) and R7 within 5e-3 of A-prime's qualified R7."""
+    from knee.public_s6_recovery_entry import assignments
+    reports, r6_reports = r['workers']['r7'], r['workers']['r6']
+    pins = cfg['r6flip_binding']['r7']['cpu_pins']['folds']
+    shards = assignments(cfg['staged_ids'])
+    require(len(reports) == 2 and len(r6_reports) == 2, 'R7_SHARED_TWO_BOARDS')
+    for board, (x, x6) in enumerate(zip(reports, r6_reports)):
+        require(x.get('version') == VERSION and x.get('status') == 'PASS' and x.get('arm') == 'r7' and x.get('slot') == 'r7-shared'
+                and x.get('board') == board and x.get('pass') == 'production' and x.get('assigned') == shards[board]
+                and x.get('completed') == len(shards[board]) and x.get('failed') == 0 and x.get('cut') is None
+                and x.get('fp32_recoveries') == 0 and x.get('flip') == {'enabled': False}
+                and x.get('environment') == x6.get('environment'), 'R7_SHARED_WORKER_PASS')
+        require(len(x['folds']) == 4 and all(f['strict'] is True and all(f[k] == p[k] for k in ('file', 'file_sha256', 'state', 'buffers',
+                                                                                              'constructor', 'constructor_args'))
+                                             for f, p in zip(x['folds'], pins)), 'R7_SHARED_FOLD_BINDING')
+        require(x['state_before'] == x['state_after'] == R6F.digest([p['state'] for p in pins]), 'R7_SHARED_STATE_BEFORE_AFTER')
+        c = x['compile']
+        require(c.get('requested') is True and c.get('active') is True and c.get('fallback') is None and c.get('decision') == 'compiled',
+                'R7_SHARED_COMPILED_NO_FALLBACK')
+        require(x6.get('r7_shared', {}).get('status') == 'PASS', 'R7_SHARED_R6_WORKER_HANDOFF')
+    r6_rows = {row['id']: row for w in r6_reports for row in w['records']}
+    rows = {row['id']: row for w in reports for row in w['records']}
+    require(set(rows) == set(cfg['staged_ids']) == set(r6_rows) and all(x['status'] == 'genuine' for x in rows.values()), 'R7_COMPLETE39_GENUINE')
+    require(all(rows[s]['input'] == r6_rows[s]['input'] and rows[s]['windows'] == r6_rows[s]['windows'] for s in rows), 'R7_INPUT_EQUALS_R6_INPUT')
+    require(all(x['checksum_equal'] is True and x['fluid_status_ok'] is True and x['fp32_rescues'] == 0 and x['calls'] == 4
+                and x['shared_decode'] is True and not x['r6_aborted'] and all(v.get('fallback') is None for v in x['stackers'].values())
+                for x in rows.values()), 'R7_SHARED_STUDY_GATES')
+    ref = cfg['p6_reference']
+    require(set(ref['r6']) == set(ref['r7']) == set(rows), 'P6_REFERENCE_COVERAGE')
+    dist = lambda a, b: max(abs(float(u) - float(v)) for u, v in zip(a, b))
+    d6 = max(dist(r6_rows[s]['probabilities'], ref['r6'][s]) for s in rows)
+    d7 = max(dist(rows[s]['probabilities'], ref['r7'][s]) for s in rows)
+    require(d6 <= R6_CROSS_TOLERANCE, 'P6S_R6_SEPARATE_PASS_PARITY')
+    require(d7 <= R6_CROSS_TOLERANCE, 'P6S_R7_SEPARATE_PASS_PARITY')
+    aprime = cfg['r7_reference']['probabilities']
+    worst = max(dist(rows[s]['probabilities'], aprime[s]) for s in rows)
+    require(worst <= R7_REFERENCE_TOLERANCE, 'R7_APRIME_REFERENCE_PARITY')
+    return {'studies': len(rows), 'input_equals_r6': True, 'shared_decode': True, 'p6_separate_pass_r6_max_abs': d6,
+            'p6_separate_pass_r7_max_abs': d7, 'separate_pass_tolerance': R6_CROSS_TOLERANCE, 'aprime_reference_max_abs': worst,
+            'tolerance': R7_REFERENCE_TOLERANCE, 'compile': [x['compile'] for x in reports],
+            'reference_receipts_sha256': cfg['r7_reference']['receipts_sha256'], 'p6_reference_receipt_sha256': ref['receipt_sha256']}
+
+
 def require_rehearsal(r, cfg, out, csv_path):
     """Every saved gate of the R6-flip rehearsal except the ordinary projection gate, which is returned."""
     import csv
@@ -812,10 +876,12 @@ def require_rehearsal(r, cfg, out, csv_path):
         require_crop224(r, cfg, old_rows)
     nafull = require_nafull(r, cfg, old_rows) if 'nafull' in arm_names else None
     r6 = require_r6(r, cfg)
-    r7 = require_r7(r, cfg, r6['anatomy_state']) if 'r7' in compact_names else None
+    shared = R6F.compact_shared(blend)
+    r7 = None if 'r7' not in compact_names else require_r7_shared(r, cfg, r6['anatomy_state']) if shared else \
+        require_r7(r, cfg, r6['anatomy_state'])
     phases = r.get('phases') or {}
     require(set(phases) == {'old', *[a for a in ('crop224', 'nafull') if a in arm_names], 'r6_sentinel1', 'r6_sentinel2', 'r6',
-                            *[a for a in ('r7',) if a in compact_names]}
+                            *[a for a in ('r7',) if a in compact_names and not shared]}
             and all(p['wall_seconds'] > 0 and p['peaks']['host_rss_bytes'] > 0 and p['peaks']['output_disk_bytes'] > 0
                     and p['minimum_disk_free_bytes'] > 0 for p in phases.values()), 'MEASURED_PHASE_RESOURCES')
     require(r.get('resources') == resources(phases, r['workers']), 'REPLAY_RESOURCES')

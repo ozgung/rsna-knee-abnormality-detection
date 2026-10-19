@@ -46,7 +46,7 @@ OWNER = 'ozgung'
 COMP = 'rsna-knee-abnormality-detection'
 SLUGS = {'rehearsal': 'r6flip-rehearsal-20261017', 'entry': 'r6flip-entry-20261017'}
 VARIANT_DATE = '20261018'
-VARIANT_DATES = {'p6': '20261019', 'p6p': '20261019'}
+VARIANT_DATES = {'p6': '20261019', 'p6p': '20261019', 'p6s': '20261020', 'p6sp': '20261020'}
 
 
 def slug_for(variant, mode):
@@ -64,6 +64,30 @@ APRIME_R7_BASE = OUT / 'kaggle/ws2-r224-v2-qual-20261015-result/ws2-a-prime/base
 APRIME_R7_BASE_SHA = '1ac92b6a7ecf7bd8b90b52f7b2aad7f6f4273a9b319d24744b097e6ab29931f2'     # = A-prime v2 result's base_receipt_sha256
 APRIME_R7_BOARD_SHA = ('2527f350813384ecd621db713253c1ce76ae7a70deb274f4cac99c4111c5313d',
                        '0ae1fe71bba29bdb94730e489da604b8065e0766a303fc3cf7fe155883615f71')
+
+
+P6_REHEARSAL_OUT = OUT / 'kaggle/r6flip-p6-rehearsal-20261019-out/r6flip'
+P6_REHEARSAL_RECEIPT_SHA = '5548d5c570f095655960c13f5111783651cf6567eb4a8c7d13ca3968914ada09'     # FAIL_PROJECTION_ONLY, every other gate PASS
+
+
+def p6_reference():
+    """P6s rehearsal fixture: the separate-pass P6 rehearsal's R6 plain and R7 plain probabilities on the frozen 39 (private)."""
+    R6F.require(file_sha(P6_REHEARSAL_OUT / 'receipt.json') == P6_REHEARSAL_RECEIPT_SHA, 'EXACT_P6_REHEARSAL_RECEIPT')
+    r = read(P6_REHEARSAL_OUT / 'receipt.json')
+    R6F.require(r['status'] == 'FAIL_PROJECTION_ONLY' and r['qualification']['all_ledgers_recomputed'] is True, 'P6_REHEARSAL_QUALIFIED')
+    out = {}
+    for arm in ('r6', 'r7'):
+        out[arm] = {}
+        for board, w in enumerate(r['workers'][arm]):
+            path = P6_REHEARSAL_OUT / ('board%d-%s-production' % (board, arm)) / arm / 'predictions.npz'
+            R6F.require(w['ledger_sha256'] == file_sha(path) and w['status'] == 'PASS', 'P6_REFERENCE_LEDGER_BINDING')
+            for row in w['records']:
+                R6F.require(row['status'] == 'genuine' and row['id'] not in out[arm], 'P6_REFERENCE_GENUINE')
+                out[arm][row['id']] = row['probabilities']
+    ids = json.loads((P6_REHEARSAL_OUT / 'assignment.json').read_bytes())['ids']
+    R6F.require(sorted(out['r6']) == sorted(out['r7']) == sorted(ids) and len(ids) == 39, 'P6_REFERENCE_FROZEN39')
+    return {'r6': {s: out['r6'][s] for s in ids}, 'r7': {s: out['r7'][s] for s in ids}, 'receipt_sha256': P6_REHEARSAL_RECEIPT_SHA,
+            'source': 'ozgung/r6flip-p6-rehearsal-20261019 v1 (separate R6 plain and R7 plain stages)'}
 
 
 def has_r7(variant):
@@ -185,6 +209,11 @@ def variant_frame(variant):
                                  'r7': {'bundle_id': R7P.BUNDLE_ID, 'dataset': '%s/%d' % (R7P.DATASET, R7P.DATASET_VERSION)},
                                  'worker': 'compact_infer.py v4c (captured, unchanged), plain pass, 2 loader workers; R7 stage last',
                                  'guard_fallback': 'studies without R7 keep rank(R6) as the compact slot'}
+        if R6F.compact_shared(R6F.VARIANTS[variant]):
+            frame['compact_half'].update(worker='compact_infer.py v4c (captured, unchanged) R6 plain; R7 fold models scored in the same '
+                                                'worker on R6\'s rendered windows (one decode per study)',
+                                         guard_fallback='R7 stops first near the deadline (R6-only pace x 1.3); studies without R7 '
+                                                        'keep rank(R6 plain) as the compact slot (R6 flip is not run in P6s)')
     return frame
 
 
@@ -343,6 +372,12 @@ def variant_deviations(variant):
                    'the same observed compact_infer worker, plain pass; compact slot = 1/2 rank(R6) + 1/2 rank(R7) (pre-registered). '
                    'Guard-cut or failed R7 studies keep rank(R6) as their compact slot. Rehearsal: R7 input must equal R6 input per '
                    'study and R7 probabilities must lie within 5e-3 of A-prime\'s qualified R7 run on the frozen 39.')
+    if R6F.compact_shared(R6F.VARIANTS[variant]):
+        out.append('Shared decode (P6s): no separate R7 stage. The R6 plain production worker loads the pinned R7 folds (CPU state '
+                   'digests), compiles them like compact_infer --compile (warm-up 32..192 windows, first-study compiled-vs-eager '
+                   'check 1e-3), and scores them right after R6\'s last fold on the same rendered windows; R7 stackers recomputed '
+                   'with knee.public_r7_stackers. R7 stops before R6 near the deadline. Rehearsal: R6 and R7 within 1e-3 of the '
+                   'separate-pass P6 rehearsal on the frozen 39.')
     return out
 
 
@@ -370,6 +405,8 @@ def packet(mode='rehearsal', qualified=None, variant=None):
                 sources[name] = text
             if mode == 'rehearsal':
                 cfg['r7_reference'] = r7_reference(pack)
+                if R6F.compact_shared(cfg['blend']):
+                    cfg['p6_reference'] = p6_reference()
     b = binding(pack, sources, variant)
     for key in R7_ONLY_CFG:
         cfg.pop(key)
@@ -380,6 +417,7 @@ def packet(mode='rehearsal', qualified=None, variant=None):
         for key in PRIVATE_CFG:
             cfg.pop(key)
         cfg.pop('r7_reference', None)
+        cfg.pop('p6_reference', None)
         cfg['binding'] = {k: v for k, v in cfg['binding'].items() if k not in PRIVATE_BINDING}
         if 'nafull' in cfg:
             cfg['nafull'] = {k: v for k, v in cfg['nafull'].items() if k != 'reader_reference'}
