@@ -4130,3 +4130,7 @@ No public notebook or discussion claims 0.959; the 64 teams there have no publis
 - R6 plain costs about 70 % of R6 flip, not 50 %, because decoding dominates. The dual compact vs R6 flip has Spearman 0.990, and the P6 blend vs the P2 blend 0.994 (39 rehearsal studies), which is too close to P2 to be worth much as final 2.
 - Code merged (0c49b21): `p6`/`p6p` variants, `knee/public_r7_profile.py`, 22 new tests. 49 r6flip tests and smoke pass after the merge.
 - Final 2 now falls to P7′ (Lane C) or A′-w under the selection rule.
+
+### 2026-10-19 22:30 UTC: Claude (solo), Lane B done; P6 reopened as shared-decode P6s
+- Lane B (merged e483f37): fold mapping confirmed in 8 of 8 folds. On 4,349 held-out studies, dual − R6 flip = **+0.0029 [+0.0019, +0.0039]**, with the dual winning in all folds, so the final-1 out-of-fold rule is met. The caveat is that these are single-model columns; on gold-58 with four models averaged, the difference is −0.0022 (wide CI). Labels v3 is READY, and Lane C picks it up. Colab burn is 5.3 units per A100-h; the balance was about 499 at 22:09.
+- P6 failed only on runtime, and decoding dominates that cost. Lane A is reopened to build **P6s**, which decodes each study once and feeds both R6 plain and R7 plain. Pre-registered gate: point ≤ 26,000 s (else P6s′ without R224 if ≤ 29,000 s). No submission after Oct 21 18:00.
