@@ -55,3 +55,11 @@ Owner: Claude (lane C agent). Plan: [final-push plan §2 Lane C](../research/fin
   then create the export datasets. No other dataset is touched.
 - P7′ smoke rehearsal (not a candidate): `r6flip-p7smoke-rehearsal-20261019`, seeds = nartaa S6fall control (as seed
   41) + our V2-all s42, to exercise the s6c worker in the A-prime image before the lane C seeds exist.
+- Smoke v1 (21:07) failed before any stage: `S6C_MODEL_SCHEMA` (the bootstrap adds each model's mounted path; the schema
+  check now allows it, commit "s6c: accept the bootstrap-added model path"). **Smoke v2 PASS** (21:10–21:52, 2×T4,
+  A-prime image torch 2.10.0+cu128): 39/39 genuine, 0 fallback, every R384/R224 gate and every s6c gate (sentinel
+  repeats 5 per sentinel across fresh processes and boards, max |Δp| 0.0; state unchanged; source/anatomy pins), CSV
+  recomputed; elapsed 2,169 s; projection point 15,125 s, conservative 19,294 s (two seeds; gate 29,880 s). Phase walls:
+  old 946 s, crop224 498 s, s6c sentinels 287 + 125 s, s6c production 256 s; s6c peak CUDA 7.3 GB/board. The s42 per-seed
+  probabilities on the 36 probes match the A100 fp16 reference within 0.0047 (the same as nartaa's image), so the
+  exact S6 code tree runs unchanged in the A-prime image.
