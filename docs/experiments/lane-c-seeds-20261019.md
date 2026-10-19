@@ -26,8 +26,8 @@ Owner: Claude (lane C agent). Plan: [final-push plan §2 Lane C](../research/fin
 
 | Run | Labels | Seed | VM / session | Start | Epoch-0 loss | Final loss | Wall | Gold-58 | Export |
 |---|---|---|---|---|---|---|---|---|---|
-| v2-s43 | v2 | 43 | lanec1 | 2026-10-19 18:30 | | | | | |
-| v2-s44 | v2 | 44 | lanec1 | 2026-10-19 18:31 | | | | | |
+| v2-s43 | v2 | 43 | lanec1 | 2026-10-19 19:21 | 0.5083 (1,563 s) | | | | |
+| v2-s44 | v2 | 44 | lanec1 | 2026-10-19 19:22 | 0.5105 (1,661 s) | | | | |
 
 ## Recovery
 
@@ -40,3 +40,18 @@ Owner: Claude (lane C agent). Plan: [final-push plan §2 Lane C](../research/fin
 - Resume after a VM loss: new session, rerun the boot (restore + preflight), put the backed-up checkpoint at
   `/content/runs/<tag>_s<seed>/ckpt/E_prior_s<seed>_f0.pt`, rerun the fit script (the trainer resumes).
 - Stop: `outputs/lanec-20261019/vm/c.sh stop -s lanec1`, then kill the local refresher.
+
+## Log
+
+- 2026-10-19 19:20: cache restored on lanec1 (17 shards, every sha256 matches the original preflight; 52 min in
+  asia-southeast1 vs 393 s on Oct 16), preflight on targets_V2_all passed, fits started. Epoch time ≈ 1,600 s per fit
+  with two fits sharing the A100 (V2-all alone: 778 s) → ETA ≈ 02:45 Oct 20.
+- Reference read-out, V2-all seed 42 (already exposed): gold-58 macro **0.9341** (compact_infer stride 1, bf16, 58/58,
+  0 fallback; the scorer reproduces nartaa S6fall's 0.9314). Probe-36 A100 fp16 vs the s6solo-v2 T4 rehearsal: max
+  |Δp| 0.0047 → the P7′ rehearsal reference gate uses 0.01.
+- **Kaggle private-dataset quota is exhausted** (0 B left; 133 GB cache backup plus earlier lanes). Epoch-0 checkpoints
+  of both fits were backed up; from epoch 1 every versioned backup fails. A VM loss now means restarting from epoch 1.
+  Exports at fit end need space: plan = delete only this lane's own checkpoint datasets once the final models exist,
+  then create the export datasets. No other dataset is touched.
+- P7′ smoke rehearsal (not a candidate): `r6flip-p7smoke-rehearsal-20261019`, seeds = nartaa S6fall control (as seed
+  41) + our V2-all s42, to exercise the s6c worker in the A-prime image before the lane C seeds exist.
