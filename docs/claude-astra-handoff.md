@@ -4117,3 +4117,6 @@ New facts kept:
 - P3 57366765, P4 57368819 and P5 57368388 all scored **0.957 public**: none beat P2 57340072 (0.958). The na-full arm, the V2 per-finding weights and dropping crop224 gave no displayed gain. The 0.001 gap is inside the public SD of about 0.003, so this is not evidence of harm. Whether the guard cut na-full in hidden runs is unknown.
 - Full leaderboard (`outputs/analysis/lb-20261019/`): 6,218 teams. 0.958 is shared by 1,259 teams (ranks 186–1,444); 64 teams are at 0.959. The bronze line (about rank 622) falls inside the 0.958 block, so the private result depends on unrounded scores.
 - Finals stand: P2 57340072 (0.958) and A′-w 57324282 (0.957). No selection action yet; Oct 21 remains the plan.
+
+### 2026-10-19 16:40 UTC: Claude (solo), public scan for 0.959
+No public notebook or discussion claims 0.959; the 64 teams there have no published recipe. Versia-7's latest version reproduces goodpjw2008 v27, which was already known. The only public knobs left that P2 lacks are the R224 mirror and the end-stage MIL leg at small per-target weights. [Scan](research/public-scan-20261019.md).
