@@ -24,6 +24,13 @@ import time
 from knee import public_r6flip as R6F
 from knee import public_r6flip_worker as W
 
+S6C_ARM = 's6c'                      # P7-prime compact worker (knee.public_s6c, shipped only by compact variants)
+
+
+def _s6c():
+    from knee import public_s6c
+    return public_s6c
+
 VERSION = R6F.VERSION
 MAX_SECONDS = 9 * 3600
 PROJECTION_GATE_SECONDS = 8.3 * 3600
@@ -205,6 +212,13 @@ def launch_guarded(cfg, out, arm, deadline, pass_name='production', ids_by_board
                     name = 'board%d-r6-%s' % (board, pass_name)
                     c = r6_worker_config(cfg, board, pass_name, ids_by_board[board], out / name, inject_uid)
                     module, env = W.WORKER_MODULE, {**worker_environment(board), **W.PROBE_DUAL_ENV}
+                elif arm == S6C_ARM:
+                    S6C = _s6c()
+                    from knee import public_s6c_worker as S6CW
+                    require(inject_uid is None, 'S6C_NO_INJECTION')
+                    name = 'board%d-s6c-%s' % (board, pass_name)
+                    c = S6CW.worker_config(cfg, board, pass_name, ids_by_board[board], out / name)
+                    module, env = S6C.WORKER_MODULE, {**worker_environment(board), **W.PROBE_DUAL_ENV}
                 elif arm == 'nafull':
                     name = 'board%d-nafull' % board
                     c = nafull_worker_config(cfg, board, out / name)
@@ -224,7 +238,7 @@ def launch_guarded(cfg, out, arm, deadline, pass_name='production', ids_by_board
                 children.append(subprocess.Popen([sys.executable, '-u', '-m', module, '--worker', str(path)], env=env,
                                                  stdout=log, stderr=subprocess.STDOUT))
                 log.close()
-                folders.append(out / name / ('old' if arm == 'nafull' else arm))   # the A-triple-prime worker writes under old/
+                folders.append(out / name / ('old' if arm == 'nafull' else arm))   # the A-triple-prime worker writes under old/ (s6c under s6c/)
             while any(c.poll() is None for c in children):
                 s = resource_snapshot(out)
                 for k in high:
@@ -291,9 +305,10 @@ def salvage(ids, out, arm, folder_names):
     return p, status.tolist()
 
 
-def arm_table(ids, workers, out, entry, blend=None):
+def arm_table(ids, workers, out, entry, blend=None, compact=None):
     """Strict merges (A-prime's for the R384/R224 arms, A-triple-prime's for na-full); in entry, anything incomplete is
-    salvaged (missing rows become 'unavailable'). Only the arms of the sealed blend plus R6 are tabulated."""
+    salvaged (missing rows become 'unavailable'). Only the arms of the sealed blend plus R6 are tabulated.
+    compact = cfg['s6c'] (P7-prime): the compact slot is our seed ensemble's mean rank (knee.public_s6c), not R6."""
     import numpy as np
     from knee import public_r7_recovery_entry as R7
     from knee import public_ws2_entry as WS2
@@ -302,7 +317,8 @@ def arm_table(ids, workers, out, entry, blend=None):
                                                for i, x in enumerate(workers['old'])], 'old'),
               'crop224': lambda: WS2.merged_arm(ids, workers['crop224'], out, 'crop224'),
               'nafull': lambda: merge_nafull(ids, workers['nafull'], out),
-              'r6': lambda: merge_r6(ids, workers['r6'], out)}
+              'r6': (lambda: merge_r6(ids, workers['r6'], out)) if compact is None else
+                    (lambda: _s6c().merge(ids, workers['r6'], out, len(compact['models']))[:2])}
     folders = SALVAGE_FOLDERS
     for name in R6F.blend_arm_names(blend) + ['r6']:
         try:
@@ -315,7 +331,10 @@ def arm_table(ids, workers, out, entry, blend=None):
         except Exception as e:
             if not entry:
                 raise
-            arrays[name], statuses[name] = salvage(ids, out, *folders[name])
+            if name == 'r6' and compact is not None:
+                arrays[name], statuses[name] = _s6c().salvage(ids, out, len(compact['models']))
+            else:
+                arrays[name], statuses[name] = salvage(ids, out, *folders[name])
             notes[name] = 'salvaged after %s' % type(e).__name__
     return arrays, statuses, notes
 
@@ -327,7 +346,7 @@ SALVAGE_FOLDERS = {'old320': ('old', ['board0-old', 'board1-old']),
                    'r6': ('r6', ['board0-r6-production', 'board1-r6-production'])}
 
 
-def salvage_csv(root, out, ids, csv_path, reason, blend=None):
+def salvage_csv(root, out, ids, csv_path, reason, blend=None, compact=None):
     """Entry after an unexpected error: blend every genuine ledger row on disk (fallback ranks for the rest).
     Only the arms of the sealed blend plus R6 are read; a variant's missing na-full ledger is simply 'unavailable'."""
     from knee.public_fullfield_entry import test_contract, write_csv
@@ -335,7 +354,10 @@ def salvage_csv(root, out, ids, csv_path, reason, blend=None):
     active = [name for name in SALVAGE_FOLDERS if name == 'r6' or name in R6F.blend_arm_names(blend)]
     for name in active:
         arm, names = SALVAGE_FOLDERS[name]
-        arrays[name], statuses[name] = salvage(ids, Path(out), arm, names)
+        if name == 'r6' and compact is not None:
+            arrays[name], statuses[name] = _s6c().salvage(ids, Path(out), len(compact['models']))
+        else:
+            arrays[name], statuses[name] = salvage(ids, Path(out), arm, names)
     require(any(s == 'genuine' for st in statuses.values() for s in st), 'SALVAGE_NOTHING_GENUINE')
     rec = R6F.recover_guarded(arrays, statuses, blend=blend)
     columns, _, _ = test_contract(root, R6F.LABELS)
@@ -361,6 +383,8 @@ def run(root, cfg, out, *, started, started_epoch=None):
     binding = cfg['r6flip_binding']
     blend = cfg.get('blend')            # sealed variant blend (None: the frozen R6F-pure arithmetic and stages)
     arm_names = R6F.blend_arm_names(blend)
+    compact = cfg.get('s6c')            # P7-prime: our S6 seed ensemble in the compact slot instead of the R6 bundle
+    compact_arm = 'r6' if compact is None else S6C_ARM
     started_epoch = time.time() - (time.monotonic() - started) if started_epoch is None else started_epoch
     deadline = started + R6F.DEADLINE_SECONDS - STAGE_RESERVE_SECONDS
     r = {'status': 'RUNNING', 'version': VERSION, 'mode': cfg['mode'], 'binding': binding,
@@ -373,6 +397,10 @@ def run(root, cfg, out, *, started, started_epoch=None):
         require(rehearsal or not any(k in cfg for k in ('probes', 'probe_order', 'old_sentinels', 's6_sentinels')), 'PURE_ENTRY_CFG')
         require('raptor_arms' not in cfg, 'RAPTOR_ARMS_ONLY_VIA_SEALED_BLEND')
         require(('nafull' in arm_names) == ('nafull' in cfg), 'NAFULL_STAGE_CONFIG_MATCHES_BLEND')
+        require((compact is not None) == (R6F.COMPACT_VARIANTS.get((cfg['r6flip_binding'].get('entry_variant') or {}).get('name')) == S6C_ARM),
+                'COMPACT_STAGE_CONFIG_MATCHES_VARIANT')
+        if compact is not None:
+            _s6c().validate_models(compact['models'])
         require(rehearsal or not any(k in cfg.get('nafull', {}).get('worker', {}) for k in NAFULL_WORKER_PRIVATE)
                 and 'reader_reference' not in cfg.get('nafull', {}), 'PURE_ENTRY_NAFULL_CFG')
         columns, visible, records = test_contract(root, R6F.LABELS, visible=rehearsal)
@@ -419,11 +447,11 @@ def run(root, cfg, out, *, started, started_epoch=None):
             sentinels = list(cfg['s6_sentinels'])
             workers['r6_sentinels'] = {}
             for name in R6_PASSES[:2]:
-                rep, phase = launch_guarded(cfg, out, 'r6', deadline, pass_name=name, ids_by_board=[sentinels, sentinels],
-                                            inject_uid=sentinels[0] if name == 'sentinel1' else None)
+                rep, phase = launch_guarded(cfg, out, compact_arm, deadline, pass_name=name, ids_by_board=[sentinels, sentinels],
+                                            inject_uid=sentinels[0] if name == 'sentinel1' and compact is None else None)
                 workers['r6_sentinels'][name], phases['r6_' + name] = rep, phase
                 save(out / 'receipt.json', r)
-        workers['r6'], phases['r6'] = stage_run('r6', 'r6', pass_name='production', ids_by_board=cfg['assignment'])
+        workers['r6'], phases['r6'] = stage_run('r6', compact_arm, pass_name='production', ids_by_board=cfg['assignment'])
         save(out / 'receipt.json', r)
         if 'nafull' in arm_names:        # last, after r6: at the T0+8.3 h guard it is the arm cut (0.1 of the blend), not R6 (0.5); entry: a failed or missing na-full only costs its rank
             try:
@@ -440,7 +468,7 @@ def run(root, cfg, out, *, started, started_epoch=None):
                                     'minimum_disk_free_bytes': shutil.disk_usage(out).free}
             save(out / 'receipt.json', r)
         merge_start = time.monotonic()
-        arrays, statuses, notes = arm_table(ids, workers, out, entry=not rehearsal, blend=blend)
+        arrays, statuses, notes = arm_table(ids, workers, out, entry=not rehearsal, blend=blend, compact=compact)
         rec = R6F.recover_guarded(arrays, statuses, blend=blend)
         index = {s: i for i, s in enumerate(ids)}
         require(len(visible) == len(set(visible)) and set(visible) <= set(index), 'VISIBLE_COVERAGE')
@@ -472,7 +500,8 @@ def run(root, cfg, out, *, started, started_epoch=None):
             raise
         if not csv_path.exists() and r.get('visible_ids'):
             try:   # salvage every arm ledger already on disk before the constant (57326253 scored 0.500)
-                r.update(status='SALVAGED_AFTER_ERROR', **salvage_csv(root, out, r['visible_ids'], csv_path, type(e).__name__, blend))
+                r.update(status='SALVAGED_AFTER_ERROR', **salvage_csv(root, out, r['visible_ids'], csv_path, type(e).__name__, blend,
+                                                                      cfg.get('s6c')))
             except Exception as e3:
                 r['salvage_failure'] = type(e3).__name__
         if not csv_path.exists():
@@ -728,7 +757,8 @@ def require_rehearsal(r, cfg, out, csv_path):
     if 'crop224' in arm_names:
         require_crop224(r, cfg, old_rows)
     nafull = require_nafull(r, cfg, old_rows) if 'nafull' in arm_names else None
-    r6 = require_r6(r, cfg)
+    compact = cfg.get('s6c')
+    r6 = require_r6(r, cfg) if compact is None else _s6c().require_compact(r, cfg)
     phases = r.get('phases') or {}
     require(set(phases) == {'old', *[a for a in ('crop224', 'nafull') if a in arm_names], 'r6_sentinel1', 'r6_sentinel2', 'r6'}
             and all(p['wall_seconds'] > 0 and p['peaks']['host_rss_bytes'] > 0 and p['peaks']['output_disk_bytes'] > 0
@@ -737,9 +767,10 @@ def require_rehearsal(r, cfg, out, csv_path):
     replay = projection(r['setup_seconds'], phases, r['workers'], r['merge_seconds'], cfg['development_windows'])
     require(replay == r.get('projection'), 'REPLAY_PROJECTION')
     require(0 < r['elapsed_seconds'] < MAX_SECONDS, 'ACTUAL_NINE_HOUR_LIMIT')
-    arrays, statuses, _ = arm_table(ids, r['workers'], Path(out), entry=False, blend=blend)
+    arrays, statuses, _ = arm_table(ids, r['workers'], Path(out), entry=False, blend=blend, compact=compact)
     rec = R6F.recover_guarded(arrays, statuses, blend=blend)
-    require(rec['mode'] == ('aprime_complete_population' if blend is None else 'variant_complete_population')
+    frozen_arms = R6F.resolve_blend(blend)[0] == R6F.RAPTOR_ARMS
+    require(rec['mode'] == ('aprime_complete_population' if frozen_arms else 'variant_complete_population')
             and rec['fallback_studies'] == 0
             and R6F.guarded_receipt(rec) == r['recovery'], 'REPLAY_RECOVERY')
     require(r.get('csv_sha256') == file_sha(csv_path), 'CSV_BINDING')

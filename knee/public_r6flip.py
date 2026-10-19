@@ -276,7 +276,11 @@ VARIANTS = {
            'default_weight': DEFAULT_RAPTOR_WEIGHT},
     'p5': {'raptor_arms': [['old320', .65], ['nafull', .35]], 'weights': dict(RAPTOR_WEIGHTS),
            'default_weight': DEFAULT_RAPTOR_WEIGHT},
+    # P7-prime (Lane C): P2's frozen Raptor half and v1 weights; the compact slot is our S6 seed ensemble (knee.public_s6c)
+    'p7': {'raptor_arms': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]], 'weights': dict(RAPTOR_WEIGHTS),
+           'default_weight': DEFAULT_RAPTOR_WEIGHT},
 }
+COMPACT_VARIANTS = {'p7': 's6c'}     # variants whose compact ('r6') slot is not the heliosli R6 bundle
 PRECISION = {'old320': 'float64', 'r6': '%.9g', 'crop224': 'float32 CSV', 'nafull': 'float64'}
 
 

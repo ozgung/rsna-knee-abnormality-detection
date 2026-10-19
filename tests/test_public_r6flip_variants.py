@@ -46,7 +46,10 @@ V2_COLUMNS = ['Lateral OA', 'PF OA', 'Synovitis', "Baker's"]
 
 class VariantTableTests(unittest.TestCase):
     def test_variants_match_the_spec(self):
-        self.assertEqual(sorted(R6F.VARIANTS), ['p3', 'p4', 'p5'])
+        self.assertEqual(sorted(R6F.VARIANTS), ['p3', 'p4', 'p5', 'p7'])
+        self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p7'])[0], R6F.RAPTOR_ARMS)        # P2's Raptor half, compact = S6 seeds
+        self.assertEqual(R6F.raptor_weight_vector(blend=R6F.VARIANTS['p7']), R6F.raptor_weight_vector())
+        self.assertEqual(R6F.COMPACT_VARIANTS, {'p7': 's6c'})
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p3'])[0], (('old320', .52), ('crop224', .28), ('nafull', .2)))
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p4'])[0], R6F.resolve_blend(R6F.VARIANTS['p3'])[0])
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p5'])[0], (('old320', .65), ('nafull', .35)))
@@ -130,7 +133,8 @@ class BlendArithmeticTests(unittest.TestCase):
             names = R6F.blend_arm_names(blend) + ['r6']
             statuses = {a: ['genuine'] * 40 for a in names}
             rec = R6F.recover_guarded({a: arrays[a] for a in names}, statuses, blend=blend)
-            self.assertEqual((rec['mode'], rec['fallback_studies']), ('variant_complete_population', 0), variant)
+            mode = 'aprime_complete_population' if R6F.resolve_blend(blend)[0] == R6F.RAPTOR_ARMS else 'variant_complete_population'
+            self.assertEqual((rec['mode'], rec['fallback_studies']), (mode, 0), variant)
             self.assertTrue(np.allclose(rec['blend'], self.expected(arrays, blend), rtol=0, atol=1e-12), variant)
             self.assertEqual(rec['raptor_weights'], dict(zip(R6F.LABELS, R6F.raptor_weight_vector(blend=blend))))
             self.assertEqual(sorted(rec['ranks']), sorted(names))
@@ -405,7 +409,7 @@ class VariantPacketTests(unittest.TestCase):
         from scripts import build_r6flip_entry as B
         cls.B = B
         cls.default = B.packet('rehearsal')
-        cls.packs = {v: B.packet('rehearsal', variant=v) for v in R6F.VARIANTS}
+        cls.packs = {v: B.packet('rehearsal', variant=v) for v in R6F.VARIANTS if v not in R6F.COMPACT_VARIANTS}   # p7: test_public_s6c
 
     def test_default_build_has_no_variant_artifacts(self):
         cfg = self.default['cfg']
