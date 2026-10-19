@@ -1,4 +1,5 @@
-"""Synthetic stand-in for compact_infer (tests only): DataLoader with two spawn workers, flip passes, stackers, CSV."""
+"""Synthetic stand-in for compact_infer (tests only): DataLoader with two spawn workers, flip passes, stackers, CSV.
+Without --flip-tta (P6 plain arms) it scores the plain pass only with its own arithmetic and writes no flip_tta receipt."""
 import argparse, csv, hashlib, json, sys
 from pathlib import Path
 import numpy as np
@@ -50,6 +51,7 @@ def main():
     ap.add_argument('--size', type=int)
     ap.add_argument('--crop', type=int)
     ap.add_argument('--workers', type=int)
+    ap.add_argument('--flip-tta', action='store_true')
     a, _ = ap.parse_known_args()
     out = Path(a.output); out.mkdir(parents=True)
     uids = json.loads(Path(a.assignment).read_text())
@@ -78,6 +80,18 @@ def main():
             meta = item['meta'][None]
             mask = torch.ones((1, img.shape[1]), dtype=torch.bool)
             models[0](img, meta, mask, chunk=192)
+            if not a.flip_tta:          # compact_infer v4c score_v4c with FLIP None: per-model plain z, fold-mean state read-out
+                zs, states = [], []
+                for m in models:
+                    z, sl, bl = m(img, meta, mask, chunk=192, return_aux=True)
+                    zs.append(z[0])
+                    p_ = sl.float().softmax(-1)
+                    states.append(torch.cat([p_[:, c, :k] for c, k in enumerate(m.state_k)] + [torch.sigmoid(bl.float())], 1)[0])
+                zs = torch.stack(zs)
+                p, _ = stackers.apply(torch.sigmoid(zs.mean(0)).double().numpy(), zs.mean(0).double().numpy(),
+                                      torch.stack(states).double().mean(0).numpy(), item['fluid'], fluid, state, CT.LABELS)
+                rows.append([item['uid']] + ['%.9g' % float(x) for x in p])
+                continue
             img_m, meta_m = F.mirror_inputs(img, meta)
             plain, mirror, pa, ma = [], [], [], []
             for m in models:
@@ -90,7 +104,9 @@ def main():
             rows.append([item['uid']] + ['%.9g' % float(x) for x in p])
     with open(out / 'predictions.csv', 'w', newline='') as h:
         w = csv.writer(h); w.writerow(['StudyInstanceUID'] + CT.LABELS); w.writerows(rows)
-    (out / 'receipt.json').write_text(json.dumps({'status': 'PASS', 'fallback': fallback, 'timed_out': False, 'amp': 'fp16',
-        'flip_tta': {'perm': perm, 'bin_perm': bin_perm, 'mcl': 'plain pass only'},
-        'compile': {'requested': True, 'active': True, 'fallback': None}, 'state_stacker': {'stack_fallback': {}},
-        'fluid_stacker': {'stack_fallback': {}}, 'stats': {}, 'seconds': 1.0}))
+    receipt = {'status': 'PASS', 'fallback': fallback, 'timed_out': False, 'amp': 'fp16',
+               'compile': {'requested': True, 'active': True, 'fallback': None}, 'state_stacker': {'stack_fallback': {}},
+               'fluid_stacker': {'stack_fallback': {}}, 'stats': {}, 'seconds': 1.0}
+    if a.flip_tta:
+        receipt['flip_tta'] = {'perm': perm, 'bin_perm': bin_perm, 'mcl': 'plain pass only'}
+    (out / 'receipt.json').write_text(json.dumps(receipt))

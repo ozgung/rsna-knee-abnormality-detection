@@ -8,6 +8,8 @@
 The payload is A-prime's sealed v2 rehearsal payload (ws2-r224-v2-qual-20261015, notebook 412eef8f...) with every
 source byte kept, R7-only configuration removed, and four new modules: the R6 profile, the frozen frame, the R6
 worker/observer and the controller. R6 assets come from heliosli/rsna-knee-r6-frozen-fe055406-w1 version 1.
+--variant p6 / p6p (dual compact) also ship knee/public_r7_profile.py and mount heliosli/rsna-knee-compact-r7cnxfsss version 1
+(A-prime's R7 pins); the rehearsal adds A-prime's qualified R7 probabilities on the frozen 39 as a private reference.
 """
 import argparse
 import ast
@@ -44,12 +46,28 @@ OWNER = 'ozgung'
 COMP = 'rsna-knee-abnormality-detection'
 SLUGS = {'rehearsal': 'r6flip-rehearsal-20261017', 'entry': 'r6flip-entry-20261017'}
 VARIANT_DATE = '20261018'
+VARIANT_DATES = {'p6': '20261019', 'p6p': '20261019'}
 
 
 def slug_for(variant, mode):
     """The kernel slug (the title must equal it). No variant keeps the existing R6F-pure slugs."""
     R6F.require(variant is None or variant in R6F.VARIANTS, 'KNOWN_VARIANT')
-    return SLUGS[mode] if variant is None else 'r6flip-%s-%s-%s' % (variant, mode, VARIANT_DATE)
+    return SLUGS[mode] if variant is None else 'r6flip-%s-%s-%s' % (variant, mode, VARIANT_DATES.get(variant, VARIANT_DATE))
+
+
+# P6 dual compact: R7 v1 bundle (A-prime pins), its actual-checkpoint CPU pins and A-prime's qualified R7 run on the frozen 39.
+R7_SOURCES = ('knee/public_r7_profile.py',)
+R7_ASSETS = OUT / 'analysis/lanea-20261019/r7-v1-assets'
+R7_CPU_PINS = OUT / 'analysis/lanea-20261019/r7-cpu-pins.json'
+R7_CPU_PINS_SHA = '6d749b29ebca935badab2482602dc40460091ea1b2f2406907feb14518a38190'
+APRIME_R7_BASE = OUT / 'kaggle/ws2-r224-v2-qual-20261015-result/ws2-a-prime/base'
+APRIME_R7_BASE_SHA = '1ac92b6a7ecf7bd8b90b52f7b2aad7f6f4273a9b319d24744b097e6ab29931f2'     # = A-prime v2 result's base_receipt_sha256
+APRIME_R7_BOARD_SHA = ('2527f350813384ecd621db713253c1ce76ae7a70deb274f4cac99c4111c5313d',
+                       '0ae1fe71bba29bdb94730e489da604b8065e0766a303fc3cf7fe155883615f71')
+
+
+def has_r7(variant):
+    return variant is not None and 'r7' in R6F.compact_arm_names(R6F.VARIANTS[variant])
 
 
 # na-full K62 one-view Raptor: the A-triple-prime packet's worker, config and checkpoint binding, taken from its sealed r3 rehearsal.
@@ -159,6 +177,14 @@ def variant_frame(variant):
     frame['raptor_weight_per_finding'] = dict(weights)
     frame['raptor_weight_default'] = default
     frame['excluded'] = [x for x in frame['excluded'] if x != 'na-full']
+    compact, flip = R6F.resolve_compact(R6F.VARIANTS[variant])
+    if compact != R6F.DEFAULT_COMPACT:
+        from knee import public_r7_profile as R7P
+        frame['compact_half'] = {'arms': dict(compact), 'flip_tta': flip, 'combine': 'weighted sum of average percentile ranks',
+                                 'r6': {'bundle_id': PROFILE.BUNDLE_ID, 'dataset': '%s/%d' % (R6F.R6_DATASET, R6F.R6_DATASET_VERSION)},
+                                 'r7': {'bundle_id': R7P.BUNDLE_ID, 'dataset': '%s/%d' % (R7P.DATASET, R7P.DATASET_VERSION)},
+                                 'worker': 'compact_infer.py v4c (captured, unchanged), plain pass, 2 loader workers; R7 stage last',
+                                 'guard_fallback': 'studies without R7 keep rank(R6) as the compact slot'}
     return frame
 
 
@@ -188,6 +214,61 @@ def cpu_pins():
 def r6_manifest():
     receipt = PROFILE.validate_r6_assets(R6_ASSETS)
     return read(R6_ASSETS / 'manifest.json'), receipt
+
+
+def r7_cpu_pins():
+    from knee import public_r7_profile as R7P
+    R6F.require(file_sha(R7_CPU_PINS) == R7_CPU_PINS_SHA, 'EXACT_R7_CPU_PIN_RECEIPT')
+    c = read(R7_CPU_PINS)
+    R6F.require(c['status'] == 'PASS_ACTUAL_CHECKPOINT_CPU_SYNTHETIC_INPUTS' and c['environment']['torch'] == '2.10.0'
+                and c['environment']['timm'] == '1.0.26' and c['profile']['manifest_sha256'] == R7P.MANIFEST_SHA256
+                and c['profile']['profile_id'] == R7P.PROFILE_ID and c['profile']['assets_sha256'] == dict(R7P.ASSET_SHA256)
+                and c['profile']['sources_sha256'] == dict(PROFILE.SOURCE_SHA256) and c['flip'] is None
+                and c['side']['strict'] is True, 'R7_CPU_PIN_RECEIPT_CONTENT')
+    keys = ('file', 'file_sha256', 'state', 'buffers', 'constructor', 'constructor_args')
+    folds = [{k: f[k] for k in keys} for f in c['folds']]
+    R6F.require([f['file'] for f in folds] == ['E_lrprior_s0_f%d.pt' % i for i in range(4)]
+                and all(f['file_sha256'] == R7P.ASSET_SHA256[f['file']] for f in folds), 'R7_CPU_PIN_FOLDS')
+    return {'receipt_sha256': R7_CPU_PINS_SHA, 'folds': folds, 'side': {k: c['side'][k] for k in ('state', 'buffers', 'constructor')},
+            'flip': None}
+
+
+def r7_block(pack):
+    """The binding's R7 profile: A-prime's R7 dataset/manifest pins (asset_binding, manifest of its sealed cfg) and CPU pins."""
+    from knee import public_r7_profile as R7P
+    receipt = R7P.validate_r7_assets(R7_ASSETS)
+    manifest = read(R7_ASSETS / 'manifest.json')
+    ab = pack['cfg']['asset_binding']
+    R6F.require(manifest == pack['cfg']['manifest'] and ab == {'bundle_id': R7P.BUNDLE_ID, 'dataset': R7P.DATASET,
+                                                               'dataset_version': R7P.DATASET_VERSION,
+                                                               'manifest_sha256': R7P.MANIFEST_SHA256}, 'APRIME_R7_PINS')
+    return {'dataset': R7P.DATASET, 'dataset_version': R7P.DATASET_VERSION, 'profile_id': R7P.PROFILE_ID,
+            'bundle_id': R7P.BUNDLE_ID, 'tag': R7P.BUNDLE_TAG, 'manifest_sha256': R7P.MANIFEST_SHA256,
+            'asset_sha256': dict(R7P.ASSET_SHA256), 'source_sha256': dict(PROFILE.SOURCE_SHA256), 'manifest': manifest,
+            'profile_receipt': receipt, 'cpu_pins': r7_cpu_pins(),
+            'worker': {'controller': 'same compact_infer worker as R6, plain pass (no --flip-tta), loader workers 2, amp auto',
+                       'flip_tta': False, 'module': WORKER.WORKER_MODULE, 'env': WORKER.PROBE_DUAL_ENV},
+            'aprime_pins': {'module': 'knee/public_r7_recovery_entry.py', 'asset_binding': ab}}
+
+
+def r7_reference(pack):
+    """A-prime's qualified R7 probabilities on the frozen 39 (its v2 rehearsal base run), bound by receipt SHA256 (private)."""
+    R6F.require(file_sha(APRIME_RESULT) == APRIME_RESULT_SHA and read(APRIME_RESULT)['base_receipt_sha256'] == APRIME_R7_BASE_SHA
+                and file_sha(APRIME_R7_BASE / 'receipt.json') == APRIME_R7_BASE_SHA, 'APRIME_R7_BASE_BINDING')
+    probabilities = {}
+    for board, pin in enumerate(APRIME_R7_BOARD_SHA):
+        path = APRIME_R7_BASE / ('board%d-s6' % board) / 's6' / 'receipt.json'
+        R6F.require(file_sha(path) == pin, 'APRIME_R7_BOARD_RECEIPT')
+        x = read(path)
+        R6F.require(x['status'] == 'PASS' and x['slot'] == 'r7' and x['board'] == board
+                    and all(row['status'] == 'genuine' for row in x['records']), 'APRIME_R7_BOARD_PASS')
+        for row in x['records']:
+            R6F.require(row['id'] not in probabilities, 'APRIME_R7_UNIQUE')
+            probabilities[row['id']] = row['probabilities']
+    ids = pack['cfg']['probe_order'] + pack['cfg']['binding']['visible_ids']
+    R6F.require(sorted(probabilities) == sorted(ids) and len(ids) == 39, 'APRIME_R7_FROZEN39')
+    return {'probabilities': {s: probabilities[s] for s in ids}, 'receipts_sha256': list(APRIME_R7_BOARD_SHA),
+            'base_receipt_sha256': APRIME_R7_BASE_SHA, 'source': 'ozgung A-prime v2 rehearsal (ws2-r224-v2-qual-20261015) base R7 arm'}
 
 
 def binding(pack, sources, variant=None):
@@ -227,15 +308,23 @@ def binding(pack, sources, variant=None):
         arms, weights, default = R6F.resolve_blend(blend)
         frame = variant_frame(variant)
         names = [a for a, _ in arms]
-        b.update(variant='R6flip-%s: %s Raptor half (%s), heliosli R6 fe055406 flip TTA, per-finding weights' % (
-                     variant.upper(), '+'.join(names), ', '.join('%s %g' % x for x in arms)),
+        compact, flip = R6F.resolve_compact(blend)
+        compact_text = ('heliosli R6 fe055406 flip TTA' if compact == R6F.DEFAULT_COMPACT else
+                        'compact %s (%s, flip TTA %s)' % ('+'.join(a for a, _ in compact), ', '.join('%s %g' % x for x in compact), flip))
+        b.update(variant='R6flip-%s: %s Raptor half (%s), %s, per-finding weights' % (
+                     variant.upper(), '+'.join(names), ', '.join('%s %g' % x for x in arms), compact_text),
                  frame=frame, frame_digest=R6F.digest(frame), raptor_weight_vector=R6F.raptor_weight_vector(blend=blend),
-                 entry_variant={'name': variant, 'blend': blend, 'stages': names + ['r6'], 'crop224_stage': 'crop224' in names,
+                 entry_variant={'name': variant, 'blend': blend, 'stages': names + [a for a, _ in compact],
+                                'crop224_stage': 'crop224' in names, 'compact_arms': [list(x) for x in compact], 'compact_flip': flip,
                                 'nafull_stage': 'nafull' in names, 'weights_digest': R6F.digest(blend),
                                 'default_unchanged': 'no --variant: no cfg[blend], no cfg[nafull], original slugs and sources shipped'})
         b['deviations'] = DEVIATIONS + variant_deviations(variant)
         if 'nafull' in names:
             b['nafull_source_sha256'] = {n: hashlib.sha256(sources[n].encode()).hexdigest() for n in NAFULL_SOURCES}
+        if has_r7(variant):
+            b['r7'] = r7_block(pack)
+            b['r7_source_sha256'] = {n: hashlib.sha256(sources[n].encode()).hexdigest() for n in R7_SOURCES}
+            b['tolerances']['r7_aprime_reference_dprob'] = ENTRY.R7_REFERENCE_TOLERANCE
     return b
 
 
@@ -249,6 +338,11 @@ def variant_deviations(variant):
                    'Missing/failed na-full only costs its rank in the entry. Dataset ozgung/knee-raptor64-na-full-fold0-final-20261016 v1.')
     if 'crop224' not in names:
         out.append('No R224 stage: crop224 is not run and its gates are skipped.')
+    if has_r7(variant):
+        out.append('Dual compact: R6 runs without --flip-tta; a last stage runs heliosli R7 v1 (8c7b666e27dc0e8f, A-prime pins) through '
+                   'the same observed compact_infer worker, plain pass; compact slot = 1/2 rank(R6) + 1/2 rank(R7) (pre-registered). '
+                   'Guard-cut or failed R7 studies keep rank(R6) as their compact slot. Rehearsal: R7 input must equal R6 input per '
+                   'study and R7 probabilities must lie within 5e-3 of A-prime\'s qualified R7 run on the frozen 39.')
     return out
 
 
@@ -268,6 +362,14 @@ def packet(mode='rehearsal', qualified=None, variant=None):
             cfg['nafull'], extra = nafull_block()
             R6F.require(not set(extra) & set(sources), 'NAFULL_SOURCES_DISJOINT')
             sources.update(extra)
+        if has_r7(variant):
+            for name in R7_SOURCES:
+                R6F.require(name not in sources, 'R7_SOURCES_DISJOINT')
+                text = (PROJECT / name).read_text()
+                compile(text, name, 'exec')
+                sources[name] = text
+            if mode == 'rehearsal':
+                cfg['r7_reference'] = r7_reference(pack)
     b = binding(pack, sources, variant)
     for key in R7_ONLY_CFG:
         cfg.pop(key)
@@ -277,6 +379,7 @@ def packet(mode='rehearsal', qualified=None, variant=None):
         R6F.require(qualified is not None, 'ENTRY_REQUIRES_QUALIFIED_REHEARSAL')
         for key in PRIVATE_CFG:
             cfg.pop(key)
+        cfg.pop('r7_reference', None)
         cfg['binding'] = {k: v for k, v in cfg['binding'].items() if k not in PRIVATE_BINDING}
         if 'nafull' in cfg:
             cfg['nafull'] = {k: v for k, v in cfg['nafull'].items() if k != 'reader_reference'}
@@ -360,8 +463,17 @@ NAFULL_MOUNT = """    naweights=mount({dataset!r},[{file!r}])
 """
 
 
+R7_MOUNT = """    r7=mount(b6['r7']['dataset'],['manifest.json',*b6['r7']['asset_sha256']])
+    require(file_sha(r7/'manifest.json')==b6['r7']['manifest_sha256'],'EXACT_R7_V1_MANIFEST')
+    cfg['r7_mount']=str(r7)
+"""
+
+
 def bootstrap(pack):
     tail = BOOTSTRAP_TAIL
+    if 'r7' in pack['cfg']['r6flip_binding']:      # P6 dual compact only; every other tail is untouched
+        R6F.require(tail.count(NAFULL_MOUNT_SITE) == 1, 'EXACT_R7_MOUNT_SITE')
+        tail = tail.replace(NAFULL_MOUNT_SITE, R7_MOUNT + NAFULL_MOUNT_SITE)
     if 'nafull' in pack['cfg']:        # variants with the na-full arm only; the default tail is untouched
         ck = pack['cfg']['nafull']['checkpoint']
         R6F.require(tail.count(NAFULL_MOUNT_SITE) == 1, 'EXACT_NAFULL_MOUNT_SITE')
@@ -391,7 +503,8 @@ def metadata(slug, variant=None):
     return {'id': '%s/%s' % (OWNER, slug), 'title': slug, 'code_file': 'notebook.ipynb', 'language': 'python', 'kernel_type': 'notebook',
             'is_private': True, 'enable_gpu': True, 'enable_tpu': False, 'enable_internet': False, 'competition_sources': [COMP],
             'dataset_sources': list(DATASETS) + (nafull_dataset_sources() if variant is not None
-                                                 and 'nafull' in R6F.blend_arm_names(R6F.VARIANTS[variant]) else []),
+                                                 and 'nafull' in R6F.blend_arm_names(R6F.VARIANTS[variant]) else [])
+                               + (['heliosli/rsna-knee-compact-r7cnxfsss/1'] if has_r7(variant) else []),
             'kernel_sources': [], 'model_sources': [], 'docker_image': arch['docker_image'], 'machine_shape': 'NvidiaTeslaT4'}
 
 
@@ -412,7 +525,8 @@ def emit(dest, slug, pack, mode, extra=None, variant=None):
     dest.mkdir(parents=True)
     (dest / 'notebook.ipynb').write_text(raw)
     save_json(dest / 'kernel-metadata.json', metadata(slug, variant))
-    tracked = [*NEW_SOURCES, *(NAFULL_SOURCES if variant is not None else ()), 'scripts/build_r6flip_entry.py', 'scripts/qualify_r6flip_cpu.py']
+    tracked = [*NEW_SOURCES, *(NAFULL_SOURCES if variant is not None else ()), *(R7_SOURCES if has_r7(variant) else ()),
+               'scripts/build_r6flip_entry.py', 'scripts/qualify_r6flip_cpu.py']
     changed = subprocess.check_output(['git', 'status', '--porcelain', '--', *tracked], cwd=PROJECT, text=True).strip()
     receipt = {'status': 'PREPARATION_ONLY' if mode == 'rehearsal' else 'QUALIFIED_ENTRY_BUILD', 'mode': mode, 'slug': slug,
                'binding_sha256': R6F.digest(pack['cfg']['r6flip_binding']), 'payload_sha256': R6F.digest(pack),
@@ -459,6 +573,8 @@ def verify_result(result_root, rehearsal_cfg):
             'csv_sha256': file_sha(root / 'visible-predictions.csv'), 'r224_state': crop.pop() if crop else None,
             **({'nafull_state': r['workers']['nafull'][0]['state_before']['state']} if 'nafull' in r['workers'] else {}),
             'r6_state': r['workers']['r6'][0]['state_before'], 'anatomy_state': q['r6']['anatomy_state'],
+            **({'r7_state': r['workers']['r7'][0]['state_before'], 'r7_reference_max_abs': q['r7']['aprime_reference_max_abs']}
+               if 'r7' in r['workers'] else {}),
             'projection': {k: r['projection'][k] for k in ('point_seconds', 'conservative_seconds', 'gate_seconds', 'gate_pass')},
             'elapsed_seconds': r['elapsed_seconds']}
 
@@ -470,7 +586,8 @@ def build_rehearsal(dest=None, variant=None):
 
 def same_stages(a, b):
     """A rehearsal of variant a also qualifies variant b when only per-finding weights differ (same stages, same arm weights)."""
-    return a is not None and b is not None and R6F.VARIANTS[a]['raptor_arms'] == R6F.VARIANTS[b]['raptor_arms']
+    return (a is not None and b is not None and R6F.VARIANTS[a]['raptor_arms'] == R6F.VARIANTS[b]['raptor_arms']
+            and R6F.resolve_compact(R6F.VARIANTS[a]) == R6F.resolve_compact(R6F.VARIANTS[b]))
 
 
 def build_entry(rehearsal_build, rehearsal_result, waiver=None, dest=None, slug=None, variant=None):

@@ -1,4 +1,4 @@
-"""Actual R6 checkpoint CPU pins for the R6-flip packet: constructor, strict state, buffers, side net, flip maps.
+"""Actual R6 (or, with --profile r7, R7) checkpoint CPU pins for the R6-flip packets: constructor, strict state, buffers, side net, flip maps.
 
 Runs the hash-verified pinned compact_train/compact_infer/side_common sources (the seven-file set already sealed in
 A-prime) against the staged R6 v1 assets. Synthetic windows only: no DICOM reader, GPU, compile or runtime claim.
@@ -21,6 +21,13 @@ from knee import public_r6flip as R6F
 from knee.public_r6_profile import SOURCE_SHA256, validate_r6_assets
 
 
+def validate(profile, assets, sources):
+    if profile == 'r7':
+        from knee.public_r7_profile import validate_r7_assets      # P6: R7 v1 bundle, plain pass only (no flip maps pinned)
+        return validate_r7_assets(assets, source_dir=sources)
+    return validate_r6_assets(assets, source_dir=sources)
+
+
 def import_pinned(name, root):
     path = Path(root) / (name + '.py')
     R6F.require(hashlib.sha256(path.read_bytes()).hexdigest() == SOURCE_SHA256[name + '.py'], 'PINNED_SOURCE_' + name)
@@ -36,6 +43,7 @@ def main(argv=None):
     p.add_argument('--assets', required=True)
     p.add_argument('--sources', required=True)
     p.add_argument('--out', required=True)
+    p.add_argument('--profile', choices=('r6', 'r7'), default='r6')
     a = p.parse_args(argv)
     t0 = time.time()
     import numpy as np
@@ -43,7 +51,8 @@ def main(argv=None):
     import timm
     torch.manual_seed(20261017)
     assets, sources = Path(a.assets).resolve(), Path(a.sources).resolve()
-    profile = validate_r6_assets(assets, source_dir=sources)
+    profile = validate(a.profile, assets, sources)
+    flip_pins = a.profile == 'r6'
     sys.path.insert(0, str(sources))
     CT = import_pinned('compact_train', sources)
     CI = import_pinned('compact_infer', sources)
@@ -87,9 +96,12 @@ def main(argv=None):
     side = side.eval()
     side_pin = {'state': R6F.module_digest(side), 'buffers': R6F.buffers_digest(side), 'constructor': R6F.constructor_digest(side),
                 'strict': not side_res.missing_keys and not side_res.unexpected_keys}
-    perm, bin_perm = R6F.mirror_perm(R6F.LABELS, spec, folds[0]['bin_names'])
-    ci_perm, ci_bin = CI.mirror_perm(R6F.LABELS, spec, [tuple(x) for x in folds[0]['bin_names']])
-    R6F.require(perm == ci_perm and bin_perm == ci_bin, 'FLIP_PERMUTATION_EQUALS_PINNED_SOURCE')
+    if flip_pins:
+        perm, bin_perm = R6F.mirror_perm(R6F.LABELS, spec, folds[0]['bin_names'])
+        ci_perm, ci_bin = CI.mirror_perm(R6F.LABELS, spec, [tuple(x) for x in folds[0]['bin_names']])
+        R6F.require(perm == ci_perm and bin_perm == ci_bin, 'FLIP_PERMUTATION_EQUALS_PINNED_SOURCE')
+    else:
+        perm = bin_perm = ci_perm = ci_bin = None
     # synthetic windows through fold 0: transform, aux read-out and deployed-logit arithmetic against the pinned source
     w = 32
     img = torch.randint(0, 256, (1, w, 3, manifest['crop'], manifest['crop']), dtype=torch.uint8)
@@ -98,6 +110,8 @@ def main(argv=None):
     meta[0, :, 1] = torch.tensor([i % 6 for i in range(w)], dtype=torch.float32)
     meta[0, :, 2] = torch.linspace(-1, 1, w)
     mask = torch.ones((1, w), dtype=torch.bool)
+    if not flip_pins:
+        return plain_receipt(a, t0, profile, folds, side_pin, models, CI, img, meta, mask, manifest, np, torch, timm)
     img_m, meta_m = CI.mirror_windows(img, meta)
     ours_img, ours_meta = R6F.mirror_inputs(img, meta)
     R6F.require(torch.equal(img_m, ours_img) and torch.equal(meta_m, ours_meta) and not torch.equal(img_m, img), 'FLIP_INPUT_TRANSFORM')
@@ -127,6 +141,27 @@ def main(argv=None):
                'synthetic_forward': {'windows': w, 'fold': manifest['models'][0], 'mirror_changes_logits': bool((z - zm).abs().max() > 0),
                                      'max_abs_plain_mirror_dlogit': float((z - zm).abs().max()), 'deployed_logits_equal_source': True,
                                      'deployed_state_equal_source': True},
+               'environment': {'python': sys.version.split()[0], 'torch': torch.__version__, 'timm': timm.__version__,
+                               'numpy': np.__version__, 'device': 'cpu'},
+               'limits': ['CPU fp32 eager only: no CUDA, autocast, torch.compile, DataLoader workers or real DICOM input',
+                          'anatomy V-Net not available locally: bound by file hash and runtime cross-board digest only'],
+               'seconds': round(time.time() - t0, 1), 'gpu_exercised': False, 'real_images_used': False}
+    out = Path(a.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(receipt, indent=1, sort_keys=True) + '\n')
+    print(json.dumps({'status': receipt['status'], 'seconds': receipt['seconds'], 'out': str(out)}))
+    return 0
+
+
+def plain_receipt(a, t0, profile, folds, side_pin, models, CI, img, meta, mask, manifest, np, torch, timm):
+    """R7 plain pass: the deployed state read-out of every fold model on synthetic windows equals the pinned source's."""
+    with torch.inference_mode():
+        z, sl, bl = models[0](img, meta, mask, chunk=32, return_aux=True)
+    R6F.require(torch.isfinite(z).all().item(), 'FINITE_PLAIN_LOGITS')
+    R6F.require(torch.equal(CI.state_readout(models[0], sl, bl), R6F.state_readout(folds[0]['state_k'], sl, bl)), 'STATE_READOUT')
+    receipt = {'status': 'PASS_ACTUAL_CHECKPOINT_CPU_SYNTHETIC_INPUTS', 'profile': profile, 'folds': folds, 'side': side_pin,
+               'flip': None, 'synthetic_forward': {'windows': int(img.shape[1]), 'fold': manifest['models'][0], 'pass': 'plain only',
+                                                   'state_readout_equal_source': True},
                'environment': {'python': sys.version.split()[0], 'torch': torch.__version__, 'timm': timm.__version__,
                                'numpy': np.__version__, 'device': 'cpu'},
                'limits': ['CPU fp32 eager only: no CUDA, autocast, torch.compile, DataLoader workers or real DICOM input',
