@@ -22,15 +22,13 @@ done
 wait $TP
 M=$OUT/models/E_prior_s${SEED}_f0.pt
 [ -s $M ] || { echo "FIT_FAIL no model"; exit 1; }
-ID=ozgung/knee-s6-${TAG}all-s${SEED}-20261019
 D=/content/export_${TAG}_s${SEED}; mkdir -p $D
 cp $M $D/E_prior_s${SEED}_${TAG}all.pt
 cp $OUT/run_config.json $OUT/membership_E_prior_s${SEED}_f0.json $OUT/partial_preds_E_prior_s${SEED}.json $D/
 (cd $D && sha256sum E_prior_s${SEED}_${TAG}all.pt run_config.json membership_E_prior_s${SEED}_f0.json partial_preds_E_prior_s${SEED}.json > SHA256SUMS)
-echo "{\"title\": \"knee-s6-${TAG}all-s${SEED}-20261019\", \"id\": \"$ID\", \"licenses\": [{\"name\": \"other\"}]}" > $D/dataset-metadata.json
-for i in 1 2 3 4 5; do
-  KAGGLE_CONFIG_DIR=/content /usr/local/bin/kaggle datasets create -p $D --dir-mode skip -q && break
-  KAGGLE_CONFIG_DIR=/content /usr/local/bin/kaggle datasets status $ID 2>/dev/null | grep -qi ready && break
+# private Kaggle Model ozgung/knee-s6-lanec-seeds-20261019, variation <tag>-s<seed> (private dataset quota is exhausted)
+for i in 1 2 3; do
+  v=$(bash /content/vm_kmodel.sh knee-s6-lanec-seeds-20261019 ${TAG}-s${SEED} $D E_prior_s${SEED}_${TAG}all.pt "export") && { echo "EXPORT_DONE ozgung/knee-s6-lanec-seeds-20261019/pyTorch/${TAG}-s${SEED}/$v"; exit 0; }
   sleep 120
 done
-echo "EXPORT_DONE $ID"
+echo "EXPORT_FAIL"; exit 4
