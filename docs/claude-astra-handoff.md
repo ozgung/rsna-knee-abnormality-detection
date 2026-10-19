@@ -4112,3 +4112,8 @@ New facts kept:
 - Submissions: **P3 57366765** (19:36 UTC), **P5 57368388** (20:41 UTC).
 - P4 is next in the p3 chain (bg bd0hvzl15): build, visible run, then auto-submit.
 - 20:59 UTC: **P4 submitted as 57368819.** Its visible run passed (receipt PASS, `fallback_studies` 0, code identical). Both chains have finished. All three variants are waiting on hidden scoring; there are no local jobs left.
+
+### 2026-10-19 16:15 UTC: Claude (solo), P3/P4/P5 scored 0.957
+- P3 57366765, P4 57368819 and P5 57368388 all scored **0.957 public**: none beat P2 57340072 (0.958). The na-full arm, the V2 per-finding weights and dropping crop224 gave no displayed gain. The 0.001 gap is inside the public SD of about 0.003, so this is not evidence of harm. Whether the guard cut na-full in hidden runs is unknown.
+- Full leaderboard (`outputs/analysis/lb-20261019/`): 6,218 teams. 0.958 is shared by 1,259 teams (ranks 186–1,444); 64 teams are at 0.959. The bronze line (about rank 622) falls inside the 0.958 block, so the private result depends on unrounded scores.
+- Finals stand: P2 57340072 (0.958) and A′-w 57324282 (0.957). No selection action yet; Oct 21 remains the plan.
