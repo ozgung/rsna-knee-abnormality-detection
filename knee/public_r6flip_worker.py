@@ -18,6 +18,11 @@ Observers (rehearsal and entry alike, so rehearsal timing includes them):
   parameter checksums; worker_init_fn binds the anatomy V-Net and side net inside each loader child
   (state before/after every item) and, in rehearsal sentinel pass 1 only, injects one no-usable-window
   failure through the source's own window_rows seam.
+
+P6 dual compact (sealed cfg['blend'] compact_arms): the same worker runs R6 and then heliosli's R7 v1 bundle without
+--flip-tta. Its board config then carries 'flip': False and, for R7, 'profile': 'r7' / 'compact_arm': 'r7' with the R7
+manifest, CPU pins and mount in the 'r6' / 'r6_mount' slots; only plain passes are observed and the deployed probabilities
+are recomputed from them. A config without these keys is the unchanged R6 flip-TTA worker.
 """
 import functools
 import hashlib
@@ -70,6 +75,25 @@ def file_sha(path):
     return h.hexdigest()
 
 
+def flip_enabled(cfg):
+    """--flip-tta unless the board config seals 'flip': False (P6 plain compact arms)."""
+    flip = cfg.get('flip', R6F.FLIP_TTA)
+    require(isinstance(flip, bool), 'R6_FLIP_FLAG')
+    return flip
+
+
+def profile_name(cfg):
+    name = cfg.get('profile', 'r6')
+    require(name in ('r6', 'r7') and (name == 'r6' or flip_enabled(cfg) is False), 'COMPACT_PROFILE')   # R7 only as a plain arm
+    return name
+
+
+def compact_arm(cfg):
+    arm = cfg.get('compact_arm', 'r6')
+    require(arm == profile_name(cfg), 'COMPACT_ARM_IS_PROFILE')
+    return arm
+
+
 def worker_args(cfg, assignment, output):
     """probe_dual.py's worker command (minus interpreter/script) plus the notebook's WORKER_ARGS, in their order."""
     m = cfg['r6']['manifest']
@@ -93,7 +117,7 @@ def worker_args(cfg, assignment, output):
         args += ['--compile']
     if m.get('fluid_stacker'):
         args += ['--fluid-stacker', str(mount / m['fluid_stacker'])]
-    if m.get('flip_tta') or R6F.FLIP_TTA:
+    if flip_enabled(cfg):
         args += ['--flip-tta']
     if m.get('state_stacker'):
         args += ['--state-stacker', str(mount / m['state_stacker'])]
@@ -171,6 +195,7 @@ class Observer:
         self.child_dir = self.out / 'children'
         self.child_dir.mkdir(parents=True, exist_ok=True)
         self.inject = cfg.get('inject_uid')
+        self.flip = flip_enabled(cfg)
 
     # -- installation
     def install(self):
@@ -341,6 +366,7 @@ class Observer:
         if img is cur['plain']:
             kind = 'plain'
         else:
+            require(self.flip, 'R6_PLAIN_ONLY_UNEXPECTED_SCORING_INPUT')
             if cur['mirror'] is None:
                 expected, expected_meta = R6F.mirror_inputs(cur['plain'], cur['plain_meta'])
                 cur['mirror_input_equal'] = bool(torch.equal(img, expected) and torch.equal(meta, expected_meta))
@@ -390,13 +416,23 @@ class Observer:
         self.mark = now
 
     @staticmethod
-    def observation(study, models):
-        """The deployed (last) plain and mirrored call of every fold model."""
+    def observation(study, models, flip=True):
+        """The deployed (last) plain and mirrored call of every fold model (plain only without flip TTA)."""
         last = {}
         for c in study['calls']:
             last[(c['model'], c['pass'])] = c
         n = len(models)
-        require(all((k, p) in last for k in range(n) for p in ('plain', 'mirror')), 'R6_FOLD_PASS_COVERAGE')
+        passes = ('plain', 'mirror') if flip else ('plain',)
+        require(all((k, p) in last for k in range(n) for p in passes)
+                and all(c['pass'] in passes for c in study['calls']), 'R6_FOLD_PASS_COVERAGE')
+        if not flip:
+            entry = models[0]['entry']
+            require(all(m['entry']['state_k'] == entry['state_k'] and m['entry']['bin_names'] == entry['bin_names'] for m in models),
+                    'R6_FOLD_HEADS')
+            return {'plain': [last[(k, 'plain')]['z'] for k in range(n)], 'mirror': None,
+                    'plain_aux': [(last[(k, 'plain')]['sl'], last[(k, 'plain')]['bl']) for k in range(n)], 'mirror_aux': None,
+                    'state_k': entry['state_k'], 'bin_names': entry['bin_names'],
+                    'fp32_rescues': sum(1 for c in study['calls'] if c['mode'] == 'fp32'), 'calls': len(study['calls'])}
         entry = models[0]['entry']
         require(all(m['entry']['state_k'] == entry['state_k'] and m['entry']['bin_names'] == entry['bin_names'] for m in models),
                 'R6_FOLD_HEADS')
@@ -429,6 +465,7 @@ def summarize(cfg, obs, ci_receipt, predictions, labels, spec, fluid_doc, state_
     """Per-study records and the complete assigned-population ledger arrays (worker-local checks only)."""
     import numpy as np
     ids = cfg['ids']
+    flip = flip_enabled(cfg)
     fallback = ci_receipt.get('fallback') or {}
     require(set(predictions) <= set(ids) and set(fallback) <= set(ids) and not set(predictions) & set(fallback)
             and set(predictions) | set(fallback) == set(ids), 'R6_SCORED_OR_FALLBACK_PARTITION')
@@ -442,11 +479,11 @@ def summarize(cfg, obs, ci_receipt, predictions, labels, spec, fluid_doc, state_
     for ordinal, sid in enumerate(ids):
         s = by_id.get(sid)
         if sid in predictions:
-            require(s is not None and not s.get('aborted') and s['error'] is None and s['windows'] > 0 and s['plain'] and s['mirror'],
+            require(s is not None and not s.get('aborted') and s['error'] is None and s['windows'] > 0 and s['plain'] and s['mirror'] == flip,
                     'R6_SCORED_STUDY_OBSERVED')
-            o = Observer.observation(s, obs.models)
+            o = Observer.observation(s, obs.models, flip)
             fall = [n for n, hit in (("Baker's", sid in state_fallback), ('Effusion', sid in fluid_fallback)) if hit]
-            p_recon, detail = R6F.reconstruct(o, s['fluid'], fluid_doc, state_doc, spec, labels, stack_fallback=fall)
+            p_recon, detail = R6F.reconstruct(o, s['fluid'], fluid_doc, state_doc, spec, labels, stack_fallback=fall, flip=flip)
             p = np.asarray(predictions[sid], dtype=np.float64)
             err = float(np.max(np.abs(p - p_recon)))
             require(np.isfinite(p).all() and ((p >= 0) & (p <= 1)).all() and err <= RECONSTRUCTION_ATOL, 'R6_DEPLOYED_RECONSTRUCTION')
@@ -489,9 +526,19 @@ def load_stackers(mount, manifest, labels):
     return spec, fluid_doc, state_doc, pair
 
 
+def profile_module(name):
+    if name == 'r7':
+        from knee import public_r7_profile as P
+    else:
+        from knee import public_r6_profile as P
+    return P
+
+
 def check_compact_receipt(ci, manifest):
     """The captured worker's own receipt must name exactly the pinned bundle, sources and switches."""
-    from knee.public_r6_profile import SOURCE_SHA256, ASSET_SHA256
+    from knee import public_r7_profile
+    from knee.public_r6_profile import SOURCE_SHA256
+    ASSET_SHA256 = profile_module('r7' if manifest.get('bundle_id') == public_r7_profile.BUNDLE_ID else 'r6').ASSET_SHA256
     require(ci.get('status') == 'PASS' and ci.get('timed_out') is False and ci.get('amp') == 'fp16'
             and ci.get('models') == manifest['models'] and ci.get('extent_models') == 4 and ci.get('syn_decomp_models') == 4
             and ci.get('spatial_models') == 4 and ci.get('trainer_md5') == manifest['trainer_md5']
@@ -533,9 +580,14 @@ def execute(cfg, out, r, torch, CT, import_ci, manifest, spec, fluid_doc, state_
     r['compact_receipt_sha256'] = file_sha(out / 'compact' / 'receipt.json')
     require(len(obs.models) == len(manifest['models']) == 4 and [m['entry']['file'] for m in obs.models] == manifest['models'],
             'R6_FOUR_FOLDS_BOUND')
-    perm, bin_perm = R6F.mirror_perm(labels, spec, obs.models[0]['entry']['bin_names'])
-    flip = ci.get('flip_tta') or {}
-    require(flip.get('perm') == perm and flip.get('bin_perm') == bin_perm and flip.get('mcl') == 'plain pass only', 'R6_FLIP_PERMUTATION')
+    if flip_enabled(cfg):
+        perm, bin_perm = R6F.mirror_perm(labels, spec, obs.models[0]['entry']['bin_names'])
+        flip = ci.get('flip_tta') or {}
+        require(flip.get('perm') == perm and flip.get('bin_perm') == bin_perm and flip.get('mcl') == 'plain pass only', 'R6_FLIP_PERMUTATION')
+        flip_receipt = {'perm': perm, 'bin_perm': bin_perm, 'receipt': flip}
+    else:
+        require('flip_tta' not in ci, 'PLAIN_PASS_NO_FLIP_RECEIPT')
+        flip_receipt = {'enabled': False}
     check_ci(ci, manifest)
     predictions = read_predictions(out / 'compact' / 'predictions.csv', labels)
     probs, statuses, logits, records = summarize(cfg, obs, ci, predictions, labels, spec, fluid_doc, state_doc)
@@ -562,7 +614,7 @@ def execute(cfg, out, r, torch, CT, import_ci, manifest, spec, fluid_doc, state_
              folds=[dict(m['entry'], sentinel=m['sentinel'], checksum=m['checksum']) for m in obs.models],
              state_before=R6F.digest([m['entry']['state'] for m in obs.models]),
              state_after=R6F.digest([a['state'] for a in after]),
-             flip={'perm': perm, 'bin_perm': bin_perm, 'receipt': flip}, compile=compile_receipt,
+             flip=flip_receipt, compile=compile_receipt,
              loaders=obs.loaders, children=children, compile_check_forward_calls=obs.calls_other,
              compact_stats=ci.get('stats'), compact_seconds=ci.get('seconds'),
              fallback_reasons={k: str(v)[:200] for k, v in (ci.get('fallback') or {}).items()},
@@ -579,15 +631,18 @@ def execute(cfg, out, r, torch, CT, import_ci, manifest, spec, fluid_doc, state_
 def r6_worker(config_path):
     """Kaggle board worker: environment, staged inputs, source closure, assets and pins first; then execute()."""
     cfg = json.loads(Path(config_path).read_bytes())
-    out = Path(cfg['out']) / 'r6'
+    arm, name, flip = compact_arm(cfg), profile_name(cfg), flip_enabled(cfg)
+    out = Path(cfg['out']) / arm
     out.mkdir()
     start = time.perf_counter()
-    r = {'status': 'RUNNING', 'version': VERSION, 'arm': 'r6', 'slot': 'r6flip', 'pass': cfg['pass'], 'board': cfg['board'],
-         'assigned': cfg['ids'], 'completed': 0, 'records': []}
+    r = {'status': 'RUNNING', 'version': VERSION, 'arm': arm, 'slot': 'r6flip' if flip else name + '-plain', 'pass': cfg['pass'],
+         'board': cfg['board'], 'assigned': cfg['ids'], 'completed': 0, 'records': []}
     save(out / 'receipt.json', r)
     try:
         import torch
-        from knee.public_r6_profile import validate_r6_assets, SOURCE_SHA256, MANIFEST_SHA256
+        from knee.public_r6_profile import SOURCE_SHA256
+        P = profile_module(name)
+        MANIFEST_SHA256 = P.MANIFEST_SHA256
         from knee.public_s6_qualification import verify_sources
         from knee.public_s6_recovery_entry import board_environment, verify_staged
         r['environment'] = board_environment(torch, cfg)
@@ -595,7 +650,7 @@ def r6_worker(config_path):
         require(all(os.environ.get(k) == v for k, v in PROBE_DUAL_ENV.items()), 'R6_PROBE_DUAL_ENV')
         verify_staged(cfg['data'], cfg['data_ids'], cfg['data_binding'])
         verify_sources(cfg['code'], cfg['source_pins'])
-        r['profile'] = validate_r6_assets(cfg['r6_mount'], source_dir=cfg['code'])
+        r['profile'] = (P.validate_r7_assets if name == 'r7' else P.validate_r6_assets)(cfg['r6_mount'], source_dir=cfg['code'])
         mount = Path(cfg['r6_mount'])
         manifest = json.loads((mount / 'manifest.json').read_bytes())
         require(manifest == cfg['r6']['manifest'] and hashlib.sha256((mount / 'manifest.json').read_bytes()).hexdigest() == MANIFEST_SHA256,

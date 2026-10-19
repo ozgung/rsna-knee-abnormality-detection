@@ -529,6 +529,7 @@ def r6_worker_receipt(cfg, board, ids, pins):
     child = {'before': {'side': dict(pins['side']), 'anatomy': {'state': 'anat'}}, 'changed': False, 'items': len(ids), 'injected': []}
     child['after'] = json.loads(json.dumps(child['before']))
     return {'version': R6F.VERSION, 'status': 'PASS', 'board': board, 'pass': 'production', 'assigned': ids, 'completed': len(ids),
+            'arm': 'r6', 'slot': 'r6flip',
             'environment': {'torch': cfg['binding']['environment']['torch'], 'packages': cfg['binding']['environment']['packages'],
                             'physical_uuid': 'GPU-%d' % board, 'cuda_device_count': 1},
             'folds': folds, 'state_before': R6F.digest([p['state'] for p in pins['folds']]),
@@ -565,11 +566,13 @@ class R6WorkerGateTests(unittest.TestCase):
             'R6_STUDY_GATES': lambda x: x['records'][1].update(reconstruction_max_abs=1e-3),
             'R6_ISOLATED_PINNED_BOARD': lambda x: x['environment'].update(physical_uuid='GPU-1'),
             'R6_WORKER_PASS': lambda x: x.update(assigned=['b', 'a']),
+            'R6_WORKER_PASS ': lambda x: x.update(slot='r6-plain'),
+            'R6_WORKER_PASS  ': lambda x: x.update(arm='r7'),
         }
         for code, mutate in mutations.items():
             x = json.loads(json.dumps(good))
             mutate(x)
-            with self.assertRaisesRegex(ValueError, code):
+            with self.assertRaisesRegex(ValueError, code.strip()):
                 ENTRY.require_r6_worker(x, self.r, self.cfg, 0, 'production', ids)
         x = json.loads(json.dumps(good))
         x['children'][0]['before']['side']['state'] = 'other'
