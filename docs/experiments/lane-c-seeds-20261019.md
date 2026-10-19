@@ -74,3 +74,12 @@ Owner: Claude (lane C agent). Plan: [final-push plan §2 Lane C](../research/fin
   A CPU probe kernel showed the mount layout `/kaggle/input/models/<owner>/<model>/pytorch/<variation>/<version>/`;
   P7′ and C1 packets now take Model sources. lanec2 created 22:07; cache restore + both fits restarted from scratch
   (same seeds, same scripts apart from the backup target).
+- lanec2: restore OK 22:56; epoch 0 s43 0.5083 (1,561 s), s44 0.5112 (1,659 s). First Model backups failed (the CLI's
+  version listing returns every variation of the model; fixed by filtering on the variation), then epoch-0 checkpoints
+  confirmed remotely (`ozgung/knee-s6-lanec-ckpt-20261019/pyTorch/v2-s4{3,4}/1`, 600,696,617 B each). ETA ≈ 06:15.
+  Resume after a loss: new session, boot (restore + preflight), `kaggle models instances versions download
+  ozgung/knee-s6-lanec-ckpt-20261019/pyTorch/v2-s<seed>/<latest> --untar` and place `ckpt__E_prior_s<seed>_f0.pt` as
+  `/content/runs/v2_s<seed>/ckpt/E_prior_s<seed>_f0.pt`, rerun `vm_seed_fit.sh v2 <seed> <targets>`.
+- Queued on lanec2 (`/content/after_pair.log`): when both exports exist, start seed 45 on v2 at once (GPU otherwise idle;
+  if labels v3 is READY by 06:00 the v3 pair runs next and the pre-registered set is v3), then gold-58 read-out of
+  s43+s44 (bf16, one decode) and the probe-36 fp16 reference of s42+s43+s44.
