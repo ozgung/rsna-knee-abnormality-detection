@@ -12,7 +12,23 @@ LABELS = ["ACL", "MCL", "Medial Meniscus", "Lateral Meniscus", "Medial OA", "Lat
 RAPTOR_W = {"Medial OA": 0.5, "Lateral OA": 0.2, "PF OA": 0.6, "Synovitis": 0.8, "Baker's": 0.35}
 W = np.array([RAPTOR_W.get(L, 0.5) for L in LABELS])
 ARMS = {"old": ("board%d-old", "old"), "crop224": ("board%d-crop224", "crop224"), "r6": ("board%d-r6-production", "r6")}
-FM_WEIGHT = 0.5
+EFFECTIVE_FM_WEIGHT = 0.5      # plan: teacher targets at weight 0.5 relative to a competition study
+
+
+def cell_weight(f, target=EFFECTIVE_FM_WEIGHT, batch=2):
+    """compact_train's bce_soft normalises by the batch's weight sum per class, so with batch 2 a nominal cell weight w is not
+    the effective one.  Solve for w such that E[per-sample weight | fastMRI] / E[per-sample weight | competition] = target
+    under uniform sampling with fastMRI fraction f (batch 2: partner is fastMRI with probability f)."""
+    assert batch == 2
+    def ratio(w):
+        ef = (1 - f) * w / (1 + w) + f * 0.5
+        ec = (1 - f) * 0.5 + f * 1 / (1 + w)
+        return ef / ec
+    lo, hi = 1e-4, 1.0
+    for _ in range(100):
+        mid = 0.5 * (lo + hi)
+        lo, hi = (mid, hi) if ratio(mid) < target else (lo, mid)
+    return round(0.5 * (lo + hi), 4)
 
 
 def arm_rows(dirs, arm):
@@ -47,6 +63,9 @@ def main(base, out, *dirs):
     pm = np.array([[float(r[L + "|prior"]) for L in LABELS] for r in pool])
     rec["competition_pool_rows"] = len(pool)
     rec["competition_target_mean"] = dict(zip(LABELS, np.round(pm.mean(0), 4).tolist()))
+    f = len(ids) / (len(ids) + len(pool))
+    FM_WEIGHT = cell_weight(f)
+    rec["fm_fraction"], rec["fm_cell_weight"], rec["fm_effective_weight"] = round(f, 4), FM_WEIGHT, EFFECTIVE_FM_WEIGHT
     newcols = cols + [L + "|pw" for L in LABELS]
     with open(out, "w", encoding="utf-8", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=newcols); w.writeheader()

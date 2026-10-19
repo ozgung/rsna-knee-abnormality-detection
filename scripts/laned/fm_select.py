@@ -39,7 +39,7 @@ def main(hdr, model, out, cap=0):
     # (the competition series have no such duplicates)
     base = h.SeriesDescription.str.upper().str.replace(r"_FIL$", "", regex=True)
     have = set(zip(h.StudyInstanceUID, h.SeriesDescription.str.upper()))
-    fil = h.SeriesDescription.str.upper().str.endswith("_FIL") & [(u, b) in have for u, b in zip(h.StudyInstanceUID, base)]
+    fil = h.SeriesDescription.str.upper().str.endswith("_FIL") & np.array([(u, b) in have for u, b in zip(h.StudyInstanceUID, base)])
     S["drop_fil_duplicate"] = int(fil.sum())
     h = h[~fil.values].reset_index(drop=True)
     for c in SC.NUM + ["n_files"]:
