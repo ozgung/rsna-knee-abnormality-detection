@@ -36,6 +36,7 @@ GEOMETRY = {'backbone': 'convnext_small', 'size': 320, 'crop': 288, 'views': 'v4
             'eval_stride': 1, 'chunk': 192, 'item_timeout': 900}
 AMP, LOADER_WORKERS = 'fp16', 2
 LABEL_TABLES = ('v2', 'v3')
+SEED_OWNERS = ('ozgung', 'nartaa')   # our exports; nartaa's S6fall control only for smoke runs. Never a heliosli bundle.
 RECONSTRUCTION_ATOL = 2e-6       # CSV '%.6f' of sigmoid(mean seed logits) vs the dumped float32 seed logits
 CROSS_TOLERANCE = 1e-3           # fresh process / other board, per seed probability
 REFERENCE_ATOL = 0.01            # A100 fp16 reference vs T4 fp16; measured s42 A100 vs s6solo T4: max 0.0047 on 36 probes
@@ -69,7 +70,7 @@ def validate_models(models):
         require(isinstance(m, dict) and set(m) == keys, 'S6C_MODEL_SCHEMA')
         require(type(m['seed']) is int and 0 <= m['seed'] < 10000 and m['labels'] in LABEL_TABLES, 'S6C_MODEL_SEED_LABELS')
         require(isinstance(m['sha256'], str) and len(m['sha256']) == 64 and type(m['bytes']) is int and m['bytes'] > 0, 'S6C_MODEL_IDENTITY')
-        require(isinstance(m['dataset'], str) and m['dataset'].startswith('ozgung/') and type(m['dataset_version']) is int
+        require(isinstance(m['dataset'], str) and m['dataset'].split('/')[0] in SEED_OWNERS and type(m['dataset_version']) is int
                 and m['dataset_version'] > 0 and isinstance(m['file'], str) and m['file'].endswith('.pt') and '/' not in m['file'],
                 'S6C_MODEL_DATASET')
     require(len({m['labels'] for m in models}) == 1, 'S6C_ONE_LABEL_TABLE_NO_MIXING')
@@ -97,7 +98,7 @@ def block(models, reference=None):
 
 
 def dataset_sources(s6c):
-    return ['%s/%d' % (CODE_DATASET, CODE_VERSION)] + ['%s/%d' % (m['dataset'], m['dataset_version']) for m in s6c['models']]
+    return list(dict.fromkeys(['%s/%d' % (CODE_DATASET, CODE_VERSION)] + ['%s/%d' % (m['dataset'], m['dataset_version']) for m in s6c['models']]))
 
 
 def sigmoid(z):
