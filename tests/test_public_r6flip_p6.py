@@ -572,6 +572,266 @@ class P6PacketTests(unittest.TestCase):
             r = subprocess.run([sys.executable, '-I', '-c', code], capture_output=True, text=True, cwd=d)
             self.assertEqual(r.stdout.strip(), 'ok', r.stderr[-2000:])
 
+# ---- P6s: shared decode ------------------------------------------------------------------------------------------------------
+P6S = R6F.VARIANTS['p6s']
+
+
+class P6sSpecTests(unittest.TestCase):
+    def test_p6s_is_p6_arithmetic_with_shared_decode(self):
+        self.assertTrue(R6F.compact_shared(P6S) and R6F.compact_shared(R6F.VARIANTS['p6sp']))
+        self.assertFalse(R6F.compact_shared(P6) or R6F.compact_shared(None) or R6F.compact_shared(R6F.VARIANTS['p3']))
+        self.assertEqual((R6F.resolve_blend(P6S), R6F.resolve_compact(P6S)), (R6F.resolve_blend(P6), R6F.resolve_compact(P6)))
+        self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p6sp'])[0], (('old320', 1.0),))
+        for mutate in (lambda b: b.update(compact_flip=True), lambda b: b.update(compact_arms=[['r6', 1.0]]),
+                       lambda b: b.update(compact_shared='yes')):
+            bad = copy.deepcopy(P6S)
+            mutate(bad)
+            with self.assertRaisesRegex(ValueError, 'COMPACT_SHARED_NEEDS_R6_R7_PLAIN'):
+                R6F.compact_shared(bad)
+
+    @unittest.skipIf(np is None or pd is None, 'numpy/pandas not installed')
+    def test_same_blend_as_p6(self):
+        rng = np.random.default_rng(9)
+        a = {k: rng.random((30, 12)) for k in ('old320', 'crop224', 'r6', 'r7')}
+        st = {k: ['genuine'] * 30 for k in a}
+        st['r7'][-5:] = ['unavailable'] * 5
+        self.assertTrue(np.array_equal(R6F.recover_guarded(a, st, blend=P6S)['blend'], R6F.recover_guarded(a, st, blend=P6)['blend']))
+
+
+@unittest.skipIf(np is None or pd is None or torch is None, 'numpy/pandas/torch not installed')
+class P6sStageTests(unittest.TestCase):
+    def test_no_separate_r7_stage_and_r7_reports_come_from_the_r6_stage(self):
+        for variant, plan in (('p6s', ['old', 'crop224', 'r6']), ('p6sp', ['old', 'r6'])):
+            calls = []
+            cfg, cols = stub_cfg(variant)
+            report, written = run_entry(cfg, cols, recorder(calls))
+            self.assertEqual(calls, plan, variant)
+            self.assertEqual(report['workers']['r7'], [{'status': 'NO_RECEIPT'}] * 2)
+            self.assertNotIn('r7', report['phases'])
+            self.assertEqual(report['status'], 'PASS_WITH_FALLBACK')
+            self.assertEqual(sorted(report['arm_merge'])[-2:], ['r6', 'r7'])
+
+    def test_worker_config_carries_the_shared_r7_block_in_production_only(self):
+        cfg = P6WorkerConfigTests().cfg('p6s')
+        cfg['deadline_epoch'] = 123.
+        prod = ENTRY.r6_worker_config(cfg, 1, 'production', ['i1'], Path('/o/board1-r6-production'), None)
+        self.assertEqual(prod['r7_shared'], {'mount': '/m7', 'manifest': {'bundle_id': 'r7'}, 'cpu_pins': {'p': 7}, 'deadline_epoch': 123.,
+                                             'out': '/o/board1-r7-production'})
+        self.assertEqual(prod['flip'], False)
+        sent = ENTRY.r6_worker_config(cfg, 1, 'sentinel1', ['i1'], Path('/o/board1-r6-sentinel1'), 'i1')
+        self.assertNotIn('r7_shared', sent)
+        self.assertNotIn('r7_shared', ENTRY.r6_worker_config(P6WorkerConfigTests().cfg('p6'), 1, 'production', ['i1'], Path('/o/b'), None))
+
+    def test_projection_counts_r7_inside_the_r6_phase_only(self):
+        def shard(seconds, windows=10):
+            return {'records': [{'production_seconds': seconds, 'status': 'genuine', 'windows': windows}] * 5, 'peak_cuda_bytes': 7}
+        phase = lambda: {'wall_seconds': 100., 'peaks': {'host_rss_bytes': 1, 'output_disk_bytes': 1}, 'minimum_disk_free_bytes': 1}
+        workers = {'old': [shard(2.), shard(3.)], 'crop224': [shard(2.), shard(3.)], 'r6': [shard(4.), shard(5.)]}
+        phases = {a: phase() for a in ('old', 'crop224', 'r6', 'r6_sentinel1', 'r6_sentinel2')}
+        base = ENTRY.projection(10., phases, workers, 5., [10] * 870)
+        shared = ENTRY.projection(10., phases, {**workers, 'r7': [shard(1.), shard(1.)]}, 5., [10] * 870)
+        self.assertEqual(shared['point_seconds'], base['point_seconds'])
+        self.assertNotIn('r7', shared['measured_production_wall_seconds'])
+
+
+class SharedCutTests(unittest.TestCase):
+    def test_r7_stops_first_when_r6_alone_could_no_longer_finish(self):
+        shared = WORKER.SharedR7.__new__(WORKER.SharedR7)
+        shared.ids = ['s%d' % i for i in range(10)]
+        shared.deadline, shared.active, shared.cut = 1000., True, None
+        studies = [{'id': 's%d' % i, 'handle_seconds': 10., 'wait_seconds': 0., 'first_of_loader': i == 0} for i in range(4)]
+        shared.rows = {s['id']: {'r7_seconds': 4.} for s in studies}
+        obs = type('O', (), {'studies': studies})()
+        self.assertAlmostEqual(shared.r6_only_pace(obs), 6.)
+        # 6 remaining x 6 s x 1.3 = 46.8 s
+        self.assertFalse(shared.should_cut(obs, now=1000. - 47.))
+        self.assertTrue(shared.active)
+        self.assertTrue(shared.should_cut(obs, now=1000. - 46.))
+        self.assertEqual((shared.active, shared.cut['after_studies'], shared.cut['remaining']), (False, 4, 6))
+        self.assertFalse(shared.should_cut(obs, now=0.))            # once cut, R7 stays off
+        fresh = WORKER.SharedR7.__new__(WORKER.SharedR7)
+        fresh.__dict__.update(ids=shared.ids, deadline=0., active=True, cut=None, rows=shared.rows)
+        self.assertFalse(fresh.should_cut(obs, now=1e12))           # no deadline (rehearsal): never cut
+        fresh.deadline = 1000.
+        self.assertFalse(fresh.should_cut(type('O', (), {'studies': studies[:2]})(), now=999.))   # < 3 studies measured
+
+
+def r7_shared_fixture():
+    r, cfg = r7_rehearsal_fixture()
+    pins7 = cfg['r6flip_binding']['r7']['cpu_pins']['folds']
+    cfg['blend'] = copy.deepcopy(P6S)
+    for board, x in enumerate(r['workers']['r7']):
+        x.update(slot='r7-shared', pass_='production', cut=None, compile={'requested': True, 'active': True, 'fallback': None,
+                                                                            'decision': 'compiled'},
+                 folds=[dict(p, strict=True) for p in pins7], state_before=R6F.digest([p['state'] for p in pins7]),
+                 state_after=R6F.digest([p['state'] for p in pins7]), environment=r['workers']['r6'][board]['environment'])
+        x['pass'] = x.pop('pass_')
+        for row in x['records']:
+            row.update(fluid_status_ok=True, shared_decode=True, r6_aborted=False, stackers={"Baker's": {'fallback': None}})
+        r['workers']['r6'][board]['r7_shared'] = {'status': 'PASS'}
+    r6p = {row['id']: row['probabilities'] for w in r['workers']['r6'] for row in w['records']}
+    r7p = {row['id']: row['probabilities'] for w in r['workers']['r7'] for row in w['records']}
+    cfg['p6_reference'] = {'r6': {k: [x + 5e-4 for x in v] for k, v in r6p.items()}, 'r7': {k: [x - 5e-4 for x in v] for k, v in r7p.items()},
+                           'receipt_sha256': 'p6'}
+    return r, cfg
+
+
+class P6sRehearsalGateTests(unittest.TestCase):
+    def test_valid_shared_stage_passes_and_each_mutation_rejects(self):
+        r, cfg = r7_shared_fixture()
+        got = ENTRY.require_r7_shared(r, cfg, 'anat')
+        self.assertAlmostEqual(got['p6_separate_pass_r6_max_abs'], 5e-4, places=9)
+        self.assertAlmostEqual(got['p6_separate_pass_r7_max_abs'], 5e-4, places=9)
+        mutations = {
+            'P6S_R7_SEPARATE_PASS_PARITY': lambda r, c: c['p6_reference']['r7']['id04'].__setitem__(0, .99),
+            'P6S_R6_SEPARATE_PASS_PARITY': lambda r, c: c['p6_reference']['r6']['id07'].__setitem__(3, .99),
+            'R7_APRIME_REFERENCE_PARITY': lambda r, c: c['r7_reference']['probabilities']['id02'].__setitem__(1, .99),
+            'R7_SHARED_COMPILED_NO_FALLBACK': lambda r, c: r['workers']['r7'][0]['compile'].update(decision='eager'),
+            'R7_SHARED_WORKER_PASS': lambda r, c: r['workers']['r7'][1].update(cut={'after_studies': 3}),
+            'R7_SHARED_WORKER_PASS ': lambda r, c: r['workers']['r7'][0].update(fp32_recoveries=1),
+            'R7_SHARED_FOLD_BINDING': lambda r, c: r['workers']['r7'][0]['folds'][2].update(state='other'),
+            'R7_SHARED_STATE_BEFORE_AFTER': lambda r, c: r['workers']['r7'][1].update(state_after='other'),
+            'R7_SHARED_R6_WORKER_HANDOFF': lambda r, c: r['workers']['r6'][0].pop('r7_shared'),
+            'R7_INPUT_EQUALS_R6_INPUT': lambda r, c: r['workers']['r7'][1]['records'][0]['input'].update(metadata='x'),
+            'R7_SHARED_STUDY_GATES': lambda r, c: r['workers']['r7'][0]['records'][1]['stackers']["Baker's"].update(fallback='model'),
+            'R7_COMPLETE39_GENUINE': lambda r, c: r['workers']['r7'][0]['records'][0].update(status='data_local_failure'),
+        }
+        for code, mutate in mutations.items():
+            with self.subTest(code=code):
+                r, cfg = r7_shared_fixture()
+                mutate(r, cfg)
+                with self.assertRaisesRegex(ValueError, code.strip()):
+                    ENTRY.require_r7_shared(r, cfg, 'anat')
+
+
+@unittest.skipUnless(torch is not None and (MAIN / 'outputs/research/public-0958-20261017/r6-v1-small/state_spec.json').is_file()
+                     and (R7_SMALL / 'state_spec.json').is_file(), 'torch or R6/R7 metadata not staged')
+class SharedDecodeExecuteTests(unittest.TestCase):
+    """execute() with the fake compact_infer: R6 plain plus shared R7 in one run must equal a separate R7 plain run, study by study."""
+
+    def mount(self, d, small, seed, CT):
+        import inspect
+        spec = json.loads((small / 'state_spec.json').read_bytes())
+        d.mkdir()
+        for name in ('state_spec.json', 'fluid_stacker.json', 'state_stacker.json'):
+            (d / name).write_bytes((small / name).read_bytes())
+        pins = []
+        for i in range(4):
+            torch.manual_seed(seed + i)
+            ctor = dict(freeze_blocks=16, crop=8, state_spec=spec, in_chans=3, spatial=True, extent=True, syn_decomp=True)
+            m = CT.Net('convnext_small', None, **ctor)
+            path = d / ('E_lrprior_s0_f%d.pt' % i)
+            torch.save(m.state_dict(), path)
+            b = inspect.signature(CT.Net.__init__).bind(m, 'convnext_small', None, **ctor)
+            b.apply_defaults()
+            args = {k: v for k, v in b.arguments.items() if k != 'self'}
+            args['state_spec'] = R6F.digest(spec)
+            pins.append({'file': path.name, 'file_sha256': WORKER.file_sha(path), 'state': R6F.module_digest(m),
+                         'buffers': R6F.buffers_digest(m), 'constructor': R6F.constructor_digest(m), 'constructor_args': args})
+        torch.manual_seed(11)
+        side = torch.nn.Linear(3, 1)
+        manifest = {'arm': 'E_lrprior', 'backbone': 'convnext_small', 'size': 12, 'crop': 8, 'eval_stride': 1, 'views': 'v4',
+                    'state_spec': 'state_spec.json', 'side_model': 'side_cls.pt', 'slices': 3, 'phys_mm': 3.5, 'freeze_blocks': 16,
+                    'fluid_stacker': 'fluid_stacker.json', 'state_stacker': 'state_stacker.json', 'compile': False,
+                    'models': [p['file'] for p in pins], 'flip_tta': False}
+        (d / 'manifest.json').write_text(json.dumps(manifest))
+        return manifest, {'folds': pins, 'side': {'state': R6F.module_digest(side), 'constructor': R6F.constructor_digest(side)}}
+
+    def run_execute(self, d, name, cfg, manifest, CT, shared=None):
+        from knee.public_r6flip_worker import execute, load_stackers
+        out = d / name
+        out.mkdir(parents=True)
+        r = {'records': [], 'environment': {'board': 0}}
+        spec2, fluid, state, pair = load_stackers(Path(cfg['r6_mount']), manifest, R6F.LABELS)
+        import compact_infer
+        execute(cfg, out, r, torch, CT, lambda: compact_infer, manifest, spec2, fluid, state, pair, check_ci=lambda ci, m: None,
+                shared=shared)
+        return r
+
+    def test_shared_r7_equals_separate_r7_and_writes_its_own_ledger(self):
+        from knee import public_r7_profile as R7P
+        small6 = MAIN / 'outputs/research/public-0958-20261017/r6-v1-small'
+        fake = PROJECT / 'tests/fixtures/r6flip_fake'
+        saved_path, saved = list(sys.path), {k: sys.modules.pop(k) for k in ('compact_train', 'compact_infer') if k in sys.modules}
+        sys.path.insert(0, str(fake))
+        try:
+            import compact_train as CT
+            with tempfile.TemporaryDirectory() as d:
+                d = Path(d)
+                m6, pins6 = self.mount(d / 'm6', small6, 20, CT)
+                m7, pins7 = self.mount(d / 'm7', R7_SMALL, 40, CT)
+                ids = ['u0', 'u1', 'u2', 'u3']
+                base = {'ids': ids, 'inject_uid': None, 'data': str(d), 'code': str(fake), 'anatomy': str(d / 'anatomy.pt'),
+                        'pass': 'production', 'flip': False, 'board': 0}
+                sep = self.run_execute(d, 'sep/r7', {**base, 'r6_mount': str(d / 'm7'), 'profile': 'r7', 'compact_arm': 'r7',
+                                                     'r6': {'manifest': m7, 'cpu_pins': pins7}}, m7, CT)
+                cfg = {**base, 'r6_mount': str(d / 'm6'), 'r6': {'manifest': m6, 'cpu_pins': pins6},
+                       'r7_shared': {'mount': str(d / 'm7'), 'manifest': m7, 'cpu_pins': pins7, 'deadline_epoch': None,
+                                     'out': str(d / 'board0-r7-production')}}
+                shared = WORKER.SharedR7({**cfg, 'code': None}, torch, CT)
+                with mock.patch.object(R7P, 'MANIFEST_SHA256', WORKER.file_sha(d / 'm7' / 'manifest.json')):
+                    setup = shared.load()
+                self.assertEqual(setup['folds'], 4)
+                r6 = self.run_execute(d, 'board0-r6-production/r6', cfg, m6, CT, shared=shared)
+                rec7 = json.loads((d / 'board0-r7-production' / 'r7' / 'receipt.json').read_bytes())
+                from knee.public_s6_qualification import file_sha
+                self.assertEqual(rec7['ledger_sha256'], file_sha(d / 'board0-r7-production' / 'r7' / 'predictions.npz'))
+                csv_rows = (d / 'board0-r7-production' / 'r7' / 'compact' / 'predictions.csv').read_text().splitlines()
+            self.assertEqual((r6['status'], r6['genuine'], r6['r7_shared']['status']), ('PASS', 4, 'PASS'))
+            self.assertEqual((rec7['status'], rec7['arm'], rec7['slot'], rec7['genuine'], rec7['cut']), ('PASS', 'r7', 'r7-shared', 4, None))
+            self.assertEqual(len(csv_rows), 5)
+            seprows = {x['id']: x for x in sep['records']}
+            r6rows = {x['id']: x for x in r6['records']}
+            for x in rec7['records']:
+                self.assertTrue(x['shared_decode'] and x['checksum_equal'] and x['calls'] == 4)
+                self.assertEqual(x['input'], r6rows[x['id']]['input'])                # one decode: R6's own windows
+                self.assertEqual(x['input'], seprows[x['id']]['input'])
+                self.assertLessEqual(max(abs(a - b) for a, b in zip(x['probabilities'], seprows[x['id']]['probabilities'])), 1e-6)
+            self.assertEqual(rec7['state_before'], R6F.digest([p['state'] for p in pins7['folds']]))
+        finally:
+            sys.path[:] = saved_path
+            for k in ('compact_train', 'compact_infer'):
+                sys.modules.pop(k, None)
+            sys.modules.update(saved)
+
+    def test_wrong_r7_pin_rejects_at_load(self):
+        fake = PROJECT / 'tests/fixtures/r6flip_fake'
+        saved_path, saved = list(sys.path), {k: sys.modules.pop(k) for k in ('compact_train', 'compact_infer') if k in sys.modules}
+        sys.path.insert(0, str(fake))
+        try:
+            import compact_train as CT
+            from knee import public_r7_profile as R7P
+            with tempfile.TemporaryDirectory() as d:
+                d = Path(d)
+                m7, pins7 = self.mount(d / 'm7', R7_SMALL, 40, CT)
+                pins7['folds'][1]['state'] = 'other'
+                shared = WORKER.SharedR7({'ids': ['u0'], 'r7_shared': {'mount': str(d / 'm7'), 'manifest': m7, 'cpu_pins': pins7,
+                                                                      'out': str(d / 'o')}}, torch, CT)
+                with mock.patch.object(R7P, 'MANIFEST_SHA256', WORKER.file_sha(d / 'm7' / 'manifest.json')):
+                    with self.assertRaisesRegex(ValueError, 'QUALIFIED_R7_SHARED_FOLD_STATE'):
+                        shared.load()
+        finally:
+            sys.path[:] = saved_path
+            for k in ('compact_train', 'compact_infer'):
+                sys.modules.pop(k, None)
+            sys.modules.update(saved)
+
+
+@unittest.skipUnless(P6_EVIDENCE and (MAIN / 'outputs/kaggle/r6flip-p6-rehearsal-20261019-out/r6flip/receipt.json').is_file(),
+                     'P6 rehearsal evidence not staged')
+class P6sPacketTests(unittest.TestCase):
+    def test_rehearsal_has_the_separate_pass_reference_and_entry_strips_it(self):
+        from scripts import build_r6flip_entry as B
+        pack = B.packet('rehearsal', variant='p6s')
+        ref = pack['cfg']['p6_reference']
+        self.assertEqual(list(ref['r6']), pack['cfg']['probe_order'] + pack['cfg']['binding']['visible_ids'])
+        self.assertEqual(set(ref['r7']), set(ref['r6']))
+        self.assertEqual(B.slug_for('p6s', 'rehearsal'), 'r6flip-p6s-rehearsal-20261020')
+        self.assertIn("cfg['r7_mount']=str(r7)", B.bootstrap(pack))
+        entry = B.packet('entry', {'r224_state': 'x', 'anatomy_state': 'y', 'status': 'PASS'}, 'p6s')
+        self.assertFalse({'p6_reference', 'r7_reference'} & set(entry['cfg']))
+        self.assertTrue(entry['cfg']['blend']['compact_shared'])
+
 
 if __name__ == '__main__':
     unittest.main()

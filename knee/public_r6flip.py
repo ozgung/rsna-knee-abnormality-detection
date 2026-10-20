@@ -299,6 +299,14 @@ VARIANTS = {
     # P6-prime: P6 without the R224 stage (only if the P6 rehearsal point exceeds 26,000 s).
     'p6p': {'raptor_arms': [['old320', 1.0]], 'weights': dict(RAPTOR_WEIGHTS),
             'default_weight': DEFAULT_RAPTOR_WEIGHT, 'compact_arms': [['r6', .5], ['r7', .5]], 'compact_flip': False},
+    # P6s (2026-10-20, after Lane B's out-of-fold win): P6 with one decode per study -- R7 scored in the R6 plain worker on
+    # R6's rendered windows (compact_shared). Same arithmetic as P6; p6sp is P6s without R224.
+    'p6s': {'raptor_arms': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]], 'weights': dict(RAPTOR_WEIGHTS),
+            'default_weight': DEFAULT_RAPTOR_WEIGHT, 'compact_arms': [['r6', .5], ['r7', .5]], 'compact_flip': False,
+            'compact_shared': True},
+    'p6sp': {'raptor_arms': [['old320', 1.0]], 'weights': dict(RAPTOR_WEIGHTS),
+             'default_weight': DEFAULT_RAPTOR_WEIGHT, 'compact_arms': [['r6', .5], ['r7', .5]], 'compact_flip': False,
+             'compact_shared': True},
 }
 PRECISION = {'old320': 'float64', 'r6': '%.9g', 'crop224': 'float32 CSV', 'nafull': 'float64', 'r7': '%.9g'}
 BLEND_KEYS = {'raptor_arms', 'weights', 'default_weight'}
@@ -309,7 +317,7 @@ def resolve_blend(blend=None):
     """(raptor arms, per-finding weights, default weight) from the sealed cfg['blend']; None is the frozen default."""
     if blend is None:
         return RAPTOR_ARMS, dict(RAPTOR_WEIGHTS), DEFAULT_RAPTOR_WEIGHT
-    require(set(blend) in (BLEND_KEYS, BLEND_KEYS | COMPACT_KEYS), 'BLEND_SCHEMA')
+    require(set(blend) in (BLEND_KEYS, BLEND_KEYS | COMPACT_KEYS, BLEND_KEYS | COMPACT_KEYS | {'compact_shared'}), 'BLEND_SCHEMA')
     arms = tuple((str(a), float(w)) for a, w in blend['raptor_arms'])
     names = [a for a, _ in arms]
     require(names and 'old320' in names and names == [x for x in BLEND_ARM_NAMES if x in names], 'BLEND_ARM_ORDER')
@@ -336,6 +344,15 @@ def resolve_compact(blend=None):
     require(all(0.0 < w <= 1.0 for _, w in arms) and abs(sum(w for _, w in arms) - 1.0) <= 1e-12, 'COMPACT_ARM_WEIGHTS_SUM_TO_ONE')
     require(isinstance(blend['compact_flip'], bool), 'COMPACT_FLIP_FLAG')
     return arms, blend['compact_flip']
+
+
+def compact_shared(blend=None):
+    """P6s: R7 scored inside the R6 plain worker on the same rendered windows (one decode); requires the r6+r7 plain pair."""
+    if blend is None or not blend.get('compact_shared'):
+        return False
+    require(blend['compact_shared'] is True and compact_arm_names(blend) == ['r6', 'r7'] and resolve_compact(blend)[1] is False,
+            'COMPACT_SHARED_NEEDS_R6_R7_PLAIN')
+    return True
 
 
 def compact_arm_names(blend=None):

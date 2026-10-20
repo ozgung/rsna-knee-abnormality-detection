@@ -14,6 +14,13 @@ class Net(torch.nn.Module):
         self.enc = torch.nn.Linear(in_chans, hidden)
         self.head = torch.nn.Linear(hidden, 12 + 12 * max(self.state_k) + len(self.bin_names))
         self.register_buffer('mean', torch.zeros(1))
+        # the head keys compact_infer's load_group detects (sp_q / ext_u / syn_beta), so key-based construction matches
+        if spatial:
+            self.sp_q = torch.nn.Parameter(torch.zeros(1))
+        if extent:
+            self.ext_u = torch.nn.Parameter(torch.zeros(1))
+        if syn_decomp:
+            self.syn_beta = torch.nn.Parameter(torch.zeros(1))
 
     def forward(self, img, meta, mask, chunk=0, return_aux=False):
         x = (img.float().mean(dim=(-1, -2))[0] + meta[0, :, 2:3]).mean(0, keepdim=True)
