@@ -46,7 +46,7 @@ V2_COLUMNS = ['Lateral OA', 'PF OA', 'Synovitis', "Baker's"]
 
 class VariantTableTests(unittest.TestCase):
     def test_variants_match_the_spec(self):
-        self.assertEqual(sorted(R6F.VARIANTS), ['p3', 'p4', 'p5', 'p6', 'p6p', 'p6s', 'p6sp', 'p7'])      # p6*: tests/test_public_r6flip_p6.py
+        self.assertEqual(sorted(R6F.VARIANTS), ['p3', 'p4', 'p5', 'p6', 'p6p', 'p6s', 'p6sp', 'p7', 'p9', 'p9r'])   # p6*: test_public_r6flip_p6; p9*: test_public_r6flip_p9
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p7'])[0], R6F.RAPTOR_ARMS)        # P2's Raptor half, compact = S6 seeds
         self.assertEqual(R6F.raptor_weight_vector(blend=R6F.VARIANTS['p7']), R6F.raptor_weight_vector())
         self.assertEqual(R6F.COMPACT_VARIANTS, {'p7': 's6c'})
@@ -84,7 +84,7 @@ class VariantTableTests(unittest.TestCase):
 
 @unittest.skipIf(np is None or pd is None, 'numpy/pandas not installed')
 class BlendArithmeticTests(unittest.TestCase):
-    def data(self, n=40, seed=0, arms=('old320', 'r6', 'crop224', 'nafull', 'r7')):
+    def data(self, n=40, seed=0, arms=('old320', 'r6', 'crop224', 'nafull', 'r7', 's6c')):
         rng = np.random.default_rng(seed)
         return {a: rng.random((n, 12)) for a in arms}
 
@@ -431,16 +431,18 @@ class VariantPacketTests(unittest.TestCase):
         """Everything shipped for the default except the variant additions is shared by the variants."""
         for variant, pack in self.packs.items():
             nafull, r7 = 'nafull' in R6F.blend_arm_names(R6F.VARIANTS[variant]), self.B.has_r7(variant)
+            s6c = self.B.has_s6c(variant)
             self.assertEqual(pack['codecs'], self.default['codecs'])
             for name, text in self.default['sources'].items():
                 self.assertEqual(pack['sources'][name], text, name)
             extra = set(pack['sources']) - set(self.default['sources'])
-            self.assertEqual(extra, set(self.B.NAFULL_SOURCES if nafull else ()) | set(self.B.R7_SOURCES if r7 else ()))
+            self.assertEqual(extra, set(self.B.NAFULL_SOURCES if nafull else ()) | set(self.B.R7_SOURCES if r7 else ())
+                             | ({*self.B.S6C_SOURCES, self.B.S6C.CAPTURED} if s6c else set()))
             for key, value in self.default['cfg'].items():
                 if key != 'r6flip_binding':
                     self.assertEqual(pack['cfg'][key], value, key)
             self.assertEqual(set(pack['cfg']) - set(self.default['cfg']),
-                             {'blend', *(['nafull'] if nafull else []), *(['r7_reference'] if r7 else []),
+                             {'blend', *(['nafull'] if nafull else []), *(['r7_reference'] if r7 else []), *(['s6c'] if s6c else []),
                               *(['p6_reference'] if R6F.compact_shared(R6F.VARIANTS[variant]) else [])})
 
     def test_variant_slugs_metadata_and_blend_are_sealed(self):
@@ -448,7 +450,7 @@ class VariantPacketTests(unittest.TestCase):
             self.assertEqual(pack['cfg']['blend'], R6F.VARIANTS[variant])
             self.assertEqual(pack['cfg']['r6flip_binding']['raptor_weight_vector'], R6F.raptor_weight_vector(blend=R6F.VARIANTS[variant]))
             self.assertEqual(pack['cfg']['r6flip_binding']['entry_variant']['name'], variant)
-            date = {'p6': '20261019', 'p6p': '20261019', 'p6s': '20261020', 'p6sp': '20261020'}.get(variant, '20261018')
+            date = {'p6': '20261019', 'p6p': '20261019', 'p6s': '20261020', 'p6sp': '20261020', 'p9': '20261020', 'p9r': '20261020'}.get(variant, '20261018')
             slug = self.B.slug_for(variant, 'rehearsal')
             self.assertEqual(slug, 'r6flip-%s-rehearsal-%s' % (variant, date))
             self.assertEqual(self.B.slug_for(variant, 'entry'), 'r6flip-%s-entry-%s' % (variant, date))

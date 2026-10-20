@@ -279,8 +279,8 @@ DEADLINE_SECONDS = 8.3 * 3600          # from kernel start T0
 RAPTOR_ARMS = (('old320', R384_WEIGHT), ('crop224', R224_WEIGHT))   # frozen default; variants seal their own in cfg['blend']
 STATUSES = ('genuine', 'data_local_failure', 'unavailable')
 BLEND_ARM_NAMES = ('old320', 'crop224', 'nafull')    # stage order: R384 two-view, R224 one-view, na-full K62 one-view
-ALL_ARMS = ('old320', 'r6', 'crop224', 'nafull', 'r7')
-COMPACT_ARM_NAMES = ('r6', 'r7')               # stage order: R6, then R7 last (the arm the T0 + 8.3 h guard cuts in P6)
+ALL_ARMS = ('old320', 'r6', 'crop224', 'nafull', 'r7', 's6c')
+COMPACT_ARM_NAMES = ('r6', 'r7', 's6c')        # stage order: R6, then R7 (P6) or our own s6c members (P9) last, under the guard
 DEFAULT_COMPACT = (('r6', 1.0),)               # P2 and P3-P5: rank(R6 flip) is the whole compact slot
 DEFAULT_COMPACT_FLIP = True
 RAPTOR_WEIGHTS_V2 = {'Lateral OA': .15, 'PF OA': .65, 'Synovitis': .85, "Baker's": .30}   # heliosli V2 table, others 0.5
@@ -310,9 +310,16 @@ VARIANTS = {
     # P7-prime (Lane C): P2's frozen Raptor half and v1 weights; the compact slot is our S6 seed ensemble (knee.public_s6c)
     'p7': {'raptor_arms': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]], 'weights': dict(RAPTOR_WEIGHTS),
            'default_weight': DEFAULT_RAPTOR_WEIGHT},
+    # P9 (gap assessment 2026-10-20 §3.1, Lane P9): P2's Raptor arm R384 only (R224 dropped for runtime, as P6s-prime) and v1
+    # weights; the compact slot is 1/2 rank(R6 plain) + 1/2 rank(own S6 members' mean rank, knee.public_s6c), weights fixed
+    # before any P9 output exists. The own stage runs last under the guard; trimmed studies keep rank(R6 plain). p9r adds R224.
+    'p9': {'raptor_arms': [['old320', 1.0]], 'weights': dict(RAPTOR_WEIGHTS), 'default_weight': DEFAULT_RAPTOR_WEIGHT,
+           'compact_arms': [['r6', .5], ['s6c', .5]], 'compact_flip': False},
+    'p9r': {'raptor_arms': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]], 'weights': dict(RAPTOR_WEIGHTS),
+            'default_weight': DEFAULT_RAPTOR_WEIGHT, 'compact_arms': [['r6', .5], ['s6c', .5]], 'compact_flip': False},
 }
 COMPACT_VARIANTS = {'p7': 's6c'}     # variants whose compact ('r6') slot is not the heliosli R6 bundle
-PRECISION = {'old320': 'float64', 'r6': '%.9g', 'crop224': 'float32 CSV', 'nafull': 'float64', 'r7': '%.9g'}
+PRECISION = {'old320': 'float64', 'r6': '%.9g', 'crop224': 'float32 CSV', 'nafull': 'float64', 'r7': '%.9g', 's6c': '%.9g'}
 BLEND_KEYS = {'raptor_arms', 'weights', 'default_weight'}
 COMPACT_KEYS = {'compact_arms', 'compact_flip'}
 
@@ -362,6 +369,16 @@ def compact_shared(blend=None):
 def compact_arm_names(blend=None):
     """Compact arm names enabled by the sealed blend, in stage order (['r6'] unless a variant seals more)."""
     return [a for a, _ in resolve_compact(blend)[0]]
+
+
+def own_compact_arm(blend=None):
+    """P9: our S6 members (knee.public_s6c) run as a second compact arm next to the heliosli R6 bundle (plain), last under the
+    guard. Distinct from P7, where the s6c block replaces the R6 bundle in the 'r6' slot."""
+    names = compact_arm_names(blend)
+    if 's6c' not in names:
+        return False
+    require(names == ['r6', 's6c'] and resolve_compact(blend)[1] is False and not compact_shared(blend), 'OWN_COMPACT_NEEDS_R6_PLAIN_PAIR')
+    return True
 
 
 def recover_arms(arrays, missing, blend=None, *, fatal_errors=()):

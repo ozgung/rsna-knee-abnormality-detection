@@ -47,7 +47,7 @@ OWNER = 'ozgung'
 COMP = 'rsna-knee-abnormality-detection'
 SLUGS = {'rehearsal': 'r6flip-rehearsal-20261017', 'entry': 'r6flip-entry-20261017'}
 VARIANT_DATE = '20261018'
-VARIANT_DATES = {'p6': '20261019', 'p6p': '20261019', 'p6s': '20261020', 'p6sp': '20261020'}
+VARIANT_DATES = {'p6': '20261019', 'p6p': '20261019', 'p6s': '20261020', 'p6sp': '20261020', 'p9': '20261020', 'p9r': '20261020'}
 
 
 def slug_for(variant, mode):
@@ -95,6 +95,16 @@ def has_r7(variant):
     return variant is not None and 'r7' in R6F.compact_arm_names(R6F.VARIANTS[variant])
 
 
+def own_dual(variant):
+    """P9: our S6 members as the second compact arm next to the R6 bundle (knee.public_r6flip.own_compact_arm)."""
+    return variant is not None and R6F.own_compact_arm(R6F.VARIANTS[variant])
+
+
+def has_s6c(variant):
+    """Variants that ship the s6c worker and mount our members: P7-prime (compact replaced) and P9 (dual)."""
+    return variant in R6F.COMPACT_VARIANTS or own_dual(variant)
+
+
 # na-full K62 one-view Raptor: the A-triple-prime packet's worker, config and checkpoint binding, taken from its sealed r3 rehearsal.
 NAFULL_R3 = OUT / 'kaggle/nafull-aprime-rehearsal-r3-20261016'
 NAFULL_R3_NOTEBOOK_SHA = '1d7089e0df4283a45108d27c1ca5cc42604bdcaf49d1a1592b38aec519a519ce'
@@ -123,6 +133,16 @@ S6C_MODELS = [
 # A100 fp16 per-member read-out of the frozen-36 probes (lanec2, one compact_infer over all three members)
 S6C_REFERENCE = {'path': OUT / 'lanec-20261019/p7/reference-p7.json',
                  'sha256': 'd41d7952b8b5e47c78ae431f03eafc2a4f2951772a687235f677f8935ca48504'}
+# P9 member set (pre-registered in docs/experiments/lane-p9-20261020.md before any P9 build): the fastMRI student and v3-s43,
+# equal weight, both labels v3, loader order; v3-s43 from its private dataset copy (same bytes as the Model export, SHA256SUMS
+# read on Oct 20). v3-s42 is added only under the pre-registered runtime rule. The P7 reference covers both aliases.
+S6C_MODELS_P9 = [
+    {'seed': 42, 'slot': 1, 'labels': 'v3', 'file': 'E_prior_s42_fmall.pt',
+     'sha256': '6a13f52e424cbfd4945883273fd081dfb2f25b171adb5b6521fab4d382466b57', 'bytes': 200186923,
+     'dataset': 'ozgung/knee-laned-fmall-s42-20261020', 'dataset_version': 1},
+    {'seed': 43, 'labels': 'v3', 'file': 'E_prior_s43_v3all.pt', 'sha256': 'a99ad89705f8297ac86659ce8e5a092cd626d851d7d51331c59f1b6920c69690',
+     'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v3all-s43-20261020', 'dataset_version': 1}]
+S6C_MODELS_BY_VARIANT = {'p7': 'S6C_MODELS', 'p9': 'S6C_MODELS_P9', 'p9r': 'S6C_MODELS_P9'}
 R7_ONLY_CFG = ('manifest', 'asset_binding', 'pilot_state_sha256', 'heliosli_reference', 'heliosli_visible_atol', 'ws2_binding',
                'guard_source_sha256')
 PRIVATE_CFG = ('probes', 'probe_order', 'old_sentinels', 's6_sentinels', 'development_windows')
@@ -220,7 +240,15 @@ def variant_frame(variant):
     frame['raptor_weight_default'] = default
     frame['excluded'] = [x for x in frame['excluded'] if x != 'na-full']
     compact, flip = R6F.resolve_compact(R6F.VARIANTS[variant])
-    if compact != R6F.DEFAULT_COMPACT:
+    if own_dual(variant):
+        block = s6c_block(variant)[0]
+        frame['compact_half'] = {'arms': dict(compact), 'flip_tta': flip, 'combine': 'weighted sum of average percentile ranks',
+                                 'r6': {'bundle_id': PROFILE.BUNDLE_ID, 'dataset': '%s/%d' % (R6F.R6_DATASET, R6F.R6_DATASET_VERSION),
+                                        'worker': 'compact_infer.py v4c (captured, unchanged), plain pass, 2 loader workers'},
+                                 's6c': {'version': S6C.VERSION, 'members': list(block['aliases']), 'labels': block['labels'],
+                                         'aggregation': S6C.AGGREGATION, 'flip_tta': False, 'worker': 'knee.public_s6c_worker, last stage'},
+                                 'guard_fallback': 'studies without the own stage keep rank(R6 plain) as the compact slot'}
+    elif compact != R6F.DEFAULT_COMPACT:
         from knee import public_r7_profile as R7P
         frame['compact_half'] = {'arms': dict(compact), 'flip_tta': flip, 'combine': 'weighted sum of average percentile ranks',
                                  'r6': {'bundle_id': PROFILE.BUNDLE_ID, 'dataset': '%s/%d' % (R6F.R6_DATASET, R6F.R6_DATASET_VERSION)},
@@ -366,6 +394,16 @@ def binding(pack, sources, variant=None):
                                 'nafull_stage': 'nafull' in names, 'weights_digest': R6F.digest(blend),
                                 'default_unchanged': 'no --variant: no cfg[blend], no cfg[nafull], original slugs and sources shipped'})
         b['deviations'] = DEVIATIONS + variant_deviations(variant)
+        if own_dual(variant):
+            block = s6c_block(variant)[0]
+            b['variant'] = 'R6flip-%s: %s Raptor half (%s), compact 1/2 R6 plain + 1/2 own S6 %d-member (labels %s) mean rank, per-finding weights' % (
+                variant.upper(), '+'.join(names), ', '.join('%s %g' % x for x in arms), len(block['models']), block['labels'])
+            b['s6c'] = {'version': S6C.VERSION, 'block_digest': R6F.digest(block), 'labels': block['labels'],
+                        'models': [{k: m[k] for k in ('seed', 'file', 'sha256', 'bytes', 'dataset', 'dataset_version')} for m in block['models']],
+                        'aliases': list(block['aliases']), 'aggregation': S6C.AGGREGATION,
+                        'worker': {'module': S6C.WORKER_MODULE, 'env': WORKER.PROBE_DUAL_ENV},
+                        'source_sha256': {n: hashlib.sha256(sources[n].encode()).hexdigest() for n in (*S6C_SOURCES, S6C.CAPTURED)}}
+            b['tolerances'].update(s6c_cross_process_board_dprob=S6C.CROSS_TOLERANCE, s6c_a100_reference_dprob=S6C.REFERENCE_ATOL)
         if variant in R6F.COMPACT_VARIANTS:
             block = s6c_block()[0]
             b.pop('r6')
@@ -388,18 +426,24 @@ def binding(pack, sources, variant=None):
     return b
 
 
-def s6c_models():
-    R6F.require(S6C_MODELS is not None, 'S6C_MODELS_NOT_SEALED')
-    return copy.deepcopy(S6C_MODELS)
+def s6c_models(variant='p7'):
+    models = globals()[S6C_MODELS_BY_VARIANT[variant]]
+    R6F.require(models is not None, 'S6C_MODELS_NOT_SEALED')
+    return copy.deepcopy(models)
 
 
-def s6c_block():
-    """(cfg['s6c'], shipped sources) for the P7-prime compact stage."""
+def s6c_block(variant='p7'):
+    """(cfg['s6c'], shipped sources) for the compact stage of P7-prime or the own arm of P9 (the member set is sealed per variant;
+    the A100 reference is restricted to the sealed members' aliases)."""
     reference = None
+    models = s6c_models(variant)
     if S6C_REFERENCE is not None:
         R6F.require(file_sha(S6C_REFERENCE['path']) == S6C_REFERENCE['sha256'], 'S6C_REFERENCE_PIN')
         reference = read(S6C_REFERENCE['path'])
-    block = S6C.block(s6c_models(), reference)
+        aliases = {S6C.model_alias(m) for m in models}
+        R6F.require(aliases <= set(reference['probabilities']), 'S6C_REFERENCE_COVERS_SEALED_MEMBERS')
+        reference = {'source': reference['source'], 'probabilities': {k: v for k, v in reference['probabilities'].items() if k in aliases}}
+    block = S6C.block(models, reference)
     raw = S6C_CAPTURED.read_bytes()
     R6F.require(hashlib.sha256(raw).hexdigest() == S6C.CAPTURED_SHA256, 'S6C_CAPTURED_SOURCE')
     sources = {S6C.CAPTURED: raw.decode()}
@@ -432,6 +476,12 @@ def variant_deviations(variant):
                    'check 1e-3), and scores them right after R6\'s last fold on the same rendered windows; R7 stackers recomputed '
                    'with knee.public_r7_stackers. R7 stops before R6 near the deadline. Rehearsal: R6 and R7 within 1e-3 of the '
                    'separate-pass P6 rehearsal on the frozen 39.')
+    if own_dual(variant):
+        out.append('Dual compact with our own members (P9): R6 runs without --flip-tta; the last stage runs our all-data S6 members '
+                   '(knee.public_s6c worker, exact nartaa S6 code tree, fp16, no flip TTA, one label table) under the guard; compact '
+                   'slot = 1/2 rank(R6 plain) + 1/2 rank(mean over members of per-member average percentile ranks) (pre-registered). '
+                   'Guard-cut or failed own-stage studies keep rank(R6 plain) as their compact slot. Rehearsal: two fresh-process '
+                   'sentinel passes of the own worker, cross-board/cross-process parity 1e-3 per member, A100 fp16 reference 0.01.')
     if variant in R6F.COMPACT_VARIANTS:
         out.append('Compact slot = our all-data S6 seed ensemble (knee.public_s6c): mean over seeds of per-seed average percentile '
                    'ranks, no flip TTA, one label table; the heliosli R6 bundle is neither attached nor run. One compact_infer per '
@@ -451,8 +501,8 @@ def packet(mode='rehearsal', qualified=None, variant=None):
         compile(text, name, 'exec')
         sources[name] = text
     cfg = copy.deepcopy(pack['cfg'])
-    if variant in R6F.COMPACT_VARIANTS:
-        cfg['s6c'], extra = s6c_block()
+    if has_s6c(variant):
+        cfg['s6c'], extra = s6c_block(variant)
         R6F.require(not set(extra) & set(sources), 'S6C_SOURCES_DISJOINT')
         sources.update(extra)
     if variant is not None:
@@ -587,6 +637,17 @@ S6C_MOUNT = """    s6c=cfg['s6c'];r6=None
     s6c.update(code_mount=str(cm),helios_mount=str(helios))
 """
 S6C_R6_MOUNT_ARG = "cfg.update(code=str(code),r6_mount=str(r6),"
+S6C_DUAL_MOUNT = """    s6c=cfg['s6c']
+    cm=mount(s6c['code']['dataset'],list(s6c['code']['files']))
+    for name,pin in s6c['code']['files'].items():require(file_sha(cm/name)==pin['sha256'],'EXACT_S6C_CODE_MOUNT')
+    require(file_sha(anatomy)==s6c['anatomy_sha256'],'EXACT_ANATOMY')
+    for m in s6c['models']:
+        parts=m['dataset'].split('/')
+        md=Path('/kaggle/input/models')/parts[0]/parts[1]/parts[2].lower()/parts[3]/str(m['dataset_version']) if len(parts)==4 else mount(m['dataset'],[m['file']])
+        m['path']=str(md/m['file'])
+        require((md/m['file']).stat().st_size==m['bytes'] and file_sha(md/m['file'])==m['sha256'],'EXACT_S6C_SEED_BYTES')
+    s6c.update(code_mount=str(cm),helios_mount=str(anatomy.parent))
+"""
 
 
 def bootstrap(pack):
@@ -594,7 +655,10 @@ def bootstrap(pack):
     if 'r7' in pack['cfg']['r6flip_binding']:      # P6 dual compact only; every other tail is untouched
         R6F.require(tail.count(NAFULL_MOUNT_SITE) == 1, 'EXACT_R7_MOUNT_SITE')
         tail = tail.replace(NAFULL_MOUNT_SITE, R7_MOUNT + NAFULL_MOUNT_SITE)
-    if 's6c' in pack['cfg']:           # P7-prime only: no R6 mount; our seed datasets and the S6 code mount instead
+    if 's6c' in pack['cfg'] and 'r6' in pack['cfg']['r6flip_binding']:    # P9: the R6 mount stays; our members and the S6 code mount are added
+        R6F.require(tail.count(NAFULL_MOUNT_SITE) == 1 and tail.count(S6C_MOUNT_SITE) == 1, 'EXACT_S6C_DUAL_MOUNT_SITE')
+        tail = tail.replace(NAFULL_MOUNT_SITE, S6C_DUAL_MOUNT + NAFULL_MOUNT_SITE)
+    elif 's6c' in pack['cfg']:         # P7-prime only: no R6 mount; our seed datasets and the S6 code mount instead
         R6F.require(tail.count(S6C_MOUNT_SITE) == 1 and tail.count(S6C_R6_MOUNT_ARG) == 1, 'EXACT_S6C_MOUNT_SITE')
         tail = tail.replace(S6C_MOUNT_SITE, S6C_MOUNT).replace(S6C_R6_MOUNT_ARG, "cfg.update(code=str(code),r6_mount=None,")
     if 'nafull' in pack['cfg']:        # variants with the na-full arm only; the default tail is untouched
@@ -626,13 +690,15 @@ def metadata(slug, variant=None):
     return {'id': '%s/%s' % (OWNER, slug), 'title': slug, 'code_file': 'notebook.ipynb', 'language': 'python', 'kernel_type': 'notebook',
             'is_private': True, 'enable_gpu': True, 'enable_tpu': False, 'enable_internet': False, 'competition_sources': [COMP],
             'dataset_sources': variant_datasets(variant),
-            'kernel_sources': [], 'model_sources': S6C.model_sources(S6C.block(s6c_models())) if variant in R6F.COMPACT_VARIANTS else [],
+            'kernel_sources': [], 'model_sources': S6C.model_sources(S6C.block(s6c_models(variant))) if has_s6c(variant) else [],
             'docker_image': arch['docker_image'], 'machine_shape': 'NvidiaTeslaT4'}
 
 
 def variant_datasets(variant):
     if variant in R6F.COMPACT_VARIANTS:     # no heliosli R6 bundle attached
         return [d for d in DATASETS if not d.startswith(R6F.R6_DATASET + '/')] + S6C.dataset_sources(S6C.block(s6c_models()))
+    if own_dual(variant):                   # the R6 bundle and our members
+        return list(DATASETS) + S6C.dataset_sources(S6C.block(s6c_models(variant)))
     return list(DATASETS) + (nafull_dataset_sources() if variant is not None
                              and 'nafull' in R6F.blend_arm_names(R6F.VARIANTS[variant]) else []) \
         + (['heliosli/rsna-knee-compact-r7cnxfsss/1'] if has_r7(variant) else [])
@@ -656,7 +722,7 @@ def emit(dest, slug, pack, mode, extra=None, variant=None):
     (dest / 'notebook.ipynb').write_text(raw)
     save_json(dest / 'kernel-metadata.json', metadata(slug, variant))
     tracked = [*NEW_SOURCES, *(NAFULL_SOURCES if variant is not None else ()), *(R7_SOURCES if has_r7(variant) else ()),
-               *(S6C_SOURCES if variant in R6F.COMPACT_VARIANTS else ()),
+               *(S6C_SOURCES if has_s6c(variant) else ()),
                'scripts/build_r6flip_entry.py', 'scripts/qualify_r6flip_cpu.py']
     changed = subprocess.check_output(['git', 'status', '--porcelain', '--', *tracked], cwd=PROJECT, text=True).strip()
     receipt = {'status': 'PREPARATION_ONLY' if mode == 'rehearsal' else 'QUALIFIED_ENTRY_BUILD', 'mode': mode, 'slug': slug,
@@ -704,6 +770,8 @@ def verify_result(result_root, rehearsal_cfg):
             'csv_sha256': file_sha(root / 'visible-predictions.csv'), 'r224_state': crop.pop() if crop else None,
             **({'nafull_state': r['workers']['nafull'][0]['state_before']['state']} if 'nafull' in r['workers'] else {}),
             'r6_state': r['workers']['r6'][0]['state_before'], 'anatomy_state': q['r6']['anatomy_state'],
+            **({'s6c_state': r['workers']['s6c'][0]['state_before'], 's6c_reference_max_abs': q['s6c']['reference_max_abs_dprob']}
+               if 's6c' in r['workers'] else {}),
             **({'r7_state': r['workers']['r7'][0]['state_before'], 'r7_reference_max_abs': q['r7']['aprime_reference_max_abs']}
                if 'r7' in r['workers'] else {}),
             'projection': {k: r['projection'][k] for k in ('point_seconds', 'conservative_seconds', 'gate_seconds', 'gate_pass')},

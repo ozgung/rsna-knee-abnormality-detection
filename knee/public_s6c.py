@@ -245,14 +245,15 @@ def require_worker(x, r, cfg, board, pass_name, ids):
     return x['anatomy_sha256']
 
 
-def require_compact(r, cfg, passes=('sentinel1', 'sentinel2', 'production')):
+def require_compact(r, cfg, passes=('sentinel1', 'sentinel2', 'production'), key='r6'):
     """Rehearsal gates of the compact stage: both boards, every pass PASS, all 39 genuine, sentinel repeats across fresh
-    processes and boards within CROSS_TOLERANCE per seed, optional A100 reference within REFERENCE_ATOL."""
+    processes and boards within CROSS_TOLERANCE per seed, optional A100 reference within REFERENCE_ATOL.
+    key: the controller's worker key ('r6' in P7-prime, where the block replaces the R6 bundle; 's6c' in P9, next to R6)."""
     from knee.public_s6_recovery_entry import assignments
     sentinels = cfg['s6_sentinels']
     anatomy, observed = set(), {}
     for pass_name in passes:
-        reports = r['workers']['r6'] if pass_name == 'production' else r['workers']['r6_sentinels'][pass_name]
+        reports = r['workers'][key] if pass_name == 'production' else r['workers'][key + '_sentinels'][pass_name]
         ids_by_board = assignments(cfg['staged_ids']) if pass_name == 'production' else [sentinels, sentinels]
         require(len(reports) == 2, 'S6C_TWO_BOARDS_' + pass_name)
         for board, x in enumerate(reports):
