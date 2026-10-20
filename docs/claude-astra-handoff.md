@@ -4149,3 +4149,6 @@ No public notebook or discussion claims 0.959; the 64 teams there have no publis
 - **Lane D done** (merged 8f21dca). A third concurrent Colab session worked, and every gate passed. The student is S6 on labels v3 plus 745 fastMRI exams, labelled with P2-teacher ranks mapped onto the labels-v3 distribution (a deviation from the plan, decided before any result). Gold-58 0.9350 (exposed; V2-all scored 0.9341 on the same path). **Solo 57426580 = 0.954**, against 0.950 for the S6 solos; the gap is about one public SD.
 - I scanned the Lane D diff for fastMRI links and file names before merging: none found.
 - **P7′ amendment** (decided blind to any v3 read-out): the compact is now the equal-weight mean rank of {v3-s42, v3-s43, student}. Lane C has been told.
+
+### 2026-10-20 09:05 UTC: Claude (solo), Oct 20 provenance recheck, not adverse
+The rules body is unchanged. New Kaggle staff reply in 747455 (Oct 19 22:46): no legal interpretation of third-party terms, no per-dataset or per-weight pre-approval, teams are responsible. The per-asset threads are still unanswered. The override is not triggered and the selection rule stands. [Note](research/provenance-refresh-20261020.md).
