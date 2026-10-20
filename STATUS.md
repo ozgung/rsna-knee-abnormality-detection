@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-20 15:40 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
+Updated **2026-10-20 15:30 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
 
 ## Current snapshot
 
@@ -18,7 +18,8 @@ Updated **2026-10-20 15:40 UTC** (Claude, solo; Codex unavailable until Oct 22).
   | 57326253 (crash before salvage) | 57326253 | 0.500 |
 
   A‴ 57288634 failed the runtime limit.
-- **Board (Oct 19 16:15):** 6,218 teams; 64 at 0.959; 1,259 tied at 0.958 (ranks 186–1,444). The bronze line (about rank 622) falls inside that tie. No public 0.959 recipe exists ([scan](docs/research/public-scan-20261019.md)).
+- **Board (Oct 20 15:06):** 6,270 teams; 211 at ≥ 0.959 (all private recipes); 1,387 tied at 0.958 (ranks 212–1,598). Silver ≈ 314 (any 0.959 display), bronze ≈ 627 inside the tie. No public 0.959 recipe exists ([scan Oct 19](docs/research/public-scan-20261019.md); Oct 20 rescan of 60 + 80 kernels and 168 topics found nothing new).
+- **Gap assessment (Oct 20, user question "what does 0.960 take?"):** [note](docs/research/silver-gap-assessment-20261020.md). The only ≥ 0.959 shot before the deadline is **P9**, P2 with the compact slot ½ rank(R6) + ½ rank(own S6 members); runtime forces R6 plain and no R224 unless a shared 384 + 320 px decode is built. Expected +0.001 to +0.003 true, P(display ≥ 0.959) 0.35–0.45. Optional parallel bet: labels v4 with out-of-fold own teachers (P ≈ 0.3 of a scored entry). **Awaiting the user's go; nothing launched.**
 - **Plan:** [final-push plan](docs/research/final-push-plan-20261019.md) (Fable max). Lanes A–D run concurrently, and the selection rule is fixed in its §4.
 - **User decisions (Oct 19):**
   - use all compute in concurrent lanes (Colab 547.87 units, Kaggle 54 h GPU / 20 h TPU);
@@ -47,4 +48,4 @@ Lanes write large outputs to `outputs/lane{a,b,c,d}-20261019/` and commit only i
 
 The last parent checks covered dependency-free unit tests and smoke at the R6F integration (Oct 18). Lane branches report their own tests, and the parent reruns them on merge. Keep patient/study grouping limits explicit, gold-58 exposure logged, image-only inference, deadline guard plus salvage-before-constant on every entry, and never use `kaggle kernels push --timeout`.
 
-**Next (parent):** user decides final 2 on Oct 21 (P6s′ by rule, P7′ as the hedge); then set the two final-selection checkboxes and record it here. No lane is running; all VMs are stopped. Slots used today: 4 of 5.
+**Next (parent):** user decides whether to launch P9 (and the optional labels-v4 bet) per the [gap assessment](docs/research/silver-gap-assessment-20261020.md); if yes, start the seed-44/45 fits and the P9 variant build at once (submission target Oct 21 03:00 UTC). Otherwise: user decides final 2 on Oct 21 (P6s′ by rule, P7′ as the hedge); then set the two final-selection checkboxes and record it here. No lane is running; all VMs are stopped. Slots used today: 4 of 5.
