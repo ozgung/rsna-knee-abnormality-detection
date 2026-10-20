@@ -134,3 +134,27 @@ Owner: Claude (lane C agent). Plan: [final-push plan §2 Lane C](../research/fin
   0 B failed rows, elapsed 245 s, submission 3×12 finite in [0, 1], pulled code cells identical, private/offline.
 - **P7′ submitted: 57432784** (10:01 UTC) after visible run v1 COMPLETE (09:47–09:59): receipt PASS, `fallback_studies` 0,
   every arm merged strictly, elapsed 458 s, pulled code cells identical. Kernel without `--timeout`; 8.3 h guard in force.
+
+## Outcome (2026-10-20 14:31 UTC)
+
+| Entry | Kernel | Submission | Public | Hidden wall |
+|---|---|---|---|---|
+| C1 solo v3-s43 (s6solo packet) | `s6solo-v3s43-entry-20261020` v1 | **57432734** | **0.955** | ≤ 4.5 h (submitted 10:00, scored by 14:31) |
+| P7′ (Raptor half + v3-s42 / v3-s43 / fastMRI student mean rank, no flip, no heliosli bundle) | `r6flip-p7-entry-20261018` v1 | **57432784** | **0.955** | ≤ 4.5 h |
+
+References on the board: V2-all and S6fall solos 0.950, Lane D student solo 0.954, P2 0.958, P6sp 0.957.
+
+- Kill rules: none fired (epoch-0 losses 0.5185 / 0.5157 ≤ 0.55; chosen-set gold-58 0.9357 ≥ 0.925; rehearsal point
+  16,369 s ≤ 27,000 s; solo 0.955 ≥ 0.949).
+- Selection rule (§4): P7′ displayed 0.955 < 0.957, so it does not become final 2 under rule 2; it stays the provenance hedge
+  (rule 3: if the Oct 20 recheck is adverse for the heliosli compact bundles, final 2 = P7′ at ≥ 0.955 — met).
+- C1 at 0.955 is the best own compact solo so far (+0.005 displayed over V2-all's 0.950, one to two public SDs); a solo is
+  never a final. Gold-58 remains selection-exposed; no private claim.
+- Exposure ledger (each read once): v3-s42 0.9283, v3-s43 0.9380 (one decode), P7′ set mean rank 0.9357, s42-v2 reference
+  0.9341. The probe-36 references (fp16) are not gold.
+- Compute: Colab A100 lanec1 2.2 h (lost), lanec2 10.6 h; Kaggle GPU ≈ 1.1 h T4-pairs for rehearsals/visibles plus the
+  two hidden runs. The v2 pair (s43/s44) stopped at epoch 3 and is not exported; their epoch-1 checkpoints sit in
+  `ozgung/knee-s6-lanec-ckpt-20261019` (v2-s43/2, v2-s44/2) if ever needed.
+- Branch `claude/lanec-20261019` (pushed): `knee/public_s6c.py`, `knee/public_s6c_worker.py`, R6F variant `p7`,
+  `scripts/build_s6_solo_seed.py`, `scripts/s6v2/{vm_seed_*,vm_bk_seed_ckpt,vm_kmodel,build_targets_table,vm_seed_readout,score_gold_seeds}`,
+  `tests/test_public_s6c.py` (18 tests) — 115 R6F/s6c/solo tests PASS, `python3.12 -m knee.smoke` passed.
