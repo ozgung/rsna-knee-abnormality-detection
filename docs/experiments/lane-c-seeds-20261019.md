@@ -93,3 +93,14 @@ Owner: Claude (lane C agent). Plan: [final-push plan §2 Lane C](../research/fin
   confirmed in the Model backups and resumes after the v3 pair as the fallback set. Running v3 first moves the primary path
   (C1 and P7′) about six hours earlier at no loss of v2 work. Seed 45 (v2) is dropped: the rule runs it only when v3 is
   not READY.
+
+## Amendment 1 — P7′ ensemble set (2026-10-20 08:40 UTC, parent decision)
+
+- **New set:** P7′ compact = equal-weight mean rank of {v3-s42, v3-s43, Lane D fastMRI student}. The student (S6 recipe on
+  labels v3 + 745 fastMRI exams with P2-teacher soft targets at effective weight 0.5, seed 42, final loss 0.3694; private
+  dataset `ozgung/knee-laned-fmall-s42-20261020` v1, checkpoint 6a13f52e…; gold-58 0.9350 exposed; solo probe 57426580
+  public 0.954) counts as a v3-family member (same labels v3, architecture and geometry). If a v3 seed fails its kill rule,
+  the remaining v3 seed(s) plus the student, equal weight; if both fail, the student alone. No v2 seed is mixed in.
+- **Reason:** a new model arrived after the pre-registration; the parent decided before any lane C v3 read-out reached it.
+- Every other rule unchanged: chosen-set gold-58 < 0.925 kills P7′; rehearsal point ≤ 27,000 s; 8.3 h guard; salvage;
+  visible PASS; then submit.
