@@ -577,9 +577,13 @@ def profile_module(name):
 
 def check_compact_receipt(ci, manifest):
     """The captured worker's own receipt must name exactly the pinned bundle, sources and switches."""
-    from knee import public_r7_profile
     from knee.public_r6_profile import SOURCE_SHA256
-    ASSET_SHA256 = profile_module('r7' if manifest.get('bundle_id') == public_r7_profile.BUNDLE_ID else 'r6').ASSET_SHA256
+    try:                                   # the R7 profile ships only with the R7 variants (P6*); every other build runs the R6 bundle
+        from knee import public_r7_profile
+        r7_bundle = public_r7_profile.BUNDLE_ID
+    except ImportError:
+        r7_bundle = None
+    ASSET_SHA256 = profile_module('r7' if r7_bundle is not None and manifest.get('bundle_id') == r7_bundle else 'r6').ASSET_SHA256
     require(ci.get('status') == 'PASS' and ci.get('timed_out') is False and ci.get('amp') == 'fp16'
             and ci.get('models') == manifest['models'] and ci.get('extent_models') == 4 and ci.get('syn_decomp_models') == 4
             and ci.get('spatial_models') == 4 and ci.get('trainer_md5') == manifest['trainer_md5']

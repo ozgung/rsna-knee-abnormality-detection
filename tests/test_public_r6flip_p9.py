@@ -383,8 +383,19 @@ class P9PacketTests(unittest.TestCase):
                     p = Path(d) / name
                     p.parent.mkdir(parents=True, exist_ok=True)
                     p.write_bytes(content.encode())
+            # the R6 receipt check must not need the R7 profile (absent here): the P9 rehearsal v1 failed on exactly this import
             code = ('import sys; sys.path.insert(0, %r); import knee.public_s6c as S, knee.public_r6flip_entry as E, '
-                    'knee.public_r6flip as F; assert F.own_compact_arm(F.VARIANTS["p9"]) and E._s6c() is S; print("ok")' % d)
+                    'knee.public_r6flip as F, knee.public_r6flip_worker as W, knee.public_r6_profile as P\n'
+                    'assert F.own_compact_arm(F.VARIANTS["p9"]) and E._s6c() is S\n'
+                    'sys.modules["knee.public_r7_profile"] = None\n'          # the local editable install would resolve it; Kaggle has no such file
+                    'try:\n    import knee.public_r7_profile\nexcept ImportError:\n    pass\nelse:\n    raise SystemExit("r7 profile importable")\n'
+                    'ci = {"status": "PASS", "timed_out": False, "amp": "fp16", "models": ["m"], "extent_models": 4, "syn_decomp_models": 4, '
+                    '"spatial_models": 4, "trainer_md5": "t", "anchor_weights_sha256": "a", '
+                    '"side_check": {"model_sha256": P.ASSET_SHA256["side_cls.pt"]}, "state_stacker": {"sha256": P.ASSET_SHA256["state_stacker.json"]}, '
+                    '"fluid_stacker": {"sha256": P.ASSET_SHA256["fluid_stacker.json"]}, "sha256": {n: P.SOURCE_SHA256[n] for n in '
+                    '("px_cache.py", "compact_train.py", "compact_infer.py", "probe_infer.py", "side_common.py", "knee_anchor_bank_v2.py")}}\n'
+                    'W.check_compact_receipt(ci, {"bundle_id": P.BUNDLE_ID, "models": ["m"], "trainer_md5": "t", "anchor_weights_sha256": "a"})\n'
+                    'print("ok")' % d)
             r = subprocess.run([sys.executable, '-I', '-c', code], capture_output=True, text=True, cwd=d)
             self.assertEqual(r.stdout.strip(), 'ok', r.stderr[-2000:])
 
