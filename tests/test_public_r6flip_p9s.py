@@ -135,7 +135,7 @@ class P9sStageTests(unittest.TestCase):
             c = ENTRY.r6_worker_config(cfg, 1, pass_name, ['s1'], Path('/o/board1-r6-' + pass_name), None)
             self.assertEqual(c['flip'], False)
             self.assertEqual(c['s6c_shared']['block'], cfg['s6c'])
-            self.assertEqual((c['s6c_shared']['deadline_epoch'], c['s6c_shared']['measure_stride2']), (123., True))
+            self.assertEqual((c['s6c_shared']['deadline_epoch'], c['s6c_shared']['measure_stride2']), (123., False))   # proxy measured once
             self.assertEqual(c['s6c_shared']['out'], '/o/board1-s6c-' + pass_name)
             self.assertNotIn('r7_shared', c)
         cfg['mode'] = 'entry'

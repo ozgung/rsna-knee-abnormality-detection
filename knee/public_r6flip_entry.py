@@ -81,7 +81,7 @@ def r6_worker_config(cfg, board, pass_name, ids, folder, inject_uid, arm='r6'):
                           'cpu_pins': cfg['r6flip_binding']['r7']['cpu_pins'], 'deadline_epoch': cfg.get('deadline_epoch'),
                           'out': str(Path(folder).parent / ('board%d-r7-production' % board))}
     if arm == 'r6' and R6F.own_shared(cfg.get('blend')):     # P9s: every pass (the sentinel passes give the members' repeat gates)
-        c['s6c_shared'] = {'block': cfg['s6c'], 'deadline_epoch': cfg.get('deadline_epoch'), 'measure_stride2': cfg['mode'] == 'rehearsal',
+        c['s6c_shared'] = {'block': cfg['s6c'], 'deadline_epoch': cfg.get('deadline_epoch'), 'measure_stride2': False,   # measured once (P9s v1 rehearsal)
                            'out': str(Path(folder).parent / ('board%d-s6c-%s' % (board, pass_name)))}
     return c
 
