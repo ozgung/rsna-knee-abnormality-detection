@@ -125,3 +125,8 @@ Owner: Claude (lane C agent). Plan: [final-push plan §2 Lane C](../research/fin
   (`ozgung/knee-s6-v3all-s43-20261020` v1, same five files, quota freed by Lane D). **C1 rehearsal v2 PASS** (09:09–09:36,
   every check true incl. qualified state/reload, cross-board sentinels, all 39 genuine; elapsed 585 s; conservative
   projection 10,531 s). Entry `s6solo-v3s43-entry-20261020` built from that verified result; visible run → submit chain started.
+- **P7′ rehearsal PASS** (08:42–09:39, 2×T4): 39/39 genuine, 0 fallback, every R384/R224 gate, every s6c gate
+  (3 members; sentinel repeats max |Δp| 0.0; A100 reference 108 member-study checks, max |Δp| 0.0048 ≤ 0.01), CSV
+  recomputed; elapsed 1,680 s; **projection point 16,369 s** (kill > 27,000 s: pass), conservative 21,256 s (gate 29,880 s).
+  Phase walls: old 717 s, crop224 264 s, s6c sentinels 208 + 152 s, s6c production 309 s. Entry `r6flip-p7-entry-20261018`
+  (payload aad4124d…) built from the verified result (no waiver); visible run → submit chain started.
