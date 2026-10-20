@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-20 15:30 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
+Updated **2026-10-20 15:55 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
 
 ## Current snapshot
 
@@ -19,7 +19,16 @@ Updated **2026-10-20 15:30 UTC** (Claude, solo; Codex unavailable until Oct 22).
 
   A‴ 57288634 failed the runtime limit.
 - **Board (Oct 20 15:06):** 6,270 teams; 211 at ≥ 0.959 (all private recipes); 1,387 tied at 0.958 (ranks 212–1,598). Silver ≈ 314 (any 0.959 display), bronze ≈ 627 inside the tie. No public 0.959 recipe exists ([scan Oct 19](docs/research/public-scan-20261019.md); Oct 20 rescan of 60 + 80 kernels and 168 topics found nothing new).
-- **Gap assessment (Oct 20, user question "what does 0.960 take?"):** [note](docs/research/silver-gap-assessment-20261020.md). The only ≥ 0.959 shot before the deadline is **P9**, P2 with the compact slot ½ rank(R6) + ½ rank(own S6 members); runtime forces R6 plain and no R224 unless a shared 384 + 320 px decode is built. Expected +0.001 to +0.003 true, P(display ≥ 0.959) 0.35–0.45. Optional parallel bet: labels v4 with out-of-fold own teachers (P ≈ 0.3 of a scored entry). **Awaiting the user's go; nothing launched.**
+- **Gap assessment (Oct 20, user question "what does 0.960 take?"):** [note](docs/research/silver-gap-assessment-20261020.md). The only ≥ 0.959 shot before the deadline is **P9**, P2 with the compact slot ½ rank(R6) + ½ rank(own S6 members); runtime forces R6 plain and no R224 unless a shared 384 + 320 px decode is built. Expected +0.001 to +0.003 true, P(display ≥ 0.959) 0.35–0.45. Optional parallel bet: labels v4 with out-of-fold own teachers (P ≈ 0.3 of a scored entry). **User (Oct 20 15:40): go on both, paid LLMs allowed for labels.** Lanes P9 and L4 launched 15:50 (table below).
+
+## Lanes running since Oct 20 15:50 UTC (Claude subagents, own worktrees)
+
+| Lane | Worktree / branch | Resource | Goal, gates, deadline |
+|---|---|---|---|
+| P9: dual compact R6 + own S6 | `.claude/worktrees/lanep9-20261020`, `claude/lanep9-20261020` | Kaggle 2×T4 | v1 = R384 + ½ rank(R6 plain, shared decode) + ½ rank(mean of v3-s43 and the fastMRI student), own stage last under the guard; point ≤ 27,000 s (else one member); submit by 22:00 today (hard Oct 21 03:00). v2 with Lane L4 members by Oct 21 18:00; shared 384 + 320 px decode attempted for v2 only. Note: `docs/experiments/lane-p9-20261020.md` |
+| L4: labels v4 + new members | `.claude/worktrees/lanel4-20261020`, `claude/lanel4-20261020` | Colab A100 ×2–3 (`sessions-lanel4-*.json`) | session 1: labels-v3 seeds 44 then 45; v4a = base + calibrated mean of R6-flip and R7 OOF teachers, silence-aware weights, Claude adjudication of disagreement cells (reports only, permitted per 733965); session 2: v4a seeds 42/43; session 3 optional own 4-fold OOF for v4b. Exports as dataset + Model with SHA256SUMS, gold-58 read once. Members useful only if exported by Oct 21 14:00. Note: `docs/experiments/lane-l4-20261020.md` |
+
+Lane agents commit only in their branches and write large outputs to `outputs/lane{p9,l4}-20261020/`; the parent relays L4 exports to P9 and integrates branches. If a lane agent is lost, stop its VMs with `colab --config ~/.config/colab-cli/sessions-lanel4-<n>.json stop -s <name>` (names in the lane note) before relaunching.
 - **Plan:** [final-push plan](docs/research/final-push-plan-20261019.md) (Fable max). Lanes A–D run concurrently, and the selection rule is fixed in its §4.
 - **User decisions (Oct 19):**
   - use all compute in concurrent lanes (Colab 547.87 units, Kaggle 54 h GPU / 20 h TPU);
