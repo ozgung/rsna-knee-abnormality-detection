@@ -69,8 +69,18 @@ NEW_SOURCES = ('knee/public_r6_profile.py', 'knee/public_r6flip.py', 'knee/publi
 S6C_SOURCES = ('knee/public_s6c.py', 'knee/public_s6c_worker.py')
 S6C_CAPTURED = OUT / 'research/public-0957-20261015/kernels/nartaa_rsna-knee-s6fall-solo/rsna-knee-s6fall-solo.py'
 # Sealed seed set (pre-registered rule in docs/experiments/lane-c-seeds-20261019.md): filled from the verified exports.
-S6C_MODELS = None
-S6C_REFERENCE = None            # optional {'path': ..., 'sha256': ...}: A100 fp16 per-seed read-out of the frozen-36 probes
+# Amendment 1 (parent, 2026-10-20 08:40 UTC): {v3-s42, v3-s43, Lane D fastMRI student}, equal-weight mean rank; all labels v3.
+S6C_MODELS = [
+    {'seed': 42, 'labels': 'v3', 'file': 'E_prior_s42_v3all.pt', 'sha256': '03da2cacdbc12305519e05c8e9a5626f14eb71f49bc26d56e3f2ced35f997e43',
+     'bytes': 200188027, 'dataset': 'ozgung/knee-s6-lanec-seeds-20261019/pyTorch/v3-s42', 'dataset_version': 1},
+    {'seed': 42, 'slot': 1, 'labels': 'v3', 'file': 'E_prior_s42_fmall.pt',
+     'sha256': '6a13f52e424cbfd4945883273fd081dfb2f25b171adb5b6521fab4d382466b57', 'bytes': 200186923,
+     'dataset': 'ozgung/knee-laned-fmall-s42-20261020', 'dataset_version': 1},
+    {'seed': 43, 'labels': 'v3', 'file': 'E_prior_s43_v3all.pt', 'sha256': 'a99ad89705f8297ac86659ce8e5a092cd626d851d7d51331c59f1b6920c69690',
+     'bytes': 200188027, 'dataset': 'ozgung/knee-s6-lanec-seeds-20261019/pyTorch/v3-s43', 'dataset_version': 1}]
+# A100 fp16 per-member read-out of the frozen-36 probes (lanec2, one compact_infer over all three members)
+S6C_REFERENCE = {'path': OUT / 'lanec-20261019/p7/reference-p7.json',
+                 'sha256': 'd41d7952b8b5e47c78ae431f03eafc2a4f2951772a687235f677f8935ca48504'}
 R7_ONLY_CFG = ('manifest', 'asset_binding', 'pilot_state_sha256', 'heliosli_reference', 'heliosli_visible_atol', 'ws2_binding',
                'guard_source_sha256')
 PRIVATE_CFG = ('probes', 'probe_order', 'old_sentinels', 's6_sentinels', 'development_windows')

@@ -101,7 +101,7 @@ def stage_models(s6c, folder):
         src = Path(m['path'])
         require(src.is_file() and not src.is_symlink() and src.name == m['file'] and src.stat().st_size == m['bytes']
                 and file_sha(src) == m['sha256'], 'S6C_SEED_SOURCE_BYTES')
-        dst = folder / S6C.alias(m['seed'])
+        dst = folder / S6C.model_alias(m)
         shutil.copyfile(src, dst)
         require(file_sha(dst) == m['sha256'], 'S6C_SEED_STAGED_BYTES')
         staged.append({'alias': dst.name, 'sha256': m['sha256'], 'bytes': m['bytes']})

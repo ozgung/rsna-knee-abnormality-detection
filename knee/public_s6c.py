@@ -58,8 +58,13 @@ def digest(value):
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
-def alias(seed):
-    return 'E_prior_s%d_f0.pt' % seed
+def alias(seed, slot=0):
+    return 'E_prior_s%d_f%d.pt' % (seed, slot)
+
+
+def model_alias(m):
+    """Loader alias; 'slot' separates two members that share a seed number (Lane D's student is also seed 42)."""
+    return alias(m['seed'], m.get('slot', 0))
 
 
 def validate_models(models):
@@ -67,7 +72,8 @@ def validate_models(models):
     require(isinstance(models, list) and 2 <= len(models) <= 6, 'S6C_TWO_TO_SIX_SEEDS')
     keys = {'seed', 'labels', 'file', 'sha256', 'bytes', 'dataset', 'dataset_version'}
     for m in models:
-        require(isinstance(m, dict) and set(m) - {'path'} == keys, 'S6C_MODEL_SCHEMA')     # 'path' is added by the notebook bootstrap
+        require(isinstance(m, dict) and set(m) - {'path', 'slot'} == keys, 'S6C_MODEL_SCHEMA')     # 'path' is added by the notebook bootstrap
+        require(type(m.get('slot', 0)) is int and 0 <= m.get('slot', 0) <= 9, 'S6C_MODEL_SLOT')
         require(type(m['seed']) is int and 0 <= m['seed'] < 10000 and m['labels'] in LABEL_TABLES, 'S6C_MODEL_SEED_LABELS')
         require(isinstance(m['sha256'], str) and len(m['sha256']) == 64 and type(m['bytes']) is int and m['bytes'] > 0, 'S6C_MODEL_IDENTITY')
         require(isinstance(m['dataset'], str) and m['dataset'].split('/')[0] in SEED_OWNERS and len(m['dataset'].split('/')) in (2, 4)
@@ -75,8 +81,8 @@ def validate_models(models):
                 and m['dataset_version'] > 0 and isinstance(m['file'], str) and m['file'].endswith('.pt') and '/' not in m['file'],
                 'S6C_MODEL_DATASET')
     require(len({m['labels'] for m in models}) == 1, 'S6C_ONE_LABEL_TABLE_NO_MIXING')
-    require(len({m['seed'] for m in models}) == len(models) and len({m['sha256'] for m in models}) == len(models), 'S6C_DISTINCT_SEEDS')
-    names = [alias(m['seed']) for m in models]
+    require(len({model_alias(m) for m in models}) == len(models) and len({m['sha256'] for m in models}) == len(models), 'S6C_DISTINCT_SEEDS')
+    names = [model_alias(m) for m in models]
     require(names == sorted(names), 'S6C_SEEDS_IN_LOADER_ORDER')      # compact_infer globs sorted(<arm>_s*_f*.pt)
     return names
 
@@ -223,7 +229,7 @@ def require_worker(x, r, cfg, board, pass_name, ids):
     env = x['environment']
     require(env['torch'] == ab['environment']['torch'] and env['packages'] == ab['environment']['packages']
             and env['physical_uuid'] == r['boards'][board]['uuid'] and env['cuda_device_count'] == 1, 'S6C_ISOLATED_PINNED_BOARD')
-    want = [{'alias': alias(m['seed']), 'sha256': m['sha256'], 'bytes': m['bytes']} for m in s6c['models']]
+    want = [{'alias': model_alias(m), 'sha256': m['sha256'], 'bytes': m['bytes']} for m in s6c['models']]
     require(x['models'] == want and x['state_before'] == x['state_after'] == digest(want), 'S6C_SEALED_SEED_FILES_UNCHANGED')
     ci = x['compact']
     require(ci['status'] == 'PASS' and ci['amp'] == AMP and ci['models'] == s6c['aliases'] and ci['spatial_models'] == len(want)

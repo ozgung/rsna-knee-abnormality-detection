@@ -58,6 +58,11 @@ class FrameTests(unittest.TestCase):
             with self.assertRaises(ValueError) as e:
                 S6C.validate_models(bad)
             self.assertEqual(str(e.exception), message)
+        trio = models('v3', (42, 43))
+        student = dict(trio[0], file='E_prior_s42_fmall.pt', sha256='ab' * 32, dataset='ozgung/knee-laned-fmall-s42-20261020', slot=1)
+        self.assertEqual(S6C.validate_models([trio[0], student, trio[1]]), ['E_prior_s42_f0.pt', 'E_prior_s42_f1.pt', 'E_prior_s43_f0.pt'])
+        with self.assertRaises(ValueError):
+            S6C.validate_models([trio[0], dict(student, slot=0), trio[1]])      # same alias
         b = S6C.block(models('v3', (42, 43)))
         self.assertEqual((b['labels'], b['aliases'], b['flip_tta']), ('v3', ['E_prior_s42_f0.pt', 'E_prior_s43_f0.pt'], False))
         self.assertEqual(S6C.dataset_sources(b), ['nartaa/rsna-knee-s6fall-weights/3', 'ozgung/knee-s6-v3all-s42-20261019/1',
