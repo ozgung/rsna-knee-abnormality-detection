@@ -18,7 +18,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-PROJECT = Path(__file__).resolve().parents[1]
+PROJECT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT))
 from scripts import build_s6_solo_pair as B
 from knee import s6_solo_pair as PAIR
