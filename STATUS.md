@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-20 15:55 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
+Updated **2026-10-20 16:20 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
 
 ## Current snapshot
 
@@ -26,9 +26,11 @@ Updated **2026-10-20 15:55 UTC** (Claude, solo; Codex unavailable until Oct 22).
 | Lane | Worktree / branch | Resource | Goal, gates, deadline |
 |---|---|---|---|
 | P9: dual compact R6 + own S6 | `.claude/worktrees/lanep9-20261020`, `claude/lanep9-20261020` | Kaggle 2×T4 | v1 = R384 + ½ rank(R6 plain, shared decode) + ½ rank(mean of v3-s43 and the fastMRI student), own stage last under the guard; point ≤ 27,000 s (else one member); submit by 22:00 today (hard Oct 21 03:00). v2 with Lane L4 members by Oct 21 18:00; shared 384 + 320 px decode attempted for v2 only. Note: `docs/experiments/lane-p9-20261020.md` |
-| L4: labels v4 + new members | `.claude/worktrees/lanel4-20261020`, `claude/lanel4-20261020` | Colab A100 ×2–3 (`sessions-lanel4-*.json`) | session 1: labels-v3 seeds 44 then 45; v4a = base + calibrated mean of R6-flip and R7 OOF teachers, silence-aware weights, Claude adjudication of disagreement cells (reports only, permitted per 733965); session 2: v4a seeds 42/43; session 3 optional own 4-fold OOF for v4b. Exports as dataset + Model with SHA256SUMS, gold-58 read once. Members useful only if exported by Oct 21 14:00. Note: `docs/experiments/lane-l4-20261020.md` |
+| L4: labels v4 + new members | `.claude/worktrees/lanel4-20261020`, `claude/lanel4-20261020` | Colab A100 ×2–3 (`sessions-lanel4-*.json`) | session 1: labels-v3 seeds 44 then 45; v4a = base + calibrated mean of R6-flip and R7 OOF teachers, silence-aware weights, Claude adjudication of disagreement cells (reports only, permitted per 733965); session 2: v4a seeds 42/43; builds v4b/v5 from Lane F's OOF columns. Exports as dataset + Model with SHA256SUMS, gold-58 read once. Members useful only if exported by Oct 21 14:00. Note: `docs/experiments/lane-l4-20261020.md` |
 
-Lane agents commit only in their branches and write large outputs to `outputs/lane{p9,l4}-20261020/`; the parent relays L4 exports to P9 and integrates branches. If a lane agent is lost, stop its VMs with `colab --config ~/.config/colab-cli/sessions-lanel4-<n>.json stop -s <name>` (names in the lane note) before relaunching.
+| F: own OOF teachers + label rounds | `.claude/worktrees/lanef-20261020`, `claude/lanef-20261020` | Colab A100 ×4–6 (one fit per session) | round 1: four 12-epoch fold fits on labels v3 → own OOF columns (`outputs/lanef-20261020/oof_r1/`), compared with R6/R7 OOF; round 2: L4 builds v4b from them, F trains all-data seeds 42–45 on v4b (export by Oct 21 14:00) and fold fits on v4b; round 3 (v5) only if round 2 beats round 1 by ≥ +0.002 OOF with CI > 0, export by Oct 22 00:00. Note: `docs/experiments/lane-f-20261020.md` |
+
+Lane agents commit only in their branches and write large outputs to `the main checkout's outputs/lane{p9,l4,f}-20261020/`; the parent relays L4 exports to P9 and integrates branches. If a lane agent is lost, stop its VMs with `colab --config ~/.config/colab-cli/sessions-lanel4-<n>.json stop -s <name>` (names in the lane note) before relaunching.
 - **Plan:** [final-push plan](docs/research/final-push-plan-20261019.md) (Fable max). Lanes A–D run concurrently, and the selection rule is fixed in its §4.
 - **User decisions (Oct 19):**
   - use all compute in concurrent lanes (Colab 547.87 units, Kaggle 54 h GPU / 20 h TPU);
