@@ -81,7 +81,10 @@ from the restored, preflight-verified cache (unchanged files); fastMRI rows thro
   is far inside the 58-study noise.
 - Solo probe: rehearsal `s6solo-fms42-qual-20261020` PASS (886 s, conservative projection 10,968 s); entry
   `s6solo-fms42-entry-20261020` v1 visible PASS (335 s, 0 A fallbacks, 0 B failed rows, pulled code cells identical,
-  private / offline / T4); **submitted 57426580 at 06:49** (SCORE_PENDING). Solo references: V2 0.950, S6fall 0.950.
+  private / offline / T4); **submitted 57426580 at 06:49, scored by 08:30: public 0.954** (solo references on the same packet: V2 57285381 0.950,
+  S6fall 57285382 0.950). +0.004 displayed is about one public SD (≈ 0.003); it is the best own compact solo so far but
+  not proof of a private gain. Lane C's v3 seeds (the plan's "beat V3" bar for P8) had no solo or gold read yet.
+- P8 (P6 with R7 replaced by this student) is the parent's and Lane A's decision; not built here.
 
 ## Deviations from the plan
 
