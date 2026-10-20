@@ -14,17 +14,25 @@ R=/content/runs/r1_f$K; A=/content/avg_r1_f$K; mkdir -p $A/models $A/ckpts
 have() { grep -q "^epoch $1 " $2/SHA256SUMS 2>/dev/null; }
 if have 10 /content/bk_r1_f${K}_ckpt; then cp /content/bk_r1_f${K}_ckpt/ckpt__$N.pt $A/ckpts/e10.pt; fi
 REF=ozgung/knee-s6-lanef-ckpt-20261020/pyTorch/r1-f$K
+# Kaggle's whole-version download endpoints answer 404 for this account; the per-file route works:
+#   https://www.kaggle.com/api/v1/models/<owner>/<model>/pyTorch/<variation>/<version>/download/<file>  (302 to signed storage)
+AUTH=$(/content/py/bin/python -c "import json;c=json.load(open('/content/kaggle.json'));print(c['username']+':'+c['key'])")
+kfile() { curl -sL -u "$AUTH" -o "$3" "https://www.kaggle.com/api/v1/models/$REF/$1/download/$2"; }
 vers=$(/usr/local/bin/kaggle models instances versions list $REF --page-size 50 2>/dev/null | awk -v v="r1-f$K" '$2==v {print $1}' | sort -rn)
 for v in $vers; do
   [ -s $A/ckpts/e9.pt ] && [ -s $A/ckpts/e10.pt ] && break
   d=$A/dl_v$v; mkdir -p $d
-  /usr/local/bin/kaggle models instances versions download $REF/$v -p $d --untar -q 2>/dev/null || continue
+  kfile $v SHA256SUMS $d/SHA256SUMS || continue
   ep=$(grep -oE "^epoch [0-9]+" $d/SHA256SUMS | awk '{print $2}')
-  echo "version $v = epoch $ep"
-  if [ "$ep" = 9 ] && [ ! -s $A/ckpts/e9.pt ]; then (cd $d && sha256sum -c SHA256SUMS 2>/dev/null | grep -q "ckpt__$N.pt: OK") && mv $d/ckpt__$N.pt $A/ckpts/e9.pt; fi
-  if [ "$ep" = 10 ] && [ ! -s $A/ckpts/e10.pt ]; then (cd $d && sha256sum -c SHA256SUMS 2>/dev/null | grep -q "ckpt__$N.pt: OK") && mv $d/ckpt__$N.pt $A/ckpts/e10.pt; fi
+  echo "version $v = epoch ${ep:-?}"
+  for want in 9 10; do
+    if [ "$ep" = "$want" ] && [ ! -s $A/ckpts/e$want.pt ]; then
+      kfile $v ckpt__$N.pt $d/ckpt__$N.pt
+      (cd $d && grep "ckpt__$N.pt" SHA256SUMS | sha256sum -c - 2>/dev/null | grep -q OK) && mv $d/ckpt__$N.pt $A/ckpts/e$want.pt && echo "epoch $want checkpoint fetched and verified" || echo "epoch $want checkpoint sha mismatch"
+    fi
+  done
   rm -rf $d
-  [ "$ep" -lt 9 ] 2>/dev/null && break
+  [ -n "$ep" ] && [ "$ep" -lt 9 ] 2>/dev/null && break
 done
 [ -s $A/ckpts/e9.pt ] && [ -s $A/ckpts/e10.pt ] || { echo "AVG_FAIL missing epoch 9/10 backups"; exit 1; }
 /content/py/bin/python - "$A" "$R/models/$N.pt" "$N" <<'PY'
