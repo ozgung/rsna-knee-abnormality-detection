@@ -314,11 +314,24 @@ class PacketTests(unittest.TestCase):
         cls.B = B
         cls.patch = mock.patch.object(B, 'S6C_MODELS', models())
         cls.patch.start()
+        cls.patch_ref = mock.patch.object(B, 'S6C_REFERENCE', None)
+        cls.patch_ref.start()
         cls.pack = B.packet('rehearsal', variant='p7')
 
     @classmethod
     def tearDownClass(cls):
         cls.patch.stop()
+        cls.patch_ref.stop()
+
+    def test_sealed_amendment_set(self):
+        with mock.patch.object(self.B, 'S6C_MODELS', self.patch.temp_original), \
+                mock.patch.object(self.B, 'S6C_REFERENCE', self.patch_ref.temp_original):
+            if not Path(self.B.S6C_REFERENCE['path']).is_file():
+                self.skipTest('sealed reference not staged')
+            block = self.B.packet('rehearsal', variant='p7')['cfg']['s6c']
+        self.assertEqual(block['aliases'], ['E_prior_s42_f0.pt', 'E_prior_s42_f1.pt', 'E_prior_s43_f0.pt'])
+        self.assertEqual(block['labels'], 'v3')
+        self.assertEqual(sorted(block['reference']['probabilities']), block['aliases'])
 
     def test_cfg_binding_sources_and_no_r6_bundle(self):
         cfg, b = self.pack['cfg'], self.pack['cfg']['r6flip_binding']
