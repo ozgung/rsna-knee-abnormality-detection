@@ -245,10 +245,12 @@ def require_worker(x, r, cfg, board, pass_name, ids):
     return x['anatomy_sha256']
 
 
-def require_compact(r, cfg, passes=('sentinel1', 'sentinel2', 'production'), key='r6'):
+def require_compact(r, cfg, passes=('sentinel1', 'sentinel2', 'production'), key='r6', injected=None):
     """Rehearsal gates of the compact stage: both boards, every pass PASS, all 39 genuine, sentinel repeats across fresh
     processes and boards within CROSS_TOLERANCE per seed, optional A100 reference within REFERENCE_ATOL.
-    key: the controller's worker key ('r6' in P7-prime, where the block replaces the R6 bundle; 's6c' in P9, next to R6)."""
+    key: the controller's worker key ('r6' in P7-prime, where the block replaces the R6 bundle; 's6c' in P9, next to R6).
+    injected: (pass name, study id) of R6's rehearsal source-seam injection (P9s shared decode: that study has no R6 forward, so
+    the members have no output for it in that pass; it must be the only failure there)."""
     from knee.public_s6_recovery_entry import assignments
     sentinels = cfg['s6_sentinels']
     anatomy, observed = set(), {}
@@ -258,8 +260,12 @@ def require_compact(r, cfg, passes=('sentinel1', 'sentinel2', 'production'), key
         require(len(reports) == 2, 'S6C_TWO_BOARDS_' + pass_name)
         for board, x in enumerate(reports):
             anatomy.add(require_worker(x, r, cfg, board, pass_name, ids_by_board[board]))
-            require(x['failed'] == 0, 'S6C_NO_FAILURE_' + pass_name)
+            skip = injected[1] if injected is not None and injected[0] == pass_name else None
+            require(x['failed'] == (1 if skip is not None else 0), 'S6C_NO_FAILURE_' + pass_name)
             for row in x['records']:
+                if row['id'] == skip:
+                    require(row['status'] == 'data_local_failure', 'S6C_INJECTED_ROW_NOT_GENUINE')
+                    continue
                 require(row['status'] == 'genuine', 'S6C_HEALTHY_MUST_BE_GENUINE')
                 observed.setdefault(row['id'], []).append((pass_name, board, row))
     require(anatomy == {ANATOMY_SHA256}, 'S6C_ANATOMY')
@@ -287,6 +293,39 @@ def require_compact(r, cfg, passes=('sentinel1', 'sentinel2', 'production'), key
     return {'sentinel_repeats': {sid: len(observed[sid]) for sid in sentinels}, 'sentinel_max_abs_dprob': worst,
             'reference_studies': ref_n, 'reference_max_abs_dprob': ref_max, 'anatomy_state': ANATOMY_SHA256,
             'seeds': len(cfg['s6c']['models']), 'labels': cfg['s6c']['labels']}
+
+
+def require_shared(r, cfg):
+    """P9s gates on the shared-decode members: every report is the shared slot, no cut, every genuine row rendered from the
+    shared decode with the R6 worker's own hand-off PASS, and every member's production probabilities within SHARED_PARITY of
+    the separate s6c worker (cfg['p9_reference'], the P9 rehearsal) on the frozen 39."""
+    from knee.public_s6_recovery_entry import assignments
+    shards = assignments(cfg['staged_ids'])
+    reports, r6_reports = r['workers']['s6c'], r['workers']['r6']
+    require(len(reports) == 2 and len(r6_reports) == 2, 'S6C_SHARED_TWO_BOARDS')
+    for board, (x, x6) in enumerate(zip(reports, r6_reports)):
+        require(x.get('slot') == 'compact-shared' and x.get('cut') is None and x.get('fp32_recoveries') == 0 and x.get('flip') == {'enabled': False}
+                and x.get('assigned') == shards[board] and x6.get('s6c_shared', {}).get('status') == 'PASS', 'S6C_SHARED_WORKER_PASS')
+        require(all(row['shared_decode'] is True and row['checksum_equal'] is True and not row['r6_aborted'] and row['fp32_rescues'] == 0
+                    for row in x['records'] if row['status'] == 'genuine'), 'S6C_SHARED_STUDY_GATES')
+    rows = {row['id']: row for w in reports for row in w['records']}
+    ref = cfg['p9_reference']
+    aliases = cfg['s6c']['aliases']
+    require(list(ref['aliases']) == aliases and set(ref['probabilities']) == set(rows) == set(cfg['staged_ids']), 'P9_REFERENCE_COVERAGE')
+    worst, per_member = 0.0, [0.0] * len(aliases)
+    for sid, row in rows.items():
+        for k in range(len(aliases)):
+            d = max(abs(float(u) - float(v)) for u, v in zip(row['seed_probabilities'][k], ref['probabilities'][sid][k]))
+            per_member[k] = max(per_member[k], d)
+            worst = max(worst, d)
+    require(worst <= SHARED_PARITY, 'P9S_SEPARATE_PASS_PARITY')
+    separate = sum(1 for row in rows.values() if (row.get('render') or {}).get('separate_render'))
+    return {'studies': len(rows), 'separate_pass_max_abs': worst, 'separate_pass_max_abs_by_member': dict(zip(aliases, per_member)),
+            'separate_pass_tolerance': SHARED_PARITY, 'side_flipped_separate_renders': separate,
+            'reference_receipt_sha256': ref['receipt_sha256']}
+
+
+SHARED_PARITY = 1e-3             # per member, shared decode vs the separate s6c worker (the fresh-process tolerance)
 
 
 def finite_unit(p):

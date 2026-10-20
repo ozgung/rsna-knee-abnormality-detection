@@ -80,18 +80,25 @@ def r6_worker_config(cfg, board, pass_name, ids, folder, inject_uid, arm='r6'):
         c['r7_shared'] = {'mount': cfg['r7_mount'], 'manifest': cfg['r6flip_binding']['r7']['manifest'],
                           'cpu_pins': cfg['r6flip_binding']['r7']['cpu_pins'], 'deadline_epoch': cfg.get('deadline_epoch'),
                           'out': str(Path(folder).parent / ('board%d-r7-production' % board))}
+    if arm == 'r6' and R6F.own_shared(cfg.get('blend')):     # P9s: every pass (the sentinel passes give the members' repeat gates)
+        c['s6c_shared'] = {'block': cfg['s6c'], 'deadline_epoch': cfg.get('deadline_epoch'), 'measure_stride2': cfg['mode'] == 'rehearsal',
+                           'out': str(Path(folder).parent / ('board%d-s6c-%s' % (board, pass_name)))}
     return c
 
 
-def shared_r7_reports(out):
-    """P6s: the R7 receipts the shared R6 workers wrote next to their own (NO_RECEIPT when a board left none)."""
+def shared_reports(out, arm, pass_name='production'):
+    """P6s / P9s: the receipts the shared R6 workers wrote next to their own (NO_RECEIPT when a board left none)."""
     reports = []
     for board in range(2):
         try:
-            reports.append(json.loads((Path(out) / ('board%d-r7-production' % board) / 'r7' / 'receipt.json').read_bytes()))
+            reports.append(json.loads((Path(out) / ('board%d-%s-%s' % (board, arm, pass_name)) / arm / 'receipt.json').read_bytes()))
         except (OSError, ValueError):
             reports.append({'status': 'NO_RECEIPT'})
     return reports
+
+
+def shared_r7_reports(out):
+    return shared_reports(out, 'r7')
 
 
 NAFULL_ENTRY_MODULE = 'knee.public_nafull_aprime_entry'
@@ -438,6 +445,7 @@ def run(root, cfg, out, *, started, started_epoch=None):
     compact_names = R6F.compact_arm_names(blend)
     compact = cfg.get('s6c')            # P7-prime: our S6 seed ensemble in the compact slot instead of the R6 bundle; P9: next to R6
     own = R6F.own_compact_arm(blend)
+    own_sh = R6F.own_shared(blend)       # P9s: the members inside the R6 worker, no own stage
     compact_arm = 'r6' if compact is None or own else S6C_ARM
     started_epoch = time.time() - (time.monotonic() - started) if started_epoch is None else started_epoch
     deadline = started + R6F.DEADLINE_SECONDS - STAGE_RESERVE_SECONDS
@@ -450,7 +458,8 @@ def run(root, cfg, out, *, started, started_epoch=None):
         require(cfg['mode'] in ('rehearsal', 'entry'), 'MODE')
         shared = R6F.compact_shared(blend)
         require(rehearsal or not any(k in cfg for k in ('probes', 'probe_order', 'old_sentinels', 's6_sentinels', 'r7_reference',
-                                                         'p6_reference')), 'PURE_ENTRY_CFG')
+                                                         'p6_reference', 'p9_reference')), 'PURE_ENTRY_CFG')
+        require(not rehearsal or own_sh == ('p9_reference' in cfg), 'P9S_REFERENCE_MATCHES_BLEND')
         require(('r7' in compact_names) == ('r7' in binding) and (not rehearsal or ('r7' in compact_names) == ('r7_reference' in cfg))
                 and (not rehearsal or shared == ('p6_reference' in cfg)), 'R7_STAGE_CONFIG_MATCHES_BLEND')
         require('raptor_arms' not in cfg, 'RAPTOR_ARMS_ONLY_VIA_SEALED_BLEND')
@@ -508,10 +517,14 @@ def run(root, cfg, out, *, started, started_epoch=None):
                 rep, phase = launch_guarded(cfg, out, compact_arm, deadline, pass_name=name, ids_by_board=[sentinels, sentinels],
                                             inject_uid=sentinels[0] if name == 'sentinel1' and compact_arm == 'r6' else None)
                 workers['r6_sentinels'][name], phases['r6_' + name] = rep, phase
+                if own_sh:
+                    workers.setdefault('s6c_sentinels', {})[name] = shared_reports(out, S6C_ARM, name)
                 save(out / 'receipt.json', r)
         workers['r6'], phases['r6'] = stage_run('r6', compact_arm, pass_name='production', ids_by_board=cfg['assignment'])
         if shared:                       # P6s: R7 was scored inside the R6 stage on the same windows
             workers['r7'] = shared_r7_reports(out)
+        if own_sh:                       # P9s: the members were scored inside the R6 stage from the same decode
+            workers['s6c'] = shared_reports(out, S6C_ARM)
         save(out / 'receipt.json', r)
         if 'nafull' in arm_names:        # last, after r6: at the T0+8.3 h guard it is the arm cut (0.1 of the blend), not R6 (0.5); entry: a failed or missing na-full only costs its rank
             try:
@@ -541,7 +554,7 @@ def run(root, cfg, out, *, started, started_epoch=None):
                                 'peaks': {'host_rss_bytes': 0, 'output_disk_bytes': 0},
                                 'minimum_disk_free_bytes': shutil.disk_usage(out).free}
             save(out / 'receipt.json', r)
-        if own:                          # P9: our members last of all; at the guard they are cut and those studies keep rank(R6 plain)
+        if own and not own_sh:           # P9: our members last of all; at the guard they are cut and those studies keep rank(R6 plain)
             try:
                 if rehearsal:
                     workers['s6c_sentinels'] = {}
@@ -938,15 +951,20 @@ def require_rehearsal(r, cfg, out, csv_path):
     nafull = require_nafull(r, cfg, old_rows) if 'nafull' in arm_names else None
     compact = cfg.get('s6c')
     own = R6F.own_compact_arm(blend)
+    own_sh = R6F.own_shared(blend)
     r6 = require_r6(r, cfg) if compact is None or own else _s6c().require_compact(r, cfg)
-    s6c = _s6c().require_compact(r, cfg, key='s6c') if own else None      # P9: the own stage's gates under its own worker key
+    s6c = None
+    if own:                              # P9: the own stage's gates under its own worker key; P9s adds the shared-decode parity gates
+        s6c = _s6c().require_compact(r, cfg, key='s6c', injected=('sentinel1', cfg['s6_sentinels'][0]) if own_sh else None)
+        if own_sh:
+            s6c['shared'] = _s6c().require_shared(r, cfg)
     shared = R6F.compact_shared(blend)
     r7 = None if 'r7' not in compact_names else require_r7_shared(r, cfg, r6['anatomy_state']) if shared else \
         require_r7(r, cfg, r6['anatomy_state'])
     phases = r.get('phases') or {}
     require(set(phases) == {'old', *[a for a in ('crop224', 'nafull') if a in arm_names], 'r6_sentinel1', 'r6_sentinel2', 'r6',
                             *[a for a in ('r7',) if a in compact_names and not shared],
-                            *(['s6c_sentinel1', 's6c_sentinel2', 's6c'] if own else [])}
+                            *(['s6c_sentinel1', 's6c_sentinel2', 's6c'] if own and not own_sh else [])}
             and all(p['wall_seconds'] > 0 and p['peaks']['host_rss_bytes'] > 0 and p['peaks']['output_disk_bytes'] > 0
                     and p['minimum_disk_free_bytes'] > 0 for p in phases.values()), 'MEASURED_PHASE_RESOURCES')
     require(r.get('resources') == resources(phases, r['workers']), 'REPLAY_RESOURCES')

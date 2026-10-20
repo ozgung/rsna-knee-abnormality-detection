@@ -337,6 +337,11 @@ class P9PacketTests(unittest.TestCase):
 
     def test_member_list_is_sealed_per_variant(self):
         self.assertEqual([m['sha256'][:8] for m in self.B.s6c_models('p7')], ['03da2cac', '6a13f52e', 'a99ad897'])    # P7 unchanged
+        self.assertEqual(R6F.COMPACT_VARIANTS['p10'], 's6c')                                                            # all-ours: P7's machinery
+        with self.assertRaises(ValueError) as cm:
+            self.B.packet('rehearsal', variant='p10')                                                                    # unsealed member list
+        self.assertEqual(str(cm.exception), 'S6C_MODELS_NOT_SEALED')
+        self.assertEqual(self.B.slug_for('p10', 'entry'), 'r6flip-p10-entry-20261021')
         self.assertEqual(self.B.s6c_models('p9r'), self.B.s6c_models('p9'))
         with mock.patch.object(self.B, 'S6C_MODELS_P9', None):
             with self.assertRaises(ValueError):

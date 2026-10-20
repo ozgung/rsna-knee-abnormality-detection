@@ -317,8 +317,18 @@ VARIANTS = {
            'compact_arms': [['r6', .5], ['s6c', .5]], 'compact_flip': False},
     'p9r': {'raptor_arms': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]], 'weights': dict(RAPTOR_WEIGHTS),
             'default_weight': DEFAULT_RAPTOR_WEIGHT, 'compact_arms': [['r6', .5], ['s6c', .5]], 'compact_flip': False},
+    # P9s: P9's arithmetic with one decode per study -- the members rendered at 320 px from R6's native cache and scored inside the
+    # R6 plain worker (knee.public_s6c_shared); no separate own stage. p9sr adds R224.
+    'p9s': {'raptor_arms': [['old320', 1.0]], 'weights': dict(RAPTOR_WEIGHTS), 'default_weight': DEFAULT_RAPTOR_WEIGHT,
+            'compact_arms': [['r6', .5], ['s6c', .5]], 'compact_flip': False, 'own_shared': True},
+    'p9sr': {'raptor_arms': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]], 'weights': dict(RAPTOR_WEIGHTS),
+             'default_weight': DEFAULT_RAPTOR_WEIGHT, 'compact_arms': [['r6', .5], ['s6c', .5]], 'compact_flip': False, 'own_shared': True},
+    # P10 (all-ours compact, prepared on the parent's request 2026-10-20): P7's machinery with a larger own member set, sealed
+    # when the exports exist; no heliosli bundle, no flip TTA (the members have no mirror augmentation).
+    'p10': {'raptor_arms': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]], 'weights': dict(RAPTOR_WEIGHTS),
+            'default_weight': DEFAULT_RAPTOR_WEIGHT},
 }
-COMPACT_VARIANTS = {'p7': 's6c'}     # variants whose compact ('r6') slot is not the heliosli R6 bundle
+COMPACT_VARIANTS = {'p7': 's6c', 'p10': 's6c'}     # variants whose compact ('r6') slot is not the heliosli R6 bundle
 PRECISION = {'old320': 'float64', 'r6': '%.9g', 'crop224': 'float32 CSV', 'nafull': 'float64', 'r7': '%.9g', 's6c': '%.9g'}
 BLEND_KEYS = {'raptor_arms', 'weights', 'default_weight'}
 COMPACT_KEYS = {'compact_arms', 'compact_flip'}
@@ -328,7 +338,8 @@ def resolve_blend(blend=None):
     """(raptor arms, per-finding weights, default weight) from the sealed cfg['blend']; None is the frozen default."""
     if blend is None:
         return RAPTOR_ARMS, dict(RAPTOR_WEIGHTS), DEFAULT_RAPTOR_WEIGHT
-    require(set(blend) in (BLEND_KEYS, BLEND_KEYS | COMPACT_KEYS, BLEND_KEYS | COMPACT_KEYS | {'compact_shared'}), 'BLEND_SCHEMA')
+    require(set(blend) in (BLEND_KEYS, BLEND_KEYS | COMPACT_KEYS, BLEND_KEYS | COMPACT_KEYS | {'compact_shared'},
+                           BLEND_KEYS | COMPACT_KEYS | {'own_shared'}), 'BLEND_SCHEMA')
     arms = tuple((str(a), float(w)) for a, w in blend['raptor_arms'])
     names = [a for a, _ in arms]
     require(names and 'old320' in names and names == [x for x in BLEND_ARM_NAMES if x in names], 'BLEND_ARM_ORDER')
@@ -369,6 +380,14 @@ def compact_shared(blend=None):
 def compact_arm_names(blend=None):
     """Compact arm names enabled by the sealed blend, in stage order (['r6'] unless a variant seals more)."""
     return [a for a, _ in resolve_compact(blend)[0]]
+
+
+def own_shared(blend=None):
+    """P9s: the own members scored inside the R6 plain worker from one decode (no separate s6c stage)."""
+    if blend is None or not blend.get('own_shared'):
+        return False
+    require(blend['own_shared'] is True and own_compact_arm(blend), 'OWN_SHARED_NEEDS_OWN_COMPACT_ARM')
+    return True
 
 
 def own_compact_arm(blend=None):

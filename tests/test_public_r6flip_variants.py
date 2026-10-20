@@ -46,7 +46,7 @@ V2_COLUMNS = ['Lateral OA', 'PF OA', 'Synovitis', "Baker's"]
 
 class VariantTableTests(unittest.TestCase):
     def test_variants_match_the_spec(self):
-        self.assertEqual(sorted(R6F.VARIANTS), ['p3', 'p4', 'p5', 'p6', 'p6p', 'p6s', 'p6sp', 'p7', 'p9', 'p9r'])   # p6*: test_public_r6flip_p6; p9*: test_public_r6flip_p9
+        self.assertEqual(sorted(R6F.VARIANTS), ['p10', 'p3', 'p4', 'p5', 'p6', 'p6p', 'p6s', 'p6sp', 'p7', 'p9', 'p9r', 'p9s', 'p9sr'])   # p6*/p9*/p10: own test modules
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p7'])[0], R6F.RAPTOR_ARMS)        # P2's Raptor half, compact = S6 seeds
         self.assertEqual(R6F.raptor_weight_vector(blend=R6F.VARIANTS['p7']), R6F.raptor_weight_vector())
         self.assertEqual(R6F.COMPACT_VARIANTS, {'p7': 's6c'})
@@ -410,7 +410,8 @@ class VariantPacketTests(unittest.TestCase):
         from scripts import build_r6flip_entry as B
         cls.B = B
         cls.default = B.packet('rehearsal')
-        cls.packs = {v: B.packet('rehearsal', variant=v) for v in R6F.VARIANTS if v not in R6F.COMPACT_VARIANTS}   # p7: test_public_s6c
+        cls.packs = {v: B.packet('rehearsal', variant=v) for v in R6F.VARIANTS if v not in R6F.COMPACT_VARIANTS
+                     and not (R6F.own_shared(R6F.VARIANTS[v]) and B.P9_REHEARSAL_RECEIPT_SHA is None)}   # p7: test_public_s6c; p9s: needs its reference
 
     def test_default_build_has_no_variant_artifacts(self):
         cfg = self.default['cfg']
