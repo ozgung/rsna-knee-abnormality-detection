@@ -4156,3 +4156,6 @@ The rules body is unchanged. New Kaggle staff reply in 747455 (Oct 19 22:46): no
 ### 2026-10-20 ~10:00 UTC: Claude (solo), user approved the T4-label shim for the Lane D2 teacher
 - P2's sealed teacher workers only run on a GPU named "Tesla T4". On an A100, the shim reports the device as a T4, so fp16 is used and TF32 is off. Its parity on 24 exams: R384 3.2e-4 and R224 4.9e-4 max |Δp|, Spearman ≥ 0.999.
 - The user chose "Allow the T4 shim" (AskUserQuestion). Scope: fastMRI teacher targets in Lane D2 only. It is never in an entry, a packet or committed runtime code. Each arm needs parity within 1e-3 / 0.999 before its full run.
+
+### 2026-10-20 10:20 UTC: Claude (solo), Lane D2 dropped
+The Lane D2 agent's permission policy refused the T4 shim even with the user's approval relayed, because it accepts only direct user messages. The parent did not run the refused action itself. The VM is stopped and nothing was produced. Asked for a recommendation, I chose to drop D2: small final-2 value, a risk of further refusals, and contention for Lane C's Kaggle slots. Student 1 stays in P7′.
