@@ -37,10 +37,20 @@ def arm_rows(dirs, arm):
     for d in dirs:
         for b in (0, 1):
             p = Path(d) / "r6flip" / (folder % b) / sub / "predictions.npz"
-            if not p.exists():
+            c = Path(d) / "r6flip" / (folder % b) / "r6" / "compact" / "predictions.csv"
+            if p.exists():
+                z = np.load(p, allow_pickle=False)
+                rows = zip(z["study_ids"], z["probabilities"], z["statuses"])
+            elif arm == "r6" and c.exists():      # P2's own entry salvage: compact_infer's flushed CSV rows are genuine
+                rr = [r for r in csv.reader(open(c, newline=""))]
+                assert rr[0] == ["StudyInstanceUID"] + LABELS
+                rows = [(r[0], np.array([float(x) for x in r[1:]]), "genuine") for r in rr[1:] if len(r) == 13]
+            else:
                 continue
-            z = np.load(p, allow_pickle=False)
-            for u, pr, st in zip(z["study_ids"], z["probabilities"], z["statuses"]):
+            for u, pr, st in rows:
+                pr = np.asarray(pr, dtype=np.float64)
+                if not ((pr >= 0) & (pr <= 1)).all():
+                    continue
                 if str(st) == "genuine" and np.isfinite(pr).all():
                     assert str(u) not in out, "duplicate teacher row"
                     out[str(u)] = pr.astype(np.float64)
@@ -51,9 +61,14 @@ def main(base, out, *dirs):
     arms = {a: arm_rows(dirs, a) for a in ARMS}
     ids = sorted(set.intersection(*[set(v) for v in arms.values()]))
     rec = {"teacher_rows_genuine": {a: len(v) for a, v in arms.items()}, "fm_rows_all_three": len(ids)}
-    T = np.stack([W * (0.65 * arms["old"][u] + 0.35 * arms["crop224"][u]) + (1 - W) * arms["r6"][u] for u in ids])
-    assert np.isfinite(T).all() and (T >= 0).all() and (T <= 1).all()
-    rec["fm_target_mean"] = dict(zip(LABELS, np.round(T.mean(0), 4).tolist()))
+    from scipy.stats import rankdata
+
+    def pct(a):                                   # average percentile rank in (0, 1], per finding
+        return np.stack([rankdata(a[:, j]) / len(a) for j in range(a.shape[1])], 1)
+    A = {a: np.stack([arms[a][u] for u in ids]) for a in ARMS}
+    rec["arm_prob_mean"] = {a: dict(zip(LABELS, np.round(A[a].mean(0), 4).tolist())) for a in ARMS}
+    S = W * (0.65 * pct(A["old"]) + 0.35 * pct(A["crop224"])) + (1 - W) * pct(A["r6"])
+    R = pct(S)
     rows = list(csv.DictReader(open(base, encoding="utf-8")))
     cols = list(rows[0].keys())
     assert cols[:4] == ["StudyInstanceUID", "is_gold", "review_holdout", "fold"]
@@ -61,6 +76,10 @@ def main(base, out, *dirs):
     assert not (base_ids & set(ids)), "fastMRI IDs collide with competition IDs"
     pool = [r for r in rows if r["is_gold"] == "0" and r["review_holdout"] == "0"]
     pm = np.array([[float(r[L + "|prior"]) for L in LABELS] for r in pool])
+    T = np.stack([np.quantile(pm[:, j], np.clip(R[:, j] - 0.5 / len(R), 0, 1)) for j in range(12)], 1)
+    assert np.isfinite(T).all() and (T >= 0).all() and (T <= 1).all()
+    rec["calibration"] = "P2 rank blend over fastMRI exams, quantile-mapped onto the competition pool target marginal"
+    rec["fm_target_mean"] = dict(zip(LABELS, np.round(T.mean(0), 4).tolist()))
     rec["competition_pool_rows"] = len(pool)
     rec["competition_target_mean"] = dict(zip(LABELS, np.round(pm.mean(0), 4).tolist()))
     f = len(ids) / (len(ids) + len(pool))
