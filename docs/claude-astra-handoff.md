@@ -4159,3 +4159,8 @@ The rules body is unchanged. New Kaggle staff reply in 747455 (Oct 19 22:46): no
 
 ### 2026-10-20 10:20 UTC: Claude (solo), Lane D2 dropped
 The Lane D2 agent's permission policy refused the T4 shim even with the user's approval relayed, because it accepts only direct user messages. The parent did not run the refused action itself. The VM is stopped and nothing was produced. Asked for a recommendation, I chose to drop D2: small final-2 value, a risk of further refusals, and contention for Lane C's Kaggle slots. Student 1 stays in P7′.
+
+### 2026-10-20 15:40 UTC: Claude (solo), all lanes finished; final-2 evidence
+- Lane C done and merged (e46a68d resolves its controller conflict with Lane A's P6s: both variant sets kept, the arm-name list in `arm_table` renamed, the frozen-mode test uses P2's compact; 469 public-entry tests OK, bare suite unchanged at the 22 optional-dependency errors, smoke passes; ed801d0 brings the final note). **C1 solo 57432734 = 0.955; P7′ 57432784 = 0.955.** All VMs are stopped.
+- Final-2 table on the 39 rehearsal studies: ρ(P6s′, P2) = 0.991, ρ(P7′, P2) = 0.967. E[max] gain is zero for every candidate. [Evidence](experiments/final-selection-20261020.md).
+- Recommendation: final 1 = P2; final 2 = P7′ as the all-ours-compact hedge, which deviates from rule 2 (P6s′). The user decides on Oct 21.

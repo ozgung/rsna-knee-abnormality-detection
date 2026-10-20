@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-20 10:20 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
+Updated **2026-10-20 15:40 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
 
 ## Current snapshot
 
@@ -31,7 +31,7 @@ Updated **2026-10-20 10:20 UTC** (Claude, solo; Codex unavailable until Oct 22).
 |---|---|---|---|
 | A: P6 dual-compact | merged 14f85a6 | Kaggle GPU | **P6s′ SUBMITTED as 57414571** (Oct 20 00:17). Shared decode, no R224. Point 25,507 s (P6s with R224 was 27,183 s); visible PASS, fallback 0. Studies the guard cuts from R7 take R6 plain. **Public 0.957**: under the rule it does not replace P2; it is the final-2 candidate (ρ to P2 is 0.994, so little diversity). Lane finished. Gate: point ≤ 26,000 s (else P6s′ without R224 if ≤ 29,000 s); no submission after Oct 21 18:00. Earlier: STOPPED at the kill rule. Rehearsal point 32,085 s (P6′ replay 29,832 s), above the 26,000 s limit. Spearman of P6 vs P2 is 0.994, so there is little diversity. No entry and no slot used. [Note](docs/experiments/lane-a-p6-20261019.md) |
 | B: R6/R7 out-of-fold columns | merged e483f37 | Colab #1, VM stopped 22:09 | **DONE.** Fold mapping confirmed (8/8). On 4,349 out-of-fold studies, dual − R6 flip = +0.0029 [+0.0019, +0.0039] (single-model columns; gold-58 4-model: −0.0022 [−0.0068, +0.0028]). Labels v3 READY (gold-58 0.9254 vs v2 0.9202, exposed). Colab rate 5.3 units per A100-h. [Note](docs/experiments/lane-b-oof-20261019.md) |
-| C: S6 seeds → solo → P7′ (compact = v3-s42 + v3-s43 + student, amended 08:40) | `.claude/worktrees/lanec-20261019` | Colab #2, `sessions-lanec-20261019.json`; Kaggle | seeds 43/44 on labels v2 now, then v3 or seed 45; P7′ all-ours compact submitted by Oct 21 18:00 |
+| C: S6 seeds → solo → P7′ | merged ed801d0; VMs stopped | Colab #2 + Kaggle | **DONE.** v3-s42 (gold 0.9283) and v3-s43 (gold 0.9380) exported privately; P7′ compact = mean rank of {v3-s42, v3-s43, fastMRI student}. **C1 solo 57432734 = 0.955; P7′ 57432784 = 0.955.** [Note](docs/experiments/lane-c-seeds-20261019.md) |
 | D: fastMRI noisy student | merged 8f21dca; VM stopped 06:33 | Colab #3 + Kaggle | **DONE.** All gates passed; 745 fastMRI exams got P2-teacher rank-mapped targets. Student = S6 on labels v3 + fastMRI, private dataset `ozgung/knee-laned-fmall-s42-20261020`. Gold-58 0.9350 (exposed). **Solo 57426580 = 0.954** (S6 solos 0.950). Added to P7′'s compact by a parent amendment (08:40). **D2 DROPPED (10:20):** the agent's policy refused the T4-label shim even after the user approved it, and refused a direct fp16 compact_infer call too. VM laned2 stopped 09:20 (about 0.7 A100-h); no artifacts. Recommendation adopted: keep student 1 only, protect P7′'s Kaggle slots. [Note](docs/experiments/lane-d-fastmri-20261019.md) |
 | E: local (parent) | main checkout | Mac | Oct 20 provenance recheck **DONE, not adverse** ([note](docs/research/provenance-refresh-20261020.md)); cross-entry Spearman / E[max] calculator; integration of lane branches |
 
@@ -40,11 +40,11 @@ Lanes write large outputs to `outputs/lane{a,b,c,d}-20261019/` and commit only i
 ## Selection rule (fixed in the plan, §4)
 
 - **Final 1:** P2, unless a challenger displays ≥ 0.958, passed every gate except the projection with zero visible fallback, and wins Lane B's out-of-fold comparison (Δ ≥ +0.0003, CI excluding 0).
-- **Final 2:** P6 if it displays ≥ 0.957, else P7′ if ≥ 0.957, else A′-w.
+- **Final 2:** P6 if it displays ≥ 0.957, else P7′ if ≥ 0.957, else A′-w. Rule 2 gives P6s′; the parent recommends P7′ instead as the only all-ours-compact hedge at the same zero E[max] cost ([evidence](docs/experiments/final-selection-20261020.md)). **User decision pending (Oct 21).**
 - **Provenance override (Oct 20 recheck):** if the recheck turns adverse, final 2 becomes P7′, or 57037296 if OAI is also ruled out.
 
 ## Verification and invariants
 
 The last parent checks covered dependency-free unit tests and smoke at the R6F integration (Oct 18). Lane branches report their own tests, and the parent reruns them on merge. Keep patient/study grouping limits explicit, gold-58 exposure logged, image-only inference, deadline guard plus salvage-before-constant on every entry, and never use `kaggle kernels push --timeout`.
 
-**Next (parent):** integrate lane reports as they arrive; run the Oct 20 provenance recheck; recompute E[max] with measured ρ before the Oct 21 selection.
+**Next (parent):** user decides final 2 on Oct 21 (P6s′ by rule, P7′ as the hedge); then set the two final-selection checkboxes and record it here. No lane is running; all VMs are stopped. Slots used today: 4 of 5.
