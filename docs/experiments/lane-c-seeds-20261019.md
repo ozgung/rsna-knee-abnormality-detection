@@ -28,10 +28,10 @@ Owner: Claude (lane C agent). Plan: [final-push plan §2 Lane C](../research/fin
 |---|---|---|---|---|---|---|---|---|---|
 | v2-s43 (lost) | v2 | 43 | lanec1 | 2026-10-19 19:21 | 0.5083 (1,563 s) | — (VM lost after epoch 1) | | | |
 | v2-s44 (lost) | v2 | 44 | lanec1 | 2026-10-19 19:22 | 0.5105 (1,661 s) | — (VM lost after epoch 1) | | | |
-| v2-s43 | v2 | 43 | lanec2 | ≈ 2026-10-19 23:05 | 0.5083 (1,561 s) | paused after epoch 1 (resumable) | | | |
-| v2-s44 | v2 | 44 | lanec2 | ≈ 2026-10-19 23:07 | 0.5112 (1,659 s) | paused after epoch 1 (resumable) | | | |
-| v3-s42 | v3 | 42 | lanec2 | ≈ 2026-10-20 00:10 | | | | | |
-| v3-s43 | v3 | 43 | lanec2 | ≈ 2026-10-20 00:12 | | | | | |
+| v2-s43 | v2 | 43 | lanec2 | 2026-10-19 23:05 | 0.5083 (1,561 s) | stopped at epoch 3 (0.4248); not needed after amendment 1 | | | |
+| v2-s44 | v2 | 44 | lanec2 | 2026-10-19 23:07 | 0.5112 (1,659 s) | stopped at epoch 3 (0.4279); not needed after amendment 1 | | | |
+| v3-s42 | v3 | 42 | lanec2 | 2026-10-19 23:57 | 0.5185 (1,560 s) | 0.3713 (epoch 15, 25,761 s) | 7.2 h | 0.9283 | Model `knee-s6-lanec-seeds-20261019/pyTorch/v3-s42/1`, 03da2cac… |
+| v3-s43 | v3 | 43 | lanec2 | 2026-10-19 23:59 | 0.5157 (1,662 s) | 0.3722 (epoch 15, 25,762 s) | 7.2 h | 0.9380 | Model `knee-s6-lanec-seeds-20261019/pyTorch/v3-s43/1`, a99ad897… |
 
 ## Recovery
 
@@ -104,3 +104,19 @@ Owner: Claude (lane C agent). Plan: [final-push plan §2 Lane C](../research/fin
 - **Reason:** a new model arrived after the pre-registration; the parent decided before any lane C v3 read-out reached it.
 - Every other rule unchanged: chosen-set gold-58 < 0.925 kills P7′; rehearsal point ≤ 27,000 s; 8.3 h guard; salvage;
   visible PASS; then submit.
+
+## Read-outs and packets (Oct 20)
+
+- Gold-58, read once per artifact, **exposed** (compact_infer stride 1, bf16 A100, 58/58, 0 fallback; one decode for both v3
+  seeds; scorer reproduces nartaa S6fall 0.9314): v3-s42 0.9283, v3-s43 **0.9380**, v3 pair mean logit 0.9365; reference
+  V2-all s42 0.9341; Lane D student 0.9350 (its own read-out). **P7′ set (amendment 1) mean rank 0.9357 ≥ 0.925 → no kill.**
+- Local acceptance of both v3 exports (`scripts/build_s6_solo_seed.py accept`): SHA256SUMS, run_config (seed, 16 epochs,
+  pool 4,345, targets_V3_all), membership (train dbd83070… = V2-all's pool, gold 58, holdout 0, overlap 0); strict CPU
+  state/constructor/repeat check PASS (362 tensors, repeat and masked-perturbation Δ 0). State fingerprints:
+  v3-s42 3048aae6…, v3-s43 aa2decf3…. v3-s43 was fetched from the VM because the Models download API returned 404 for it;
+  a CPU mount probe kernel confirmed all three P7′ members mount in Kaggle with the expected sha256s.
+- C1 = v3-s43 (highest gold-58 in the chosen family, exposed choice): rehearsal `s6solo-v3s43-qual-20261020` (payload
+  ee6addb1…) pushed 08:39.
+- P7′ rehearsal `r6flip-p7-rehearsal-20261018` (payload 296f10d7…; members aliased E_prior_s42_f0 = v3-s42,
+  E_prior_s42_f1 = student, E_prior_s43_f0 = v3-s43; A100 fp16 probe reference d41d7952…) pushed after C1.
+- lanec2 stopped 08:42 (`colab sessions` no longer lists it). A100 time: lanec1 2.2 h, lanec2 10.6 h.
