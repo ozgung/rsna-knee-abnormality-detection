@@ -120,3 +120,8 @@ Owner: Claude (lane C agent). Plan: [final-push plan §2 Lane C](../research/fin
 - P7′ rehearsal `r6flip-p7-rehearsal-20261018` (payload 296f10d7…; members aliased E_prior_s42_f0 = v3-s42,
   E_prior_s42_f1 = student, E_prior_s43_f0 = v3-s43; A100 fp16 probe reference d41d7952…) pushed after C1.
 - lanec2 stopped 08:42 (`colab sessions` no longer lists it). A100 time: lanec1 2.2 h, lanec2 10.6 h.
+- C1 rehearsal v1 (Model mount) failed at fixture build: the solo fixture links `input/<mount>` one level deep and cannot
+  link the nested Models path. Fix without touching the shared solo sources: a private dataset copy of the v3-s43 export
+  (`ozgung/knee-s6-v3all-s43-20261020` v1, same five files, quota freed by Lane D). **C1 rehearsal v2 PASS** (09:09–09:36,
+  every check true incl. qualified state/reload, cross-board sentinels, all 39 genuine; elapsed 585 s; conservative
+  projection 10,531 s). Entry `s6solo-v3s43-entry-20261020` built from that verified result; visible run → submit chain started.
