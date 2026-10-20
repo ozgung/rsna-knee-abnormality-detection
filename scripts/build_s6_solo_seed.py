@@ -27,9 +27,14 @@ SEED_SOURCES = ('run_config.json', 'SHA256SUMS', 'membership_E_prior_s%d_f0.json
 _ORIGINAL_ARMS, _ORIGINAL_METADATA = B.arms, B.metadata
 
 
+SOURCE = {'kind': 'model'}       # 'dataset': the solo fixture links input/<mount> one level deep, so a C1 packet uses a dataset copy
+
+
 def names(tag, seed):
     ck = 'E_prior_s%d_%sall.pt' % (seed, tag)
-    return {'dir': LANE / ('%s-s%d' % (tag, seed)), 'dataset': 'ozgung/knee-s6-lanec-seeds-20261019/pyTorch/%s-s%d' % (tag, seed),
+    ref = ('ozgung/knee-s6-%sall-s%d-20261020' % (tag, seed) if SOURCE['kind'] == 'dataset'
+           else 'ozgung/knee-s6-lanec-seeds-20261019/pyTorch/%s-s%d' % (tag, seed))
+    return {'dir': LANE / ('%s-s%d' % (tag, seed)), 'dataset': ref,
             'checkpoint': ck,
             'alias': 'E_prior_s%d_f0.pt' % seed, 'membership': 'membership_E_prior_s%d_f0.json' % seed,
             'rehearsal_slug': 's6solo-%ss%d-qual-20261020' % (tag, seed), 'entry_slug': 's6solo-%ss%d-entry-20261020' % (tag, seed)}
@@ -114,7 +119,8 @@ def seed_arm(tag, seed):
             'b_model': {'file': desc['runtime_alias'], 'source_file': desc['checkpoint_filename'], 'sha256': desc['checkpoint_sha256'],
                         'bytes': desc['checkpoint_size'], 'arm': 'E_prior', 'dataset': desc['dataset_slug'],
                         'dataset_version': desc['dataset_version'], 'descriptor_dataset_version': desc['dataset_version'],
-                        'mount': 'models/ozgung/knee-s6-lanec-seeds-20261019/pytorch/%s-s%d/%d' % (tag, seed, desc['dataset_version'])},
+                        'mount': (desc['dataset_slug'].split('/')[1] if len(desc['dataset_slug'].split('/')) == 2 else
+                                  'models/ozgung/knee-s6-lanec-seeds-20261019/pytorch/%s-s%d/%d' % (tag, seed, desc['dataset_version']))},
             'receipts': dict(acc['receipts']), 'json_expect': {'run_config.json': acc['run_config_expect'], n['membership']: acc['membership_expect']},
             'text_expect': {'SHA256SUMS': line},
             'cpu': {'receipt_sha256': acc['cpu_receipt_sha256'], 'state_sha256': ck['state_sha256'],
@@ -133,7 +139,9 @@ def install(tag, seed):
 
     def metadata(slug, variant):
         meta = _ORIGINAL_METADATA(slug, 'control')
-        if variant == 'v2':
+        if variant == 'v2' and SOURCE['kind'] == 'dataset':
+            meta['dataset_sources'] = meta['dataset_sources'] + ['%s/%d' % (n['dataset'], version)]
+        elif variant == 'v2':
             meta['model_sources'] = ['%s/%d' % (n['dataset'], version)]
         return meta
     B.metadata = metadata
@@ -149,8 +157,10 @@ def main(argv=None):
     p.add_argument('--seed', type=int, required=True)
     p.add_argument('--python', default=sys.executable, help='interpreter with torch/timm for the CPU check')
     p.add_argument('--rehearsal-result')
-    p.add_argument('--version', type=int, default=1, help='Kaggle Model variation version of the export')
+    p.add_argument('--version', type=int, default=1, help='Kaggle Model variation / dataset version of the export')
+    p.add_argument('--source', choices=['model', 'dataset'], default='model')
     a = p.parse_args(argv)
+    SOURCE['kind'] = a.source
     if a.command == 'accept':
         print(json.dumps({k: v for k, v in accept(a.tag, a.seed, a.version, python=a.python).items() if k not in ('run_config_expect',)}, indent=1))
         return 0
