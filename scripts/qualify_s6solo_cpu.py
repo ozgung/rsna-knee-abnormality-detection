@@ -35,7 +35,7 @@ def require(condition, check):
         raise ValueError(check)
 
 
-def qualify(train, infer, control, v2):
+def qualify(train, infer, control, v2, v2_sha=V2_SHA, v2_bytes=200188027):
     import torch
     import timm
 
@@ -66,7 +66,7 @@ def qualify(train, infer, control, v2):
                    runtime_qualified=False, checkpoints={})
     for name, path, expected_hash, expected_size in (
         ("control", control, CONTROL_SHA256, 200185003),
-        ("v2", v2, V2_SHA, 200188027),
+        ("v2", v2, v2_sha, v2_bytes),        # Lane C seeds pass their own export identity
     ):
         path = Path(path)
         require((file_sha(path), path.stat().st_size) == (expected_hash, expected_size), "CHECKPOINT_BYTES_" + name)
@@ -110,8 +110,10 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     for field in ("train", "infer", "control", "v2", "out"):
         p.add_argument("--" + field, type=Path, required=True)
+    p.add_argument("--v2-sha", default=V2_SHA, help="expected SHA256 of --v2 (default: the accepted V2-all seed 42 export)")
+    p.add_argument("--v2-bytes", type=int, default=200188027)
     a = p.parse_args()
     require(not a.out.exists(), "FRESH_RECEIPT")
-    result = qualify(a.train, a.infer, a.control, a.v2)
+    result = qualify(a.train, a.infer, a.control, a.v2, a.v2_sha, a.v2_bytes)
     with a.out.open("x") as f:
         f.write(json.dumps(result, indent=2, sort_keys=True) + "\n")
