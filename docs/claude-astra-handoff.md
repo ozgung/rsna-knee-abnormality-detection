@@ -4190,3 +4190,6 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 
 ### 2026-10-20 23:20 UTC: Claude (solo), round 1 READY (four folds); mixing grid
 - Lane F wrote `oof_r1/READY.json` at 22:56: own 0.9201 vs R6 flip 0.9066 (+0.0135 [+0.0113, +0.0159]) on 4,345 pool studies; gold-58 four-fold mean 0.9394 vs 0.9368. Parent grid (own vs R6 flip rank mix): report truth favours w = 0.7–0.8 by +0.002 over ½ (biased toward own); gold-58 flat 0.5–0.8. Decision unchanged: P9 v2 at ½/½ (pre-registered), p10/p11 own-only compacts are supported. L4 told to build v4b now.
+
+### 2026-10-20 23:30 UTC: Claude (solo), labels v4b READY, round-2 fits started
+- L4 built v4b in under an hour from Lane F's columns: gold-58 0.9341 (v3 0.9254); proceed rule met. Lane F starts v4b seeds 42 and 43 (16 epochs) now; L4 takes seed 44 after its v3 seed 45. Fold-bundle exports and the averaging test run alongside.
