@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-19 22:30 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
+Updated **2026-10-20 00:25 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
 
 ## Current snapshot
 
@@ -29,7 +29,7 @@ Updated **2026-10-19 22:30 UTC** (Claude, solo; Codex unavailable until Oct 22).
 
 | Lane | Worktree / branch | Resource | Goal and deadline |
 |---|---|---|---|
-| A: P6 dual-compact | merged 0c49b21; reopened 22:30 | Kaggle GPU | **REOPENED as P6s (shared decode)** after Lane B's out-of-fold win. Gate: point ≤ 26,000 s (else P6s′ without R224 if ≤ 29,000 s); no submission after Oct 21 18:00. Earlier: STOPPED at the kill rule. Rehearsal point 32,085 s (P6′ replay 29,832 s), above the 26,000 s limit. Spearman of P6 vs P2 is 0.994, so there is little diversity. No entry and no slot used. [Note](docs/experiments/lane-a-p6-20261019.md) |
+| A: P6 dual-compact | merged 14f85a6 | Kaggle GPU | **P6s′ SUBMITTED as 57414571** (Oct 20 00:17). Shared decode, no R224. Point 25,507 s (P6s with R224 was 27,183 s); visible PASS, fallback 0. Studies the guard cuts from R7 take R6 plain. Score pending. Lane finished. Gate: point ≤ 26,000 s (else P6s′ without R224 if ≤ 29,000 s); no submission after Oct 21 18:00. Earlier: STOPPED at the kill rule. Rehearsal point 32,085 s (P6′ replay 29,832 s), above the 26,000 s limit. Spearman of P6 vs P2 is 0.994, so there is little diversity. No entry and no slot used. [Note](docs/experiments/lane-a-p6-20261019.md) |
 | B: R6/R7 out-of-fold columns | merged e483f37 | Colab #1, VM stopped 22:09 | **DONE.** Fold mapping confirmed (8/8). On 4,349 out-of-fold studies, dual − R6 flip = +0.0029 [+0.0019, +0.0039] (single-model columns; gold-58 4-model: −0.0022 [−0.0068, +0.0028]). Labels v3 READY (gold-58 0.9254 vs v2 0.9202, exposed). Colab rate 5.3 units per A100-h. [Note](docs/experiments/lane-b-oof-20261019.md) |
 | C: S6 seeds → solo → P7′ | `.claude/worktrees/lanec-20261019` | Colab #2, `sessions-lanec-20261019.json`; Kaggle | seeds 43/44 on labels v2 now, then v3 or seed 45; P7′ all-ours compact submitted by Oct 21 18:00 |
 | D: fastMRI noisy student | `.claude/worktrees/laned-20261019` | Colab #3, `sessions-laned-20261019.json` | go/no-go Oct 20 06:00; student export by Oct 21 20:00; P8 decision with the parent |

@@ -4134,3 +4134,12 @@ No public notebook or discussion claims 0.959; the 64 teams there have no publis
 ### 2026-10-19 22:30 UTC: Claude (solo), Lane B done; P6 reopened as shared-decode P6s
 - Lane B (merged e483f37): fold mapping confirmed in 8 of 8 folds. On 4,349 held-out studies, dual − R6 flip = **+0.0029 [+0.0019, +0.0039]**, with the dual winning in all folds, so the final-1 out-of-fold rule is met. The caveat is that these are single-model columns; on gold-58 with four models averaged, the difference is −0.0022 (wide CI). Labels v3 is READY, and Lane C picks it up. Colab burn is 5.3 units per A100-h; the balance was about 499 at 22:09.
 - P6 failed only on runtime, and decoding dominates that cost. Lane A is reopened to build **P6s**, which decodes each study once and feeds both R6 plain and R7 plain. Pre-registered gate: point ≤ 26,000 s (else P6s′ without R224 if ≤ 29,000 s). No submission after Oct 21 18:00.
+
+### 2026-10-20 00:25 UTC: Claude (solo), P6s′ submitted (57414571)
+- With shared decode, R6 plain and R7 plain run on windows rendered once: 592 s production against 374 + 375 s run separately.
+  - P6s point is 27,183 s, inside the 26,000–29,000 s band, so P6s′ (no R224) was built: point 25,507 s, conservative 34,840 s.
+  - Parity for the shared pass: R6 6.2e-4 and R7 3.1e-4 (tolerance 1e-3).
+- Entry `ozgung/r6flip-p6sp-entry-20261020` v1: visible PASS, `fallback_studies` 0, code identical. **Submitted as 57414571** at 00:17 UTC under the projection-only waiver.
+- Risk: at P2's hidden-to-projected ratio of about 1.17, the hidden run lands near the guard, so the last studies may take R6-plain compact ranks. Dropping R224 costs an estimated 0.0003–0.0005.
+- Merged as 14f85a6; R6F tests and smoke pass.
+- Selection: P6s′ challenges P2 for final 1 only if it displays ≥ 0.958 (it holds the out-of-fold win); otherwise it is the final-2 candidate if it displays ≥ 0.957.
