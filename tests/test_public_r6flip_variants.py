@@ -444,14 +444,16 @@ class VariantPacketTests(unittest.TestCase):
                     self.assertEqual(pack['cfg'][key], value, key)
             self.assertEqual(set(pack['cfg']) - set(self.default['cfg']),
                              {'blend', *(['nafull'] if nafull else []), *(['r7_reference'] if r7 else []), *(['s6c'] if s6c else []),
-                              *(['p6_reference'] if R6F.compact_shared(R6F.VARIANTS[variant]) else [])})
+                              *(['p6_reference'] if R6F.compact_shared(R6F.VARIANTS[variant]) else []),
+                              *(['p9_reference'] if R6F.own_shared(R6F.VARIANTS[variant]) else [])})
 
     def test_variant_slugs_metadata_and_blend_are_sealed(self):
         for variant, pack in self.packs.items():
             self.assertEqual(pack['cfg']['blend'], R6F.VARIANTS[variant])
             self.assertEqual(pack['cfg']['r6flip_binding']['raptor_weight_vector'], R6F.raptor_weight_vector(blend=R6F.VARIANTS[variant]))
             self.assertEqual(pack['cfg']['r6flip_binding']['entry_variant']['name'], variant)
-            date = {'p6': '20261019', 'p6p': '20261019', 'p6s': '20261020', 'p6sp': '20261020', 'p9': '20261020', 'p9r': '20261020'}.get(variant, '20261018')
+            date = {'p6': '20261019', 'p6p': '20261019', 'p6s': '20261020', 'p6sp': '20261020', 'p9': '20261020', 'p9r': '20261020',
+                    'p9s': '20261020', 'p9sr': '20261020', 'p10': '20261021'}.get(variant, '20261018')
             slug = self.B.slug_for(variant, 'rehearsal')
             self.assertEqual(slug, 'r6flip-%s-rehearsal-%s' % (variant, date))
             self.assertEqual(self.B.slug_for(variant, 'entry'), 'r6flip-%s-entry-%s' % (variant, date))
