@@ -28,13 +28,14 @@ _ORIGINAL_ARMS, _ORIGINAL_METADATA = B.arms, B.metadata
 
 
 SOURCE = {'kind': 'model'}       # 'dataset': the solo fixture links input/<mount> one level deep, so a C1 packet uses a dataset copy
+MODEL = {'slug': 'knee-s6-lanec-seeds-20261019', 'lane': LANE}   # lane F (Oct 20) passes --model-slug knee-s6-lanef-20261020 --lane-dir
 
 
 def names(tag, seed):
     ck = 'E_prior_s%d_%sall.pt' % (seed, tag)
     ref = ('ozgung/knee-s6-%sall-s%d-20261020' % (tag, seed) if SOURCE['kind'] == 'dataset'
-           else 'ozgung/knee-s6-lanec-seeds-20261019/pyTorch/%s-s%d' % (tag, seed))
-    return {'dir': LANE / ('%s-s%d' % (tag, seed)), 'dataset': ref,
+           else 'ozgung/%s/pyTorch/%s-s%d' % (MODEL['slug'], tag, seed))
+    return {'dir': MODEL['lane'] / ('%s-s%d' % (tag, seed)), 'dataset': ref,
             'checkpoint': ck,
             'alias': 'E_prior_s%d_f0.pt' % seed, 'membership': 'membership_E_prior_s%d_f0.json' % seed,
             'rehearsal_slug': 's6solo-%ss%d-qual-20261020' % (tag, seed), 'entry_slug': 's6solo-%ss%d-entry-20261020' % (tag, seed)}
@@ -58,9 +59,9 @@ def accept(tag, seed, version, python=sys.executable):
     for line in (d / 'SHA256SUMS').read_text().splitlines():
         sha, name = line.split(None, 1)
         sums[name.strip()] = sha
-    require(set(sums) == set(files) - {'SHA256SUMS'}, 'SEED_SHA256SUMS_COVERAGE')
+    require(set(files) - {'SHA256SUMS'} <= set(sums), 'SEED_SHA256SUMS_COVERAGE')     # lane F exports also list targets.csv
     for name, sha in sums.items():
-        require(file_sha(d / name) == sha, 'SEED_SHA256SUMS_' + name)
+        require((d / name).is_file() and file_sha(d / name) == sha, 'SEED_SHA256SUMS_' + name)
     rc = json.loads((d / 'run_config.json').read_text())
     want = {'arms': 'E_prior', 'backbone': 'convnext_small', 'crop': 288, 'slices': 3, 'phys_mm': 3.5, 'spatial_attn': True,
             'extent': False, 'state_spec': None, 'freeze_blocks': 16, 'epochs': 16, 'seed_base': seed, 'seeds': 1,
@@ -120,7 +121,7 @@ def seed_arm(tag, seed):
                         'bytes': desc['checkpoint_size'], 'arm': 'E_prior', 'dataset': desc['dataset_slug'],
                         'dataset_version': desc['dataset_version'], 'descriptor_dataset_version': desc['dataset_version'],
                         'mount': (desc['dataset_slug'].split('/')[1] if len(desc['dataset_slug'].split('/')) == 2 else
-                                  'models/ozgung/knee-s6-lanec-seeds-20261019/pytorch/%s-s%d/%d' % (tag, seed, desc['dataset_version']))},
+                                  'models/ozgung/%s/pytorch/%s-s%d/%d' % (MODEL['slug'], tag, seed, desc['dataset_version']))},
             'receipts': dict(acc['receipts']), 'json_expect': {'run_config.json': acc['run_config_expect'], n['membership']: acc['membership_expect']},
             'text_expect': {'SHA256SUMS': line},
             'cpu': {'receipt_sha256': acc['cpu_receipt_sha256'], 'state_sha256': ck['state_sha256'],
@@ -153,14 +154,19 @@ def install(tag, seed):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument('command', choices=['accept', 'rehearsal', 'verify', 'entry'])
-    p.add_argument('--tag', required=True, choices=['v2', 'v3'])
+    p.add_argument('--tag', required=True, choices=['v2', 'v3', 'v4b', 'v5'])
     p.add_argument('--seed', type=int, required=True)
     p.add_argument('--python', default=sys.executable, help='interpreter with torch/timm for the CPU check')
     p.add_argument('--rehearsal-result')
     p.add_argument('--version', type=int, default=1, help='Kaggle Model variation / dataset version of the export')
     p.add_argument('--source', choices=['model', 'dataset'], default='model')
+    p.add_argument('--model-slug', default=MODEL['slug'], help='Kaggle Model holding the export (lane C default; lane F: knee-s6-lanef-20261020)')
+    p.add_argument('--lane-dir', default=None, help='local analysis directory for the seed (default: lane C)')
     a = p.parse_args(argv)
     SOURCE['kind'] = a.source
+    MODEL['slug'] = a.model_slug
+    if a.lane_dir:
+        MODEL['lane'] = Path(a.lane_dir)
     if a.command == 'accept':
         print(json.dumps({k: v for k, v in accept(a.tag, a.seed, a.version, python=a.python).items() if k not in ('run_config_expect',)}, indent=1))
         return 0
