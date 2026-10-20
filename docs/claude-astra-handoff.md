@@ -4193,3 +4193,6 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 
 ### 2026-10-20 23:30 UTC: Claude (solo), labels v4b READY, round-2 fits started
 - L4 built v4b in under an hour from Lane F's columns: gold-58 0.9341 (v3 0.9254); proceed rule met. Lane F starts v4b seeds 42 and 43 (16 epochs) now; L4 takes seed 44 after its v3 seed 45. Fold-bundle exports and the averaging test run alongside.
+
+### 2026-10-20 23:50 UTC: Claude (solo), compositions sealed; P9 v2 chain started
+- Lane P9 reported its variants ready (p9s2 grid with w ∈ {0.5, 0.6, 0.7}, optional R224 and member stride 2; p10/p10p and p11 with mean-logit own compacts, up to 8 members; 146 tests OK). Parent sealed: P9 v2 = four members {v3-s43, student, v3-s44, v3-s42} at w 0.5, stride 1, no R224 (isolates the member effect against v1); P10 and P11 = {v3-s43, student, v4b-s42, v4b-s43, f0–f3}, sealed at 06:00 with fallbacks; evening variant pre-decided on P9 v1's display.
