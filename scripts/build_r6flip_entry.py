@@ -144,10 +144,26 @@ S6C_MODELS_P9 = [
      'dataset': 'ozgung/knee-laned-fmall-s42-20261020', 'dataset_version': 1},
     {'seed': 43, 'labels': 'v3', 'file': 'E_prior_s43_v3all.pt', 'sha256': 'a99ad89705f8297ac86659ce8e5a092cd626d851d7d51331c59f1b6920c69690',
      'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v3all-s43-20261020', 'dataset_version': 1}]
-# Member sets still to be sealed (parent, 2026-10-20 22:55; expected by about 03:00 UTC): an unsealed list refuses to build.
-# P9S2 = the second P9s member set (p9s2* grid); P10 = the all-ours set shared by every p10*/p11* variant ("same members").
-S6C_MODELS_P9S2 = None
+# P9S2 (parent, sealed 2026-10-20 23:45 UTC): P9 v2 = p9s2, w 0.5, stride 1, no R224; four labels-v3-family members in loader order.
+# Sources: v3-s42 Kaggle Model (Lane C export, sha from its SHA256SUMS), the fastMRI student and v3-s43 private datasets (P9s v1),
+# v3-s44 private dataset copy (Lane L4 READY.json 2026-10-20 22:56, SHA256SUMS read by scripts/lanep9/member_entry.py).
+S6C_MODELS_P9S2 = [
+    {'seed': 42, 'labels': 'v3', 'file': 'E_prior_s42_v3all.pt', 'sha256': '03da2cacdbc12305519e05c8e9a5626f14eb71f49bc26d56e3f2ced35f997e43',
+     'bytes': 200188027, 'dataset': 'ozgung/knee-s6-lanec-seeds-20261019/pyTorch/v3-s42', 'dataset_version': 1},
+    {'seed': 42, 'slot': 1, 'labels': 'v3', 'file': 'E_prior_s42_fmall.pt',
+     'sha256': '6a13f52e424cbfd4945883273fd081dfb2f25b171adb5b6521fab4d382466b57', 'bytes': 200186923,
+     'dataset': 'ozgung/knee-laned-fmall-s42-20261020', 'dataset_version': 1},
+    {'seed': 43, 'labels': 'v3', 'file': 'E_prior_s43_v3all.pt', 'sha256': 'a99ad89705f8297ac86659ce8e5a092cd626d851d7d51331c59f1b6920c69690',
+     'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v3all-s43-20261020', 'dataset_version': 1},
+    {'seed': 44, 'labels': 'v3', 'file': 'E_prior_s44_v3all.pt', 'sha256': 'd3ca3f79bdc20ec3a81c3026071fd54d2a3805f7d5f0f0b85271dc8b3a40e404',
+     'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v3all-s44-20261020', 'dataset_version': 1}]
+# P10 / P11 (same eight members): sealed at 06:00 UTC from the Lane F / Lane L4 READY.json exports; an unsealed list refuses to build.
 S6C_MODELS_P10 = None
+# A100 fp16 probe-36 references per member list (scripts/lanep9/merge_references.py; the P7 file for the P7 and P9 lists).
+S6C_REFERENCE_BY_LIST = {
+    'S6C_MODELS_P9S2': {'path': OUT / 'lanep9-20261020/references/reference-p9s2.json',
+                        'sha256': '5271208226cde661aaf86dddea3ede3a89a0868a7a2835fe4f5de8b262e030dc'},   # P7 three + v3-s44 (cad13b6d...)
+}
 S6C_MODELS_BY_VARIANT = {'p7': 'S6C_MODELS', 'p9': 'S6C_MODELS_P9', 'p9r': 'S6C_MODELS_P9', 'p9s': 'S6C_MODELS_P9', 'p9sr': 'S6C_MODELS_P9',
                          **{k: 'S6C_MODELS_P9S2' for k in R6F.VARIANTS if k.startswith('p9s2')},
                          **{k: 'S6C_MODELS_P10' for k in R6F.VARIANTS if k.startswith('p10') or k.startswith('p11')}}
@@ -485,9 +501,10 @@ def s6c_block(variant='p7'):
     'no_reference': True -- P7's list predates the rule and is fully covered)."""
     reference = None
     models = s6c_models(variant)
-    if S6C_REFERENCE is not None:
-        R6F.require(file_sha(S6C_REFERENCE['path']) == S6C_REFERENCE['sha256'], 'S6C_REFERENCE_PIN')
-        reference = read(S6C_REFERENCE['path'])
+    spec = None if S6C_REFERENCE is None else S6C_REFERENCE_BY_LIST.get(S6C_MODELS_BY_VARIANT[variant], S6C_REFERENCE)   # None = tests
+    if spec is not None:
+        R6F.require(file_sha(spec['path']) == spec['sha256'], 'S6C_REFERENCE_PIN')
+        reference = read(spec['path'])
         aliases = {S6C.model_alias(m) for m in models}
         R6F.require(all(S6C.model_alias(m) in reference['probabilities'] or m.get('no_reference') is True for m in models),
                     'S6C_REFERENCE_COVERS_SEALED_MEMBERS')
