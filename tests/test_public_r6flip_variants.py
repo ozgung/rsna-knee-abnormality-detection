@@ -49,7 +49,7 @@ class VariantTableTests(unittest.TestCase):
         self.assertEqual(sorted(R6F.VARIANTS), ['p10', 'p3', 'p4', 'p5', 'p6', 'p6p', 'p6s', 'p6sp', 'p7', 'p9', 'p9r', 'p9s', 'p9sr'])   # p6*/p9*/p10: own test modules
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p7'])[0], R6F.RAPTOR_ARMS)        # P2's Raptor half, compact = S6 seeds
         self.assertEqual(R6F.raptor_weight_vector(blend=R6F.VARIANTS['p7']), R6F.raptor_weight_vector())
-        self.assertEqual(R6F.COMPACT_VARIANTS, {'p7': 's6c'})
+        self.assertEqual(R6F.COMPACT_VARIANTS, {'p7': 's6c', 'p10': 's6c'})
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p3'])[0], (('old320', .52), ('crop224', .28), ('nafull', .2)))
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p4'])[0], R6F.resolve_blend(R6F.VARIANTS['p3'])[0])
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p5'])[0], (('old320', .65), ('nafull', .35)))

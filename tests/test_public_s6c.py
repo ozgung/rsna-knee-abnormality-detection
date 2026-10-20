@@ -36,7 +36,7 @@ def models(labels='v2', seeds=(42, 43, 44)):
 
 class FrameTests(unittest.TestCase):
     def test_variant_is_p2s_raptor_half_with_a_compact_stage(self):
-        self.assertEqual(R6F.COMPACT_VARIANTS, {'p7': S6C.FOLDER})
+        self.assertEqual(R6F.COMPACT_VARIANTS, {'p7': S6C.FOLDER, 'p10': S6C.FOLDER})
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p7'])[0], R6F.RAPTOR_ARMS)
         self.assertEqual(R6F.raptor_weight_vector(blend=R6F.VARIANTS['p7']), R6F.raptor_weight_vector())
         self.assertEqual(ENTRY.S6C_ARM, S6C.FOLDER)
