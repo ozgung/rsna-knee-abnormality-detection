@@ -76,6 +76,25 @@ def entry_from_ready(name, path):
             ref_path = str(cands[0]) if cands else None
             if ref_path and not ref_alias:
                 ref_alias = next(iter(json.loads(Path(ref_path).read_text())['probabilities']))
+        if not ref_path:                                   # Lane F: compact_infer --dump-logits of the probe-36 read-out (one model)
+            logits = path.parent / 'ds' / 'probe36_fp16_logits.json'
+            if logits.is_file():
+                import math
+                z = json.loads(logits.read_text())
+                rows = {}
+                for sid, zs in z.items():
+                    S6C.require(len(zs) == 1 and len(zs[0]) == 12, 'PROBE_LOGITS_ONE_MODEL_' + name)
+                    rows[sid] = [1.0 / (1.0 + math.exp(-float(v))) for v in zs[0]]
+                rec = {}
+                receipt = path.parent / 'ds' / 'probe36_fp16_receipt.json'
+                if receipt.is_file():
+                    rec = json.loads(receipt.read_text())
+                    S6C.require(rec.get('amp') == 'fp16' and rec.get('scored') == len(rows) and not rec.get('fallback'), 'PROBE_RECEIPT_' + name)
+                ref_alias = ck.get('runtime_alias')
+                out = path.parent / ('reference-%s.json' % name)
+                out.write_text(json.dumps({'source': '%s fp16 compact_infer probe-36 (%s; %s)' % (rec.get('gpu', '?'), name, ck['sha256'][:12]),
+                                           'probabilities': {ref_alias: rows}}))
+                ref_path = str(out)
     m = {'seed': seed, 'labels': labels, 'file': file, 'sha256': sha, 'bytes': size, 'dataset': dataset, 'dataset_version': version}
     if slot:
         m['slot'] = slot
@@ -122,16 +141,14 @@ def main():
     for path, alias, sealed in refs:
         by_file.setdefault(path, {})[alias] = sealed
     args = [a.out_reference]
-    for path, mapping in by_file.items():
+    for path, mapping in by_file.items():                 # per-file alias renames (exports reuse alias names across lanes)
         doc = json.loads(Path(path).read_text())
-        keep = {alias: rows for alias, rows in doc['probabilities'].items() if alias in mapping}
+        keep = {mapping[alias]: rows for alias, rows in doc['probabilities'].items() if alias in mapping}
+        S6C.require(len(keep) == len(mapping), 'REFERENCE_ALIAS_MISSING_IN_' + path)
         tmp = Path(a.out_reference).with_name(Path(a.out_reference).stem + '-in-%d.json' % len(args))
         tmp.parent.mkdir(parents=True, exist_ok=True)
         tmp.write_text(json.dumps({'source': doc.get('source', path), 'probabilities': keep}))
         args.append(str(tmp))
-        for alias, sealed in mapping.items():
-            if alias != sealed:
-                args += ['--rename', '%s=%s' % (alias, sealed)]
     out = subprocess.run([sys.executable, str(PROJECT / 'scripts/lanep9/merge_references.py'), *args], capture_output=True, text=True)
     print(out.stdout.strip() or out.stderr.strip()[-800:])
     print('MISSING (not READY):', missing)
