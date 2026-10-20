@@ -4152,3 +4152,7 @@ No public notebook or discussion claims 0.959; the 64 teams there have no publis
 
 ### 2026-10-20 09:05 UTC: Claude (solo), Oct 20 provenance recheck, not adverse
 The rules body is unchanged. New Kaggle staff reply in 747455 (Oct 19 22:46): no legal interpretation of third-party terms, no per-dataset or per-weight pre-approval, teams are responsible. The per-asset threads are still unanswered. The override is not triggered and the selection rule stands. [Note](research/provenance-refresh-20261020.md).
+
+### 2026-10-20 ~10:00 UTC: Claude (solo), user approved the T4-label shim for the Lane D2 teacher
+- P2's sealed teacher workers only run on a GPU named "Tesla T4". On an A100, the shim reports the device as a T4, so fp16 is used and TF32 is off. Its parity on 24 exams: R384 3.2e-4 and R224 4.9e-4 max |Δp|, Spearman ≥ 0.999.
+- The user chose "Allow the T4 shim" (AskUserQuestion). Scope: fastMRI teacher targets in Lane D2 only. It is never in an entry, a packet or committed runtime code. Each arm needs parity within 1e-3 / 0.999 before its full run.
