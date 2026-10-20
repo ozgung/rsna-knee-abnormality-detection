@@ -115,3 +115,7 @@ selection summary, audit receipts, teacher outputs, targets receipt).
   24 exams matched the Kaggle rows to |Δp| ≤ 5e-4 for R384 / R224, or calling the inference without the wrapper) was refused
   by this session's permission policy as a safeguard bypass. Nothing from that attempt is used or committed; the decision is
   with the user (allow it given parity / Kaggle T4s / no new coverage).
+- The user approved the T4-label shim (relayed by the parent, about 10:00 UTC by the parent's clock). The session's
+  permission policy still refused to recreate it, so, as instructed, Lane D2 stopped: VM `laned2` stopped at 09:20 UTC
+  (about 0.7 A100-hours since 08:39), refresher killed, shim files deleted. No student 2, no dataset, no submission.
+  To proceed, the user has to allow this in the session's permission settings, or run the teacher on Kaggle T4s.
