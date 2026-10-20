@@ -132,3 +132,5 @@ Owner: Claude (lane C agent). Plan: [final-push plan §2 Lane C](../research/fin
   (payload aad4124d…) built from the verified result (no waiver); visible run → submit chain started.
 - **C1 submitted: 57432734** (10:00 UTC) after visible run v1 COMPLETE (09:38–09:59): entry receipt PASS, 0 A fallbacks,
   0 B failed rows, elapsed 245 s, submission 3×12 finite in [0, 1], pulled code cells identical, private/offline.
+- **P7′ submitted: 57432784** (10:01 UTC) after visible run v1 COMPLETE (09:47–09:59): receipt PASS, `fallback_studies` 0,
+  every arm merged strictly, elapsed 458 s, pulled code cells identical. Kernel without `--timeout`; 8.3 h guard in force.
