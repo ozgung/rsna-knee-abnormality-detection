@@ -130,3 +130,5 @@ Owner: Claude (lane C agent). Plan: [final-push plan §2 Lane C](../research/fin
   recomputed; elapsed 1,680 s; **projection point 16,369 s** (kill > 27,000 s: pass), conservative 21,256 s (gate 29,880 s).
   Phase walls: old 717 s, crop224 264 s, s6c sentinels 208 + 152 s, s6c production 309 s. Entry `r6flip-p7-entry-20261018`
   (payload aad4124d…) built from the verified result (no waiver); visible run → submit chain started.
+- **C1 submitted: 57432734** (10:00 UTC) after visible run v1 COMPLETE (09:38–09:59): entry receipt PASS, 0 A fallbacks,
+  0 B failed rows, elapsed 245 s, submission 3×12 finite in [0, 1], pulled code cells identical, private/offline.
