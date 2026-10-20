@@ -21,7 +21,9 @@ cp /content/ro/gold_${TAG}_s${SEED}/predictions.csv $E/gold58_predictions.csv
 cp /content/ro/gold_${TAG}_s${SEED}/logits.json $E/gold58_logits.json
 cp /content/ro/probe_${TAG}_s${SEED}/predictions.csv $E/probe36_fp16_predictions.csv
 cp /content/ro/probe_${TAG}_s${SEED}/logits.json $E/probe36_fp16_logits.json
-(cd $E && sha256sum gold58_predictions.csv gold58_logits.json probe36_fp16_predictions.csv probe36_fp16_logits.json > READOUT_SHA256SUMS && cat READOUT_SHA256SUMS)
+cp /content/ro/gold_${TAG}_s${SEED}/receipt.json $E/gold58_receipt.json
+cp /content/ro/probe_${TAG}_s${SEED}/receipt.json $E/probe36_fp16_receipt.json
+(cd $E && sha256sum gold58_predictions.csv gold58_logits.json gold58_receipt.json probe36_fp16_predictions.csv probe36_fp16_logits.json probe36_fp16_receipt.json > READOUT_SHA256SUMS && cat READOUT_SHA256SUMS)
 until grep -q "EXPORT_DONE\|EXPORT_FAIL" /content/fit_${TAG}_s${SEED}.log 2>/dev/null; do sleep 60; done
 for i in 1 2 3; do
   v=$(bash /content/vm_kmodel.sh knee-s6-lanef-20261020 ${TAG}-s${SEED} $E E_prior_s${SEED}_${TAG}all.pt "export + readouts") && { echo "READOUT_EXPORT_DONE ozgung/knee-s6-lanef-20261020/pyTorch/${TAG}-s${SEED}/$v"; break; }
