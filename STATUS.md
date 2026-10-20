@@ -40,7 +40,7 @@ Lanes write large outputs to `outputs/lane{a,b,c,d}-20261019/` and commit only i
 ## Selection rule (fixed in the plan, §4)
 
 - **Final 1:** P2, unless a challenger displays ≥ 0.958, passed every gate except the projection with zero visible fallback, and wins Lane B's out-of-fold comparison (Δ ≥ +0.0003, CI excluding 0).
-- **Final 2:** P6 if it displays ≥ 0.957, else P7′ if ≥ 0.957, else A′-w. Rule 2 gives P6s′; the parent recommends P7′ instead as the only all-ours-compact hedge at the same zero E[max] cost ([evidence](docs/experiments/final-selection-20261020.md)). **User decision pending (Oct 21).**
+- **Final 2:** P6 if it displays ≥ 0.957, else P7′ if ≥ 0.957, else A′-w. Rule 2 gives P6s′; the parent recommends P7′ instead as the only all-ours-compact hedge at the same zero E[max] cost ([evidence](docs/experiments/final-selection-20261020.md)). **User (Oct 20 15:45): decide on Oct 21; Claude sets the two checkboxes once chosen.**
 - **Provenance override (Oct 20 recheck):** if the recheck turns adverse, final 2 becomes P7′, or 57037296 if OAI is also ruled out.
 
 ## Verification and invariants
