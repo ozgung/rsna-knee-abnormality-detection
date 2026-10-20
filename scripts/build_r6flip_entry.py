@@ -48,7 +48,8 @@ COMP = 'rsna-knee-abnormality-detection'
 SLUGS = {'rehearsal': 'r6flip-rehearsal-20261017', 'entry': 'r6flip-entry-20261017'}
 VARIANT_DATE = '20261018'
 VARIANT_DATES = {'p6': '20261019', 'p6p': '20261019', 'p6s': '20261020', 'p6sp': '20261020', 'p9': '20261020', 'p9r': '20261020',
-                 'p9s': '20261020', 'p9sr': '20261020', 'p10': '20261021'}
+                 'p9s': '20261020', 'p9sr': '20261020'}
+VARIANT_DATES.update({k: '20261021' for k in R6F.VARIANTS if k not in VARIANT_DATES and k[:4] in ('p9s2', 'p10', 'p10m', 'p10p', 'p11', 'p11m')})
 
 
 def slug_for(variant, mode):
@@ -143,9 +144,13 @@ S6C_MODELS_P9 = [
      'dataset': 'ozgung/knee-laned-fmall-s42-20261020', 'dataset_version': 1},
     {'seed': 43, 'labels': 'v3', 'file': 'E_prior_s43_v3all.pt', 'sha256': 'a99ad89705f8297ac86659ce8e5a092cd626d851d7d51331c59f1b6920c69690',
      'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v3all-s43-20261020', 'dataset_version': 1}]
-S6C_MODELS_P10 = None                           # all-ours compact: sealed when Lane L4 / Lane F exports exist (an unsealed list refuses to build)
+# Member sets still to be sealed (parent, 2026-10-20 22:55; expected by about 03:00 UTC): an unsealed list refuses to build.
+# P9S2 = the second P9s member set (p9s2* grid); P10 = the all-ours set shared by every p10*/p11* variant ("same members").
+S6C_MODELS_P9S2 = None
+S6C_MODELS_P10 = None
 S6C_MODELS_BY_VARIANT = {'p7': 'S6C_MODELS', 'p9': 'S6C_MODELS_P9', 'p9r': 'S6C_MODELS_P9', 'p9s': 'S6C_MODELS_P9', 'p9sr': 'S6C_MODELS_P9',
-                         'p10': 'S6C_MODELS_P10'}
+                         **{k: 'S6C_MODELS_P9S2' for k in R6F.VARIANTS if k.startswith('p9s2')},
+                         **{k: 'S6C_MODELS_P10' for k in R6F.VARIANTS if k.startswith('p10') or k.startswith('p11')}}
 # P9s shared-decode fixture: the P9 rehearsal's separate s6c worker output on the frozen 39 (per-member probabilities, private).
 P9_REHEARSAL_OUT = OUT / 'kaggle/r6flip-p9-rehearsal-20261020-out/r6flip'
 P9_REHEARSAL_RECEIPT_SHA = 'bf5e235d5c55bf2327529ae4f61d16bc906e041a277b973ec7896f4dd811063c'   # v2 result: FAIL_PROJECTION_ONLY, every other gate PASS
@@ -275,7 +280,8 @@ def variant_frame(variant):
                                  'guard_fallback': 'studies without the own stage keep rank(R6 plain) as the compact slot'}
         if R6F.own_shared(R6F.VARIANTS[variant]):
             frame['compact_half']['s6c'].update(worker='knee.public_s6c_shared inside the R6 plain worker: members rendered at 320 px from '
-                                                       'R6\'s native cache (one decode per study), scored after R6\'s last fold')
+                                                       'R6\'s native cache (one decode per study), scored after R6\'s last fold',
+                                                eval_stride=R6F.own_stride(R6F.VARIANTS[variant]))
             frame['compact_half']['guard_fallback'] = ('members stop first near the deadline (R6-only pace x 1.3); studies without members '
                                                        'keep rank(R6 plain) as the compact slot')
     elif compact != R6F.DEFAULT_COMPACT:
@@ -437,14 +443,20 @@ def binding(pack, sources, variant=None):
         if variant in R6F.COMPACT_VARIANTS:
             block = s6c_block(variant)[0]
             b.pop('r6')
-            b['variant'] = 'R6flip-%s: %s Raptor half (%s), own S6 %d-seed ensemble (labels %s) mean rank, per-finding weights' % (
-                variant.upper(), '+'.join(names), ', '.join('%s %g' % x for x in arms), len(block['models']), block['labels'])
+            b['variant'] = ('R6flip-%s: %s Raptor half (%s), own S6 %d-member ensemble (labels %s) %s, per-finding weights' % (
+                variant.upper(), '+'.join(names), ', '.join('%s %g' % x for x in arms), len(block['models']), block['labels'],
+                block['aggregation_key']) if names else
+                'R6flip-%s: own S6 %d-member ensemble (labels %s) %s alone; no Raptor half, no heliosli bundle' % (
+                variant.upper(), len(block['models']), block['labels'], block['aggregation_key']))
             b['s6c'] = {'version': S6C.VERSION, 'block_digest': R6F.digest(block), 'labels': block['labels'],
                         'models': [{k: m[k] for k in ('seed', 'file', 'sha256', 'bytes', 'dataset', 'dataset_version')} for m in block['models']],
-                        'aggregation': S6C.AGGREGATION, 'worker': {'module': S6C.WORKER_MODULE, 'env': WORKER.PROBE_DUAL_ENV},
+                        'aliases': list(block['aliases']), 'aggregation': block['aggregation'], 'aggregation_key': block['aggregation_key'],
+                        'worker': {'module': S6C.WORKER_MODULE, 'env': WORKER.PROBE_DUAL_ENV},
                         'source_sha256': {n: hashlib.sha256(sources[n].encode()).hexdigest() for n in (*S6C_SOURCES, S6C.CAPTURED)}}
-            b['frame']['compact_half'] = {'s6c': S6C.VERSION, 'seeds': [m['seed'] for m in block['models']], 'labels': block['labels'],
-                                          'flip_tta': False, 'aggregation': S6C.AGGREGATION}
+            b['frame']['compact_half'] = {'s6c': S6C.VERSION, 'members': list(block['aliases']), 'labels': block['labels'],
+                                          'flip_tta': False, 'aggregation': block['aggregation'], 'aggregation_key': block['aggregation_key']}
+            if R6F.own_only(blend):
+                b['frame']['raptor_half'] = {'arms': {}, 'source': 'none: P11 runs no Raptor stage; the final column is the ranked own compact'}
             b['frame']['excluded'] = sorted(set(b['frame']['excluded']) | {'heliosli R6 bundle'})
             b['frame_digest'] = R6F.digest(b['frame'])
         if 'nafull' in names:
@@ -462,18 +474,25 @@ def s6c_models(variant='p7'):
     return copy.deepcopy(models)
 
 
+def s6c_block_only(variant):
+    """The sealed member block without the reference (metadata, dataset lists)."""
+    return S6C.block(s6c_models(variant), None, aggregation=R6F.own_aggregation(R6F.VARIANTS[variant]), allow_mixed_labels=variant != 'p7')
+
+
 def s6c_block(variant='p7'):
     """(cfg['s6c'], shipped sources) for the compact stage of P7-prime or the own arm of P9 (the member set is sealed per variant;
-    the A100 reference is restricted to the sealed members' aliases)."""
+    the A100 reference is restricted to the sealed members' aliases; every member needs one unless its sealed entry says
+    'no_reference': True -- P7's list predates the rule and is fully covered)."""
     reference = None
     models = s6c_models(variant)
     if S6C_REFERENCE is not None:
         R6F.require(file_sha(S6C_REFERENCE['path']) == S6C_REFERENCE['sha256'], 'S6C_REFERENCE_PIN')
         reference = read(S6C_REFERENCE['path'])
         aliases = {S6C.model_alias(m) for m in models}
-        R6F.require(aliases <= set(reference['probabilities']), 'S6C_REFERENCE_COVERS_SEALED_MEMBERS')
+        R6F.require(all(S6C.model_alias(m) in reference['probabilities'] or m.get('no_reference') is True for m in models),
+                    'S6C_REFERENCE_COVERS_SEALED_MEMBERS')
         reference = {'source': reference['source'], 'probabilities': {k: v for k, v in reference['probabilities'].items() if k in aliases}}
-    block = S6C.block(models, reference)
+    block = S6C.block(models, reference, aggregation=R6F.own_aggregation(R6F.VARIANTS[variant]), allow_mixed_labels=variant != 'p7')
     raw = S6C_CAPTURED.read_bytes()
     R6F.require(hashlib.sha256(raw).hexdigest() == S6C.CAPTURED_SHA256, 'S6C_CAPTURED_SOURCE')
     sources = {S6C.CAPTURED: raw.decode()}
@@ -518,6 +537,19 @@ def variant_deviations(variant):
                    'is re-rendered without the forced side, as the s6c worker sees it) and the main process scores every member (S6\'s own '
                    'compact_train.Net, fp16, chunk 192) right after R6\'s last fold. Members stop before R6 near the deadline. Rehearsal: '
                    'members within 1e-3 of the P9 rehearsal\'s separate s6c worker on the frozen 39; R6 sentinel passes repeat the members.')
+    if variant in R6F.COMPACT_VARIANTS and variant != 'p7':
+        agg = R6F.own_aggregation(R6F.VARIANTS[variant])
+        out.append('Own compact (%s): up to eight own members, label tables may differ (sealed list), combined by %s; members without an '
+                   'A100 probe-36 reference are allowed only when their sealed entry says so (sentinel-repeat gates still apply).'
+                   % (variant, 'the mean member logit (sigmoid of the mean; the fold-mean convention inside every S6 run, chosen because the '
+                                'members share architecture, geometry and training recipe)' if agg == 'mean_logit' else
+                      'the mean of per-member average percentile ranks (P7-prime\'s rule; robust to calibration differences across label tables)'))
+    if R6F.own_only(R6F.VARIANTS[variant]):
+        out.append('P11: no Raptor stage and no R6; the official column is the average percentile rank of the own compact alone '
+                   '(recover_arms with an empty Raptor arm set; the public fallback gives 0.5 only when nothing at all was scored).')
+    if R6F.own_shared(R6F.VARIANTS[variant]) and R6F.own_stride(R6F.VARIANTS[variant]) != 1:
+        out.append('Members at eval stride 2 (every other window centre, about half the member cost); the rehearsal also forwards the '
+                   'members on the stride-1 windows of every study for the separate-pass parity and A100 reference gates.')
     if variant in R6F.COMPACT_VARIANTS:
         out.append('Compact slot = our all-data S6 seed ensemble (knee.public_s6c): mean over seeds of per-seed average percentile '
                    'ranks, no flip TTA, one label table; the heliosli R6 bundle is neither attached nor run. One compact_infer per '
@@ -729,15 +761,15 @@ def metadata(slug, variant=None):
     return {'id': '%s/%s' % (OWNER, slug), 'title': slug, 'code_file': 'notebook.ipynb', 'language': 'python', 'kernel_type': 'notebook',
             'is_private': True, 'enable_gpu': True, 'enable_tpu': False, 'enable_internet': False, 'competition_sources': [COMP],
             'dataset_sources': variant_datasets(variant),
-            'kernel_sources': [], 'model_sources': S6C.model_sources(S6C.block(s6c_models(variant))) if has_s6c(variant) else [],
+            'kernel_sources': [], 'model_sources': S6C.model_sources(s6c_block_only(variant)) if has_s6c(variant) else [],
             'docker_image': arch['docker_image'], 'machine_shape': 'NvidiaTeslaT4'}
 
 
 def variant_datasets(variant):
     if variant in R6F.COMPACT_VARIANTS:     # no heliosli R6 bundle attached
-        return [d for d in DATASETS if not d.startswith(R6F.R6_DATASET + '/')] + S6C.dataset_sources(S6C.block(s6c_models(variant)))
+        return [d for d in DATASETS if not d.startswith(R6F.R6_DATASET + '/')] + S6C.dataset_sources(s6c_block_only(variant))
     if own_dual(variant):                   # the R6 bundle and our members
-        return list(DATASETS) + S6C.dataset_sources(S6C.block(s6c_models(variant)))
+        return list(DATASETS) + S6C.dataset_sources(s6c_block_only(variant))
     return list(DATASETS) + (nafull_dataset_sources() if variant is not None
                              and 'nafull' in R6F.blend_arm_names(R6F.VARIANTS[variant]) else []) \
         + (['heliosli/rsna-knee-compact-r7cnxfsss/1'] if has_r7(variant) else [])
@@ -823,11 +855,16 @@ def build_rehearsal(dest=None, variant=None):
 
 
 def same_stages(a, b):
-    """A rehearsal of variant a also qualifies variant b when only per-finding weights differ (same stages, same arm weights)."""
-    return (a is not None and b is not None and R6F.VARIANTS[a]['raptor_arms'] == R6F.VARIANTS[b]['raptor_arms']
-            and R6F.resolve_compact(R6F.VARIANTS[a]) == R6F.resolve_compact(R6F.VARIANTS[b])
-            and R6F.compact_shared(R6F.VARIANTS[a]) == R6F.compact_shared(R6F.VARIANTS[b])       # a shared-decode build has its own gates
-            and R6F.own_shared(R6F.VARIANTS[a]) == R6F.own_shared(R6F.VARIANTS[b]))
+    """A rehearsal of variant a also qualifies variant b when only blend weights differ: per-finding weights (p3 -> p4) or the
+    compact weight w of the p9s2 grid (the gates -- parity, repeats, reference, runtime -- do not depend on w); same stages, arms,
+    members, stride and aggregation."""
+    A, B_ = R6F.VARIANTS[a] if a is not None else None, R6F.VARIANTS[b] if b is not None else None
+    return (A is not None and B_ is not None and A['raptor_arms'] == B_['raptor_arms']
+            and R6F.compact_arm_names(A) == R6F.compact_arm_names(B_) and R6F.resolve_compact(A)[1] == R6F.resolve_compact(B_)[1]
+            and R6F.compact_shared(A) == R6F.compact_shared(B_)       # a shared-decode build has its own gates
+            and R6F.own_shared(A) == R6F.own_shared(B_) and R6F.own_stride(A) == R6F.own_stride(B_)
+            and R6F.own_aggregation(A) == R6F.own_aggregation(B_) and R6F.own_only(A) == R6F.own_only(B_)
+            and S6C_MODELS_BY_VARIANT.get(a) == S6C_MODELS_BY_VARIANT.get(b))     # the same sealed member list
 
 
 def build_entry(rehearsal_build, rehearsal_result, waiver=None, dest=None, slug=None, variant=None):

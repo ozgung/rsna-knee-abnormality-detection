@@ -280,7 +280,7 @@ def make_shared(out, board, pass_name, ids, env, deadline=0., measure=True):
     folder = Path(out) / ('board%d-s6c-%s' % (board, pass_name))
     sh.__dict__.update(torch=torch, block={'aliases': [s['alias'] for s in staged]}, ids=list(ids), board=board, pass_name=pass_name,
                        device='cpu', deadline=deadline, measure_stride2=measure, out=folder / 's6c', geometry=dict(SH.CHILD_GEOMETRY),
-                       models=models, staged=staged, active=True, cut=None, rows={}, csv=None,
+                       models=models, staged=staged, active=True, cut=None, rows={}, csv=None, stride1_check=False,
                        code_receipt={'captured_sha256': S6C.CAPTURED_SHA256, 'extras_ok': True, 'source_sha_ok': True, 'members': 1, 'extras': 1},
                        entries=[{'alias': s['alias'], 'sha256': s['sha256'], 'bytes': s['bytes'], 'spatial': True, 'state': R6F.module_digest(m),
                                  'buffers': R6F.buffers_digest(m), 'constructor': R6F.constructor_digest(m)} for s, m in zip(staged, models)])

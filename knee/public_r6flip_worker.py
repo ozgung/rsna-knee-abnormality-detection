@@ -344,7 +344,7 @@ class Observer:
         cur.pop('hash', None)
         cur.pop('plain_meta', None)
         if cur.get('s6c_input'):
-            cur['s6c_input'] = {k: v for k, v in cur['s6c_input'].items() if k not in ('images', 'meta')}
+            cur['s6c_input'] = {k: v for k, v in cur['s6c_input'].items() if k not in ('images', 'meta', 'images_ref', 'meta_ref')}
         cur.update(aborted=reason, handle_seconds=time.perf_counter() - cur.pop('t_begin'),
                    compile_check_calls=self.calls_other - cur.pop('calls_other_before'),
                    plain=cur['plain'] is not None, mirror=cur['mirror'] is not None, checksum_equal=None)
@@ -366,7 +366,8 @@ class Observer:
             images, meta = item['images'], item['meta']
             study['hash'] = self.pool.submit(lambda: {'render_windows': array_sha(images.numpy()), 'metadata': array_sha(meta.numpy())})
         if getattr(self.shared, 'KEY', None) == 's6c_shared':      # P9s: the members' windows travel in the same item
-            s6 = {'images': item.get('s6c_images'), 'meta': item.get('s6c_meta'), 'error': item.get('s6c_error'), 'note': item.get('s6c_note')}
+            s6 = {'images': item.get('s6c_images'), 'meta': item.get('s6c_meta'), 'error': item.get('s6c_error'), 'note': item.get('s6c_note'),
+                  'images_ref': item.get('s6c_images_ref'), 'meta_ref': item.get('s6c_meta_ref')}
             if s6['error'] is None and s6['images'] is not None and len(s6['images']):
                 im6, me6 = s6['images'], s6['meta']
                 s6['input'] = {'render_windows': array_sha(im6.numpy()), 'metadata': array_sha(me6.numpy()), 'windows': int(len(im6))}
@@ -447,7 +448,7 @@ class Observer:
             cur['input'] = cur.pop('hash').result()
         cur.pop('plain_meta', None)
         if cur.get('s6c_input'):
-            cur['s6c_input'] = {k: v for k, v in cur['s6c_input'].items() if k not in ('images', 'meta')}
+            cur['s6c_input'] = {k: v for k, v in cur['s6c_input'].items() if k not in ('images', 'meta', 'images_ref', 'meta_ref')}
         cur['plain'] = cur['plain'] is not None
         cur['mirror'] = cur['mirror'] is not None
         cur['checksum_equal'] = all(R6F.checksum(m['module']) == m['checksum'] for m in self.models) if self.models else None

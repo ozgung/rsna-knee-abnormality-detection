@@ -81,8 +81,11 @@ def r6_worker_config(cfg, board, pass_name, ids, folder, inject_uid, arm='r6'):
                           'cpu_pins': cfg['r6flip_binding']['r7']['cpu_pins'], 'deadline_epoch': cfg.get('deadline_epoch'),
                           'out': str(Path(folder).parent / ('board%d-r7-production' % board))}
     if arm == 'r6' and R6F.own_shared(cfg.get('blend')):     # P9s: every pass (the sentinel passes give the members' repeat gates)
+        stride = R6F.own_stride(cfg.get('blend'))
         c['s6c_shared'] = {'block': cfg['s6c'], 'deadline_epoch': cfg.get('deadline_epoch'), 'measure_stride2': False,   # measured once (P9s v1 rehearsal)
-                           'out': str(Path(folder).parent / ('board%d-s6c-%s' % (board, pass_name)))}
+                           'out': str(Path(folder).parent / ('board%d-s6c-%s' % (board, pass_name))),
+                           'geometry': {**_s6c().GEOMETRY_CHILD, 'eval_stride': stride},
+                           'stride1_check': cfg['mode'] == 'rehearsal' and stride != 1}   # stride 2: the parity/reference checks run at stride 1
     return c
 
 
@@ -366,14 +369,15 @@ def arm_table(ids, workers, out, entry, blend=None, compact=None):
     from knee import public_ws2_entry as WS2
     arrays, statuses, notes = {}, {}, {}
     own = R6F.own_compact_arm(blend)                # P9: the s6c block is a second compact arm, the R6 bundle still runs
+    agg = _s6c().aggregation_key(compact)           # P10/P11: mean logit or mean rank, sealed in the block
     strict = {'old320': lambda: R7.merge(ids, [(x, out / ('board%d-old' % i) / 'old' / 'predictions.npz')
                                                for i, x in enumerate(workers['old'])], 'old'),
               'crop224': lambda: WS2.merged_arm(ids, workers['crop224'], out, 'crop224'),
               'nafull': lambda: merge_nafull(ids, workers['nafull'], out),
               'r6': (lambda: merge_r6(ids, workers['r6'], out)) if compact is None or own else
-                    (lambda: _s6c().merge(ids, workers['r6'], out, len(compact['models']))[:2]),
+                    (lambda: _s6c().merge(ids, workers['r6'], out, len(compact['models']), aggregation=agg)[:2]),
               'r7': lambda: merge_r6(ids, workers['r7'], out, arm='r7'),
-              's6c': lambda: _s6c().merge(ids, workers['s6c'], out, len(compact['models']))[:2]}
+              's6c': lambda: _s6c().merge(ids, workers['s6c'], out, len(compact['models']), aggregation=agg)[:2]}
     folders = SALVAGE_FOLDERS
     compact_arms = R6F.compact_arm_names(blend)     # arm names; `compact` is the P7-prime S6 ensemble block (or None)
     for name in R6F.blend_arm_names(blend) + compact_arms:
@@ -388,7 +392,7 @@ def arm_table(ids, workers, out, entry, blend=None, compact=None):
             if not entry:
                 raise
             if name == 's6c' or (name == 'r6' and compact is not None and not own):
-                arrays[name], statuses[name] = _s6c().salvage(ids, out, len(compact['models']))
+                arrays[name], statuses[name] = _s6c().salvage(ids, out, len(compact['models']), aggregation=agg)
             else:
                 arrays[name], statuses[name] = salvage(ids, out, *folders[name])
             notes[name] = 'salvaged after %s' % type(e).__name__
@@ -414,7 +418,7 @@ def salvage_csv(root, out, ids, csv_path, reason, blend=None, compact=None):
     for name in active:
         arm, names = SALVAGE_FOLDERS[name]
         if name == 's6c' or (name == 'r6' and compact is not None and not own):
-            arrays[name], statuses[name] = _s6c().salvage(ids, Path(out), len(compact['models']))
+            arrays[name], statuses[name] = _s6c().salvage(ids, Path(out), len(compact['models']), aggregation=_s6c().aggregation_key(compact))
         else:
             arrays[name], statuses[name] = salvage(ids, Path(out), arm, names)
     require(any(s == 'genuine' for st in statuses.values() for s in st), 'SALVAGE_NOTHING_GENUINE')
@@ -467,7 +471,7 @@ def run(root, cfg, out, *, started, started_epoch=None):
         require((compact is not None) == (R6F.COMPACT_VARIANTS.get((cfg['r6flip_binding'].get('entry_variant') or {}).get('name')) == S6C_ARM
                                           or own), 'COMPACT_STAGE_CONFIG_MATCHES_VARIANT')
         if compact is not None:
-            _s6c().validate_models(compact['models'])
+            _s6c().validate_models(compact['models'], allow_mixed_labels=bool(compact.get('mixed_labels_allowed')))
         require(rehearsal or not any(k in cfg.get('nafull', {}).get('worker', {}) for k in NAFULL_WORKER_PRIVATE)
                 and 'reader_reference' not in cfg.get('nafull', {}), 'PURE_ENTRY_NAFULL_CFG')
         columns, visible, records = test_contract(root, R6F.LABELS, visible=rehearsal)
@@ -503,8 +507,9 @@ def run(root, cfg, out, *, started, started_epoch=None):
                                                               'minimum_disk_free_bytes': shutil.disk_usage(out).free}
             result = launch_guarded(cfg, out, arm, deadline, **kw)
             return result
-        workers['old'], phases['old'] = stage_run('old', 'old')
-        save(out / 'receipt.json', r)
+        if 'old320' in arm_names:        # P11 (own-only compact) runs no Raptor stage at all
+            workers['old'], phases['old'] = stage_run('old', 'old')
+            save(out / 'receipt.json', r)
         if 'crop224' in arm_names:       # p5 omits the R224 stage entirely (time saved, gates skipped)
             crop_cfg_sentinels = cfg.get('s6_sentinels', []) if rehearsal else []
             cfg['crop224_sentinels'] = crop_cfg_sentinels
@@ -945,7 +950,8 @@ def require_rehearsal(r, cfg, out, csv_path):
     require(('nafull' in arm_names) == ('nafull' in cfg) and ('nafull' in arm_names) == ('nafull' in r['workers'])
             and ('crop224' in arm_names) == ('crop224' in r['workers']) and ('r7' in compact_names) == ('r7' in r['workers'])
             and ('s6c' in compact_names) == ('s6c' in r['workers']), 'REHEARSAL_STAGES_MATCH_SEALED_BLEND')
-    old_rows = require_old(r, cfg)
+    require(('old320' in arm_names) == ('old' in r['workers']), 'REHEARSAL_RAPTOR_STAGE_MATCHES_SEALED_BLEND')
+    old_rows = require_old(r, cfg) if 'old320' in arm_names else None
     if 'crop224' in arm_names:
         require_crop224(r, cfg, old_rows)
     nafull = require_nafull(r, cfg, old_rows) if 'nafull' in arm_names else None
@@ -955,14 +961,17 @@ def require_rehearsal(r, cfg, out, csv_path):
     r6 = require_r6(r, cfg) if compact is None or own else _s6c().require_compact(r, cfg)
     s6c = None
     if own:                              # P9: the own stage's gates under its own worker key; P9s adds the shared-decode parity gates
-        s6c = _s6c().require_compact(r, cfg, key='s6c', injected=('sentinel1', cfg['s6_sentinels'][0]) if own_sh else None)
+        stride = R6F.own_stride(blend)
+        s6c = _s6c().require_compact(r, cfg, key='s6c', injected=('sentinel1', cfg['s6_sentinels'][0]) if own_sh else None,
+                                     reference_key='seed_probabilities' if stride == 1 else 'seed_probabilities_stride1')
         if own_sh:
-            s6c['shared'] = _s6c().require_shared(r, cfg)
+            s6c['shared'] = _s6c().require_shared(r, cfg, stride=stride)
     shared = R6F.compact_shared(blend)
     r7 = None if 'r7' not in compact_names else require_r7_shared(r, cfg, r6['anatomy_state']) if shared else \
         require_r7(r, cfg, r6['anatomy_state'])
     phases = r.get('phases') or {}
-    require(set(phases) == {'old', *[a for a in ('crop224', 'nafull') if a in arm_names], 'r6_sentinel1', 'r6_sentinel2', 'r6',
+    require(set(phases) == {*(['old'] if 'old320' in arm_names else []), *[a for a in ('crop224', 'nafull') if a in arm_names],
+                            'r6_sentinel1', 'r6_sentinel2', 'r6',
                             *[a for a in ('r7',) if a in compact_names and not shared],
                             *(['s6c_sentinel1', 's6c_sentinel2', 's6c'] if own and not own_sh else [])}
             and all(p['wall_seconds'] > 0 and p['peaks']['host_rss_bytes'] > 0 and p['peaks']['output_disk_bytes'] > 0

@@ -28,8 +28,7 @@ from knee import public_s6c as S6C
 
 require = S6C.require
 VERSION = 's6c-shared-decode-v1'
-CHILD_GEOMETRY = {'size': S6C.GEOMETRY['size'], 'crop': S6C.GEOMETRY['crop'], 'views': S6C.GEOMETRY['views'],
-                  'slices': S6C.GEOMETRY['slices'], 'eval_stride': S6C.GEOMETRY['eval_stride'], 'phys_mm': S6C.GEOMETRY['phys_mm']}
+CHILD_GEOMETRY = dict(S6C.GEOMETRY_CHILD)
 CHUNK = S6C.GEOMETRY['chunk']
 CUT_SAFETY = 1.3                 # members stop when the remaining studies at the R6-only pace x 1.3 would pass the deadline
 CUT_MIN_STUDIES = 3
@@ -98,8 +97,12 @@ def render_members_input(ds, uid, geometry, px_cache, window_rows, forced_side):
         finally:
             shutil.rmtree(work2, ignore_errors=True)
     img, meta = windows_from_item(item, window_rows, geometry)
+    ref = None
+    if geometry.get('stride1_check') and int(geometry['eval_stride']) != 1:     # rehearsal at stride 2: the stride-1 windows too
+        ref = windows_from_item(item, window_rows, {**geometry, 'eval_stride': 1})
     note['render_seconds'] = time.perf_counter() - t0
-    return img, meta, note
+    note['eval_stride'] = int(geometry['eval_stride'])
+    return img, meta, note, ref
 
 
 def install_child(ds, geometry):
@@ -121,13 +124,14 @@ def install_child(ds, geometry):
             if forced is not None:
                 CI.FORCED_SIDE.pop(str(uid), None)
             try:
-                img, meta, note = render_members_input(ds, uid, geometry, px_cache, window_rows, forced)
+                img, meta, note, ref = render_members_input(ds, uid, geometry, px_cache, window_rows, forced)
             finally:
                 if forced is not None:
                     CI.FORCED_SIDE[str(uid)] = forced
-            ds._s6c_shared_item = {'images': img, 'meta': meta, 'error': None, 'note': note}
+            ds._s6c_shared_item = {'images': img, 'meta': meta, 'error': None, 'note': note,
+                                   'images_ref': None if ref is None else ref[0], 'meta_ref': None if ref is None else ref[1]}
         except Exception as exc:
-            ds._s6c_shared_item = {'images': None, 'meta': None, 'error': repr(exc)[:300], 'note': None}
+            ds._s6c_shared_item = {'images': None, 'meta': None, 'error': repr(exc)[:300], 'note': None, 'images_ref': None, 'meta_ref': None}
         return item
 
     builder.build = build
@@ -142,6 +146,7 @@ def attach(ds, item):
         item['s6c_error'] = 'no shared render for this item'
         return item
     item['s6c_images'], item['s6c_meta'], item['s6c_error'], item['s6c_note'] = stash['images'], stash['meta'], stash['error'], stash['note']
+    item['s6c_images_ref'], item['s6c_meta_ref'] = stash.get('images_ref'), stash.get('meta_ref')
     return item
 
 
@@ -158,7 +163,10 @@ class SharedS6:
         self.deadline = float(self.cfg.get('deadline_epoch') or 0)
         self.measure_stride2 = bool(self.cfg.get('measure_stride2'))
         self.out = Path(self.cfg['out']) / S6C.FOLDER
-        self.geometry = dict(CHILD_GEOMETRY)
+        self.geometry = dict(self.cfg.get('geometry') or CHILD_GEOMETRY)
+        require(set(self.geometry) == set(CHILD_GEOMETRY) and all(self.geometry[k] == CHILD_GEOMETRY[k] for k in CHILD_GEOMETRY if k != 'eval_stride')
+                and int(self.geometry['eval_stride']) in (1, 2), 'S6C_SHARED_GEOMETRY')
+        self.stride1_check = bool(self.cfg.get('stride1_check')) and int(self.geometry['eval_stride']) != 1
         self.models, self.staged, self.entries, self.checksums = [], [], [], []
         self.active, self.cut = True, None
         self.rows = {}
@@ -167,7 +175,7 @@ class SharedS6:
 
     @property
     def child_cfg(self):
-        return dict(self.geometry)
+        return {**self.geometry, 'stride1_check': self.stride1_check}
 
     def load(self):
         """The exact S6 code tree (captured controller, publisher extras, heliosli files), the sealed member files under their
@@ -247,7 +255,7 @@ class SharedS6:
         sid = cur['id']
         self.should_cut(obs)
         s6 = cur.get('s6c_input') or {}
-        cur['s6c_input'] = {k: v for k, v in s6.items() if k not in ('images', 'meta')}     # the study record keeps no tensors
+        cur['s6c_input'] = {k: v for k, v in s6.items() if k not in ('images', 'meta', 'images_ref', 'meta_ref')}   # no tensors kept
         if not self.active:
             cur['s6c'] = None
             self.rows[sid] = {'status': 'deadline'}
@@ -279,6 +287,24 @@ class SharedS6:
                         torch.cuda.synchronize()
                     member_seconds.append(time.perf_counter() - tm)
                     zs.append(z[0].detach().cpu())
+                check = None
+                if self.stride1_check and s6.get('images_ref') is not None and len(s6['images_ref']):   # rehearsal at stride 2
+                    xr = s6['images_ref'].to(self.device, non_blocking=True)[None, :, :, off:off + g['crop'], off:off + g['crop']]
+                    mr = s6['meta_ref'].to(self.device)[None]
+                    kr = torch.ones((1, xr.shape[1]), dtype=torch.bool, device=self.device)
+                    zr, sr = [], []
+                    for m in self.models:
+                        tm = time.perf_counter()
+                        z1 = self._forward(m, xr, mr, kr, 'fp16')
+                        if not bool(torch.isfinite(z1).all()):
+                            z1 = self._forward(m, xr, mr, kr, 'fp32')
+                        if self.device == 'cuda':
+                            torch.cuda.synchronize()
+                        sr.append(time.perf_counter() - tm)
+                        zr.append(z1[0].detach().cpu())
+                    check = {'seed_probabilities': torch.sigmoid(torch.stack(zr).double()).numpy().tolist(), 'seconds': sr,
+                             'windows': int(s6['images_ref'].shape[0])}
+                    del xr, mr, kr
                 stride2 = None
                 if self.measure_stride2 and x.shape[1] >= 2:
                     ts = time.perf_counter()
@@ -299,7 +325,7 @@ class SharedS6:
         row = {'status': 'genuine' if finite else 'nonfinite', 'probabilities': [float(v) for v in p], 'logits': z.float().numpy().tolist(),
                'seed_probabilities': seed_p.tolist(), 'fp32_rescues': rescues, 'checksum_equal': checksum_equal,
                's6c_seconds': seconds, 'member_seconds': member_seconds, 'stride2_proxy': stride2,
-               'windows': int(s6['images'].shape[0]), 'note': s6.get('note'), 'input': s6.get('input')}
+               'windows': int(s6['images'].shape[0]), 'note': s6.get('note'), 'input': s6.get('input'), 'stride1_check': check}
         self.rows[sid] = row
         cur['s6c'] = True
         if finite:
@@ -324,12 +350,15 @@ class SharedS6:
                 probs.append(np.asarray(x['probabilities'], dtype=np.float64))
                 statuses.append('genuine')
                 seed_logits.append(np.asarray(x['logits'], dtype=np.float32))
+                chk = x.get('stride1_check') or {}
                 records.append({'id': sid, 'ordinal': ordinal, 'status': 'genuine', 'windows': x['windows'],
                                 'production_seconds': x['s6c_seconds'], 's6c_seconds': x['s6c_seconds'], 'member_seconds': x['member_seconds'],
                                 'stride2_proxy': x['stride2_proxy'], 'reconstruction_max_abs': x['reconstruction_max_abs'],
                                 'probabilities': x['probabilities'], 'seed_probabilities': x['seed_probabilities'],
                                 'fp32_rescues': x['fp32_rescues'], 'checksum_equal': x['checksum_equal'], 'shared_decode': True,
-                                'render': x['note'], 'input': x.get('input'), 'r6_aborted': bool(s.get('aborted'))})
+                                'render': x['note'], 'input': x.get('input'), 'r6_aborted': bool(s.get('aborted')),
+                                **({'seed_probabilities_stride1': chk['seed_probabilities'], 'stride1_seconds': chk['seconds'],
+                                    'windows_stride1': chk['windows']} if chk else {})})
             else:
                 probs.append(np.full(12, np.nan))
                 statuses.append('data_local_failure')
@@ -356,7 +385,8 @@ class SharedS6:
                'compact': {'status': 'PASS', 'amp': S6C.AMP, 'models': self.block['aliases'], 'spatial_models': sum(e['spatial'] for e in self.entries),
                            'extent_models': 0, 'timed_out': False, 'anchor_weights_sha256': S6C.ANATOMY_SHA256,
                            'sha256': dict(S6C.SOURCE_PINS), 'chunk': CHUNK, 'scored': statuses.count('genuine'), 'studies': len(self.ids)},
-               'code': self.code_receipt, 'anatomy_sha256': S6C.ANATOMY_SHA256, 'geometry': dict(S6C.GEOMETRY), 'flip': {'enabled': False},
+               'code': self.code_receipt, 'anatomy_sha256': S6C.ANATOMY_SHA256, 'geometry': {**S6C.GEOMETRY, **self.geometry},
+               'stride1_check': self.stride1_check, 'flip': {'enabled': False},
                'cut': self.cut, 'shared_with': 'r6 plain production worker (same process; members rendered at 320 px from R6\'s native cache)',
                'ledger_sha256': file_sha(ledger), 'fp32_recoveries': sum(x.get('fp32_rescues', 0) for x in records),
                'peak_rss_bytes': resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024,
