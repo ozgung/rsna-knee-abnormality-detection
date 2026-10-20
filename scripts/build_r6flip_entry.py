@@ -28,6 +28,7 @@ from knee import public_r6flip as R6F
 from knee import public_r6_profile as PROFILE
 from knee import public_r6flip_entry as ENTRY
 from knee import public_r6flip_worker as WORKER
+from knee import public_s6c as S6C
 
 MAIN = Path(subprocess.check_output(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'],
                                     cwd=PROJECT, text=True).strip()).parent
@@ -105,6 +106,23 @@ NAFULL_SOURCES = ('knee/public_nafull_aprime.py', 'knee/public_nafull_aprime_run
 NAFULL_WORKER_KEYS = ('public_source', 'decoder_source', 'public_manifest', 'control_checkpoint', 'control_state_sha256',
                       'control_grid_sha256', 'old_sentinels', 'raptor62_reference')
 NEW_SOURCES = ('knee/public_r6_profile.py', 'knee/public_r6flip.py', 'knee/public_r6flip_worker.py', 'knee/public_r6flip_entry.py')
+# P7-prime (Lane C): our S6 seed ensemble in the compact slot. Shipped only by variants in R6F.COMPACT_VARIANTS; the
+# captured solo controller (6e87350d...) is shipped byte for byte for its pure launcher/command helpers.
+S6C_SOURCES = ('knee/public_s6c.py', 'knee/public_s6c_worker.py')
+S6C_CAPTURED = OUT / 'research/public-0957-20261015/kernels/nartaa_rsna-knee-s6fall-solo/rsna-knee-s6fall-solo.py'
+# Sealed seed set (pre-registered rule in docs/experiments/lane-c-seeds-20261019.md): filled from the verified exports.
+# Amendment 1 (parent, 2026-10-20 08:40 UTC): {v3-s42, v3-s43, Lane D fastMRI student}, equal-weight mean rank; all labels v3.
+S6C_MODELS = [
+    {'seed': 42, 'labels': 'v3', 'file': 'E_prior_s42_v3all.pt', 'sha256': '03da2cacdbc12305519e05c8e9a5626f14eb71f49bc26d56e3f2ced35f997e43',
+     'bytes': 200188027, 'dataset': 'ozgung/knee-s6-lanec-seeds-20261019/pyTorch/v3-s42', 'dataset_version': 1},
+    {'seed': 42, 'slot': 1, 'labels': 'v3', 'file': 'E_prior_s42_fmall.pt',
+     'sha256': '6a13f52e424cbfd4945883273fd081dfb2f25b171adb5b6521fab4d382466b57', 'bytes': 200186923,
+     'dataset': 'ozgung/knee-laned-fmall-s42-20261020', 'dataset_version': 1},
+    {'seed': 43, 'labels': 'v3', 'file': 'E_prior_s43_v3all.pt', 'sha256': 'a99ad89705f8297ac86659ce8e5a092cd626d851d7d51331c59f1b6920c69690',
+     'bytes': 200188027, 'dataset': 'ozgung/knee-s6-lanec-seeds-20261019/pyTorch/v3-s43', 'dataset_version': 1}]
+# A100 fp16 per-member read-out of the frozen-36 probes (lanec2, one compact_infer over all three members)
+S6C_REFERENCE = {'path': OUT / 'lanec-20261019/p7/reference-p7.json',
+                 'sha256': 'd41d7952b8b5e47c78ae431f03eafc2a4f2951772a687235f677f8935ca48504'}
 R7_ONLY_CFG = ('manifest', 'asset_binding', 'pilot_state_sha256', 'heliosli_reference', 'heliosli_visible_atol', 'ws2_binding',
                'guard_source_sha256')
 PRIVATE_CFG = ('probes', 'probe_order', 'old_sentinels', 's6_sentinels', 'development_windows')
@@ -348,6 +366,19 @@ def binding(pack, sources, variant=None):
                                 'nafull_stage': 'nafull' in names, 'weights_digest': R6F.digest(blend),
                                 'default_unchanged': 'no --variant: no cfg[blend], no cfg[nafull], original slugs and sources shipped'})
         b['deviations'] = DEVIATIONS + variant_deviations(variant)
+        if variant in R6F.COMPACT_VARIANTS:
+            block = s6c_block()[0]
+            b.pop('r6')
+            b['variant'] = 'R6flip-%s: %s Raptor half (%s), own S6 %d-seed ensemble (labels %s) mean rank, per-finding weights' % (
+                variant.upper(), '+'.join(names), ', '.join('%s %g' % x for x in arms), len(block['models']), block['labels'])
+            b['s6c'] = {'version': S6C.VERSION, 'block_digest': R6F.digest(block), 'labels': block['labels'],
+                        'models': [{k: m[k] for k in ('seed', 'file', 'sha256', 'bytes', 'dataset', 'dataset_version')} for m in block['models']],
+                        'aggregation': S6C.AGGREGATION, 'worker': {'module': S6C.WORKER_MODULE, 'env': WORKER.PROBE_DUAL_ENV},
+                        'source_sha256': {n: hashlib.sha256(sources[n].encode()).hexdigest() for n in (*S6C_SOURCES, S6C.CAPTURED)}}
+            b['frame']['compact_half'] = {'s6c': S6C.VERSION, 'seeds': [m['seed'] for m in block['models']], 'labels': block['labels'],
+                                          'flip_tta': False, 'aggregation': S6C.AGGREGATION}
+            b['frame']['excluded'] = sorted(set(b['frame']['excluded']) | {'heliosli R6 bundle'})
+            b['frame_digest'] = R6F.digest(b['frame'])
         if 'nafull' in names:
             b['nafull_source_sha256'] = {n: hashlib.sha256(sources[n].encode()).hexdigest() for n in NAFULL_SOURCES}
         if has_r7(variant):
@@ -355,6 +386,29 @@ def binding(pack, sources, variant=None):
             b['r7_source_sha256'] = {n: hashlib.sha256(sources[n].encode()).hexdigest() for n in R7_SOURCES}
             b['tolerances']['r7_aprime_reference_dprob'] = ENTRY.R7_REFERENCE_TOLERANCE
     return b
+
+
+def s6c_models():
+    R6F.require(S6C_MODELS is not None, 'S6C_MODELS_NOT_SEALED')
+    return copy.deepcopy(S6C_MODELS)
+
+
+def s6c_block():
+    """(cfg['s6c'], shipped sources) for the P7-prime compact stage."""
+    reference = None
+    if S6C_REFERENCE is not None:
+        R6F.require(file_sha(S6C_REFERENCE['path']) == S6C_REFERENCE['sha256'], 'S6C_REFERENCE_PIN')
+        reference = read(S6C_REFERENCE['path'])
+    block = S6C.block(s6c_models(), reference)
+    raw = S6C_CAPTURED.read_bytes()
+    R6F.require(hashlib.sha256(raw).hexdigest() == S6C.CAPTURED_SHA256, 'S6C_CAPTURED_SOURCE')
+    sources = {S6C.CAPTURED: raw.decode()}
+    for name in S6C_SOURCES:
+        text = (PROJECT / name).read_text()
+        compile(text, name, 'exec')
+        sources[name] = text
+    R6F.require(hashlib.sha256(sources[S6C.CAPTURED].encode()).hexdigest() == S6C.CAPTURED_SHA256, 'S6C_CAPTURED_TEXT_ROUNDTRIP')
+    return block, sources
 
 
 def variant_deviations(variant):
@@ -378,6 +432,12 @@ def variant_deviations(variant):
                    'check 1e-3), and scores them right after R6\'s last fold on the same rendered windows; R7 stackers recomputed '
                    'with knee.public_r7_stackers. R7 stops before R6 near the deadline. Rehearsal: R6 and R7 within 1e-3 of the '
                    'separate-pass P6 rehearsal on the frozen 39.')
+    if variant in R6F.COMPACT_VARIANTS:
+        out.append('Compact slot = our all-data S6 seed ensemble (knee.public_s6c): mean over seeds of per-seed average percentile '
+                   'ranks, no flip TTA, one label table; the heliosli R6 bundle is neither attached nor run. One compact_infer per '
+                   'board through the captured nartaa solo launcher/B command (exact S6 code tree from nartaa/rsna-knee-s6fall-weights '
+                   'v3 + heliosli cloud_code), fp16, two spawn loader workers, eval stride 1, --dump-logits for per-seed logits. '
+                   'Rehearsal sentinel passes run the same worker without the R6 source-seam injection.')
     return out
 
 
@@ -391,6 +451,10 @@ def packet(mode='rehearsal', qualified=None, variant=None):
         compile(text, name, 'exec')
         sources[name] = text
     cfg = copy.deepcopy(pack['cfg'])
+    if variant in R6F.COMPACT_VARIANTS:
+        cfg['s6c'], extra = s6c_block()
+        R6F.require(not set(extra) & set(sources), 'S6C_SOURCES_DISJOINT')
+        sources.update(extra)
     if variant is not None:
         cfg['blend'] = copy.deepcopy(R6F.VARIANTS[variant])
         if 'nafull' in R6F.blend_arm_names(cfg['blend']):
@@ -505,6 +569,24 @@ R7_MOUNT = """    r7=mount(b6['r7']['dataset'],['manifest.json',*b6['r7']['asset
     require(file_sha(r7/'manifest.json')==b6['r7']['manifest_sha256'],'EXACT_R7_V1_MANIFEST')
     cfg['r7_mount']=str(r7)
 """
+S6C_MOUNT_SITE = """    r6=mount(b6['r6']['dataset'],['manifest.json',*b6['r6']['asset_sha256']])
+    require(file_sha(r6/'manifest.json')==b6['r6']['manifest_sha256'],'EXACT_R6_V1_MANIFEST')
+    anatomy=mount('heliosli/rsna-orthofoundation-fold0-epoch7-20261004',['anatomy.pt'])/'anatomy.pt'
+    require(file_sha(anatomy)==b6['r6']['manifest']['anchor_weights_sha256'],'EXACT_ANATOMY')
+"""
+S6C_MOUNT = """    s6c=cfg['s6c'];r6=None
+    cm=mount(s6c['code']['dataset'],list(s6c['code']['files']))
+    for name,pin in s6c['code']['files'].items():require(file_sha(cm/name)==pin['sha256'],'EXACT_S6C_CODE_MOUNT')
+    helios=mount('heliosli/rsna-orthofoundation-fold0-epoch7-20261004',['anatomy.pt']);anatomy=helios/'anatomy.pt'
+    require(file_sha(anatomy)==s6c['anatomy_sha256'],'EXACT_ANATOMY')
+    for m in s6c['models']:
+        parts=m['dataset'].split('/')
+        md=Path('/kaggle/input/models')/parts[0]/parts[1]/parts[2].lower()/parts[3]/str(m['dataset_version']) if len(parts)==4 else mount(m['dataset'],[m['file']])
+        m['path']=str(md/m['file'])
+        require((md/m['file']).stat().st_size==m['bytes'] and file_sha(md/m['file'])==m['sha256'],'EXACT_S6C_SEED_BYTES')
+    s6c.update(code_mount=str(cm),helios_mount=str(helios))
+"""
+S6C_R6_MOUNT_ARG = "cfg.update(code=str(code),r6_mount=str(r6),"
 
 
 def bootstrap(pack):
@@ -512,6 +594,9 @@ def bootstrap(pack):
     if 'r7' in pack['cfg']['r6flip_binding']:      # P6 dual compact only; every other tail is untouched
         R6F.require(tail.count(NAFULL_MOUNT_SITE) == 1, 'EXACT_R7_MOUNT_SITE')
         tail = tail.replace(NAFULL_MOUNT_SITE, R7_MOUNT + NAFULL_MOUNT_SITE)
+    if 's6c' in pack['cfg']:           # P7-prime only: no R6 mount; our seed datasets and the S6 code mount instead
+        R6F.require(tail.count(S6C_MOUNT_SITE) == 1 and tail.count(S6C_R6_MOUNT_ARG) == 1, 'EXACT_S6C_MOUNT_SITE')
+        tail = tail.replace(S6C_MOUNT_SITE, S6C_MOUNT).replace(S6C_R6_MOUNT_ARG, "cfg.update(code=str(code),r6_mount=None,")
     if 'nafull' in pack['cfg']:        # variants with the na-full arm only; the default tail is untouched
         ck = pack['cfg']['nafull']['checkpoint']
         R6F.require(tail.count(NAFULL_MOUNT_SITE) == 1, 'EXACT_NAFULL_MOUNT_SITE')
@@ -540,10 +625,17 @@ def metadata(slug, variant=None):
     R6F.require(arch['machine_shape'] == 'NvidiaTeslaT4' and arch['enable_internet'] is False and arch['is_private'] is True, 'APRIME_METADATA')
     return {'id': '%s/%s' % (OWNER, slug), 'title': slug, 'code_file': 'notebook.ipynb', 'language': 'python', 'kernel_type': 'notebook',
             'is_private': True, 'enable_gpu': True, 'enable_tpu': False, 'enable_internet': False, 'competition_sources': [COMP],
-            'dataset_sources': list(DATASETS) + (nafull_dataset_sources() if variant is not None
-                                                 and 'nafull' in R6F.blend_arm_names(R6F.VARIANTS[variant]) else [])
-                               + (['heliosli/rsna-knee-compact-r7cnxfsss/1'] if has_r7(variant) else []),
-            'kernel_sources': [], 'model_sources': [], 'docker_image': arch['docker_image'], 'machine_shape': 'NvidiaTeslaT4'}
+            'dataset_sources': variant_datasets(variant),
+            'kernel_sources': [], 'model_sources': S6C.model_sources(S6C.block(s6c_models())) if variant in R6F.COMPACT_VARIANTS else [],
+            'docker_image': arch['docker_image'], 'machine_shape': 'NvidiaTeslaT4'}
+
+
+def variant_datasets(variant):
+    if variant in R6F.COMPACT_VARIANTS:     # no heliosli R6 bundle attached
+        return [d for d in DATASETS if not d.startswith(R6F.R6_DATASET + '/')] + S6C.dataset_sources(S6C.block(s6c_models()))
+    return list(DATASETS) + (nafull_dataset_sources() if variant is not None
+                             and 'nafull' in R6F.blend_arm_names(R6F.VARIANTS[variant]) else []) \
+        + (['heliosli/rsna-knee-compact-r7cnxfsss/1'] if has_r7(variant) else [])
 
 
 def nafull_dataset_sources():
@@ -564,6 +656,7 @@ def emit(dest, slug, pack, mode, extra=None, variant=None):
     (dest / 'notebook.ipynb').write_text(raw)
     save_json(dest / 'kernel-metadata.json', metadata(slug, variant))
     tracked = [*NEW_SOURCES, *(NAFULL_SOURCES if variant is not None else ()), *(R7_SOURCES if has_r7(variant) else ()),
+               *(S6C_SOURCES if variant in R6F.COMPACT_VARIANTS else ()),
                'scripts/build_r6flip_entry.py', 'scripts/qualify_r6flip_cpu.py']
     changed = subprocess.check_output(['git', 'status', '--porcelain', '--', *tracked], cwd=PROJECT, text=True).strip()
     receipt = {'status': 'PREPARATION_ONLY' if mode == 'rehearsal' else 'QUALIFIED_ENTRY_BUILD', 'mode': mode, 'slug': slug,
