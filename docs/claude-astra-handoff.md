@@ -4238,3 +4238,6 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 
 ### 2026-10-21 16:25 UTC: Claude (solo), Lane F final report; round 3 blocked by Colab
 - Rounds 1–2 exported; round 3 (v5 seeds) has no export: eleven Colab runtimes lost after 30–50 min since 11:15, plus three laptop sleeps. Supervisor keeps retrying (A100/G4/H100) until 06:30 with automatic resume and export. Parent started caffeinate for 15 h. p12 rehearsals are COMPLETE; Lane P9 told to finish the chain and submit today.
+
+### 2026-10-21 16:55 UTC: Claude (solo), P12 submitted (57490415)
+- `p12` = no Raptor, ½ rank(R6 plain) + ½ rank(own-8 mean logit) at stride 2 from the shared decode; point 22,895 s, all non-projection gates PASS, visible fallback 0, no guard-trim risk. The flip version (30,941 s) did not fit with ≥ 4 members. v5 variants (p12v5, p12fv5, p11v5, p9s2s2b) are sealed with empty member lists, waiting for v5 exports. Rehearsal outputs are ~10 GB because member checkpoints are copied into every pass; `outputs/lanep9-20261020/fetch_small.py` pulls the rest in under a minute.

@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-21 16:25 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
+Updated **2026-10-21 16:55 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
 
 ## Current snapshot
 
@@ -9,6 +9,7 @@ Updated **2026-10-21 16:25 UTC** (Claude, solo; Codex unavailable until Oct 22).
 
   | Entry | Submission | Public |
   |---|---|---|
+  | P12 (no Raptor; ½ R6 plain + ½ own-8 mean logit, stride 2, shared decode) | 57490415 | pending (Oct 21 ~23:00) |
   | P10p (R384 half + own-only 8-member compact, no R224, no R6) | 57472040 | **0.957** |
   | P11 (own-only compact, mean logit of 8 members, no Raptor, no R6) | 57471109 | **0.956** |
   | P9 v2 (`p9s2s2`: four own members at stride 2, w 0.5, no R224) | 57464435 | **0.957** |
@@ -80,4 +81,4 @@ Lanes write large outputs to `outputs/lane{a,b,c,d}-20261019/` and commit only i
 
 The last parent checks covered dependency-free unit tests and smoke at the R6F integration (Oct 18). Lane branches report their own tests, and the parent reruns them on merge. Keep patient/study grouping limits explicit, gold-58 exposure logged, image-only inference, deadline guard plus salvage-before-constant on every entry, and never use `kaggle kernels push --timeout`.
 
-**Next (parent):** user decides whether to launch P9 (and the optional labels-v4 bet) per the [gap assessment](docs/research/silver-gap-assessment-20261020.md); if yes, start the seed-44/45 fits and the P9 variant build at once (submission target Oct 21 03:00 UTC). Otherwise: user decides final 2 on Oct 21 (P6s′ by rule, P7′ as the hedge); then set the two final-selection checkboxes and record it here. No lane is running; all VMs are stopped. Slots used Oct 20: 5 of 5; Oct 21: 4 of 5 (P9 v2, v4b solo, P11, P10p), one held for the evening.
+**Next (parent):** user decides whether to launch P9 (and the optional labels-v4 bet) per the [gap assessment](docs/research/silver-gap-assessment-20261020.md); if yes, start the seed-44/45 fits and the P9 variant build at once (submission target Oct 21 03:00 UTC). Otherwise: user decides final 2 on Oct 21 (P6s′ by rule, P7′ as the hedge); then set the two final-selection checkboxes and record it here. No lane is running; all VMs are stopped. Slots used Oct 20: 5 of 5; Oct 21: 5 of 5 (P9 v2, v4b solo, P11, P10p, P12); Oct 22: 5, last by 14:00 UTC.
