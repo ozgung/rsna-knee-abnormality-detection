@@ -4246,3 +4246,4 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 - P12 (R6 plain + own-8, no Raptor) = 0.950 against own-8 alone 0.956: Raptor is essential beside R6. Sanity check of P12's column requested before reusing shared code.
 - Lane F's supervisor worked once Colab stabilised: v4b-s45 and v5 seeds 42, 43, 44, 46 exported (gold 0.931–0.939); three more v5 seeds training.
 - Wave 1 for Oct 22: E1 = R384 + R224 + own-6 (v5 ×4, v4b-s45, v4b-s43); E2 = P9 v2 structure with four v5 members. Rehearsals now, submissions right after 00:00 UTC.
+- 22:00 UTC: P12 sanity check (Lane P9): the column replays exactly as ½ rank(R6 plain) + ½ rank(own), no fallback, members finite and distinct; own half at stride 2 vs stride 1 Spearman 0.998. No defect; 0.950 is real. Wave 1 rehearsals being pushed.
