@@ -80,11 +80,12 @@ print(round(tot, 1))" 2>/dev/null)
   # (4) deadline
   now=$(date +%s)
   alive=0; for S in $SESSIONS; do grep -qx "stopped:$S" autopilot.state || alive=$((alive+1)); done
-  [ $alive -eq 0 ] && { log "ALL_STOPPED"; echo "EVENT all_stopped"; exit 0; }
+  [ $alive -eq 0 ] && [ "${ONESHOT:-0}" != 1 ] && { log "ALL_STOPPED"; echo "EVENT all_stopped"; exit 0; }
   if [ $now -ge $((DEADLINE + 23400)) ]; then
     for S in $SESSIONS; do ./c.sh stop -s $S 2>&1 | tail -1 | xargs -I{} echo "$(date -u +%FT%TZ) stop $S: {}" >> autopilot.log; pkill -f "refresher.sh $S"; done
     log "DEADLINE: VMs stopped (running fits at deadline: $running)"; echo "EVENT deadline_stop"; exit 0
   fi
   [ -n "$ev" ] && { log "EVENT$ev"; echo "EVENT$ev"; exit 0; }
+  [ "${ONESHOT:-0}" = 1 ] && exit 0
   sleep ${CADENCE:-1500}
 done
