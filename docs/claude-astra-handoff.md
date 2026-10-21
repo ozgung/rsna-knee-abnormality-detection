@@ -4224,3 +4224,4 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 
 ### 2026-10-21 11:20 UTC: Claude (solo), last-submission cut-off moved to Oct 22 14:00 UTC
 - User decision. A 9 h hidden run started at 14:00 ends by 23:00, an hour before the deadline. Lane F's export deadline moves to 06:00 and its VM hard stop to 06:30, with extra v5 seeds filling the slots.
+- 11:25 UTC, user: final-selection lock moved from 22:00 to 23:00 UTC.
