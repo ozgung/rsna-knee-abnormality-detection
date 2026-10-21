@@ -158,12 +158,24 @@ S6C_MODELS_P9S2 = [
      'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v3all-s43-20261020', 'dataset_version': 1},
     {'seed': 44, 'labels': 'v3', 'file': 'E_prior_s44_v3all.pt', 'sha256': 'd3ca3f79bdc20ec3a81c3026071fd54d2a3805f7d5f0f0b85271dc8b3a40e404',
      'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v3all-s44-20261020', 'dataset_version': 1}]
-# P10 / P11 (same eight members): sealed at 06:00 UTC from the Lane F / Lane L4 READY.json exports; an unsealed list refuses to build.
-S6C_MODELS_P10 = None
+# P10 / P11 (parent, 2026-10-20 23:45 UTC; sealed 2026-10-21 04:00 UTC from the Lane F / Lane L4 READY.json exports, all eight
+# exported, no fallback used; scripts/lanep9/seal_from_ready.py): fastMRI student, v4b-s42, Lane F round-1 hash-fold models f0-f3
+# (12 epochs, labels v3 h4), v3-s43, v4b-s43; loader order; every member has an A100 fp16 probe-36 reference.
+S6C_MODELS_P10 = [
+    {'seed': 42, 'labels': 'v3', 'file': 'E_prior_s42_fmall.pt', 'sha256': '6a13f52e424cbfd4945883273fd081dfb2f25b171adb5b6521fab4d382466b57', 'bytes': 200186923, 'dataset': 'ozgung/knee-laned-fmall-s42-20261020', 'dataset_version': 1, 'slot': 1},
+    {'seed': 42, 'labels': 'v4b', 'file': 'E_prior_s42_v4ball.pt', 'sha256': '8ecb4f93e12efadff65c0bd70f7d19233972acc98a32d8c37820291f922f39fa', 'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v4ball-s42-20261020', 'dataset_version': 1, 'slot': 2},
+    {'seed': 42, 'labels': 'v3', 'file': 'E_prior_s42_f0.pt', 'sha256': '87170cbf21170f378ccdc2f3c37cfa90a169eb15b792b3334b63495c83b4cdf9', 'bytes': 200188027, 'dataset': 'ozgung/knee-s6-r1-f0-20261020', 'dataset_version': 1, 'slot': 5},
+    {'seed': 42, 'labels': 'v3', 'file': 'E_prior_s42_f1.pt', 'sha256': '0d3ca47fe3835c4849578290b39be30608faa430d86fcc1038cd6a22a9091077', 'bytes': 200188027, 'dataset': 'ozgung/knee-s6-r1-f1-20261020', 'dataset_version': 1, 'slot': 6},
+    {'seed': 42, 'labels': 'v3', 'file': 'E_prior_s42_f2.pt', 'sha256': 'd9ed6387ec321d61dc371379121483326a9a68429df7dcca091cc910ea556c5d', 'bytes': 200188027, 'dataset': 'ozgung/knee-s6-r1-f2-20261020', 'dataset_version': 1, 'slot': 7},
+    {'seed': 42, 'labels': 'v3', 'file': 'E_prior_s42_f3.pt', 'sha256': '702c8f295e90c1b50cef97c551b22ae84b7dcf1526a25c59e8491e7847b6b701', 'bytes': 200188027, 'dataset': 'ozgung/knee-s6-r1-f3-20261020', 'dataset_version': 1, 'slot': 8},
+    {'seed': 43, 'labels': 'v3', 'file': 'E_prior_s43_v3all.pt', 'sha256': 'a99ad89705f8297ac86659ce8e5a092cd626d851d7d51331c59f1b6920c69690', 'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v3all-s43-20261020', 'dataset_version': 1},
+    {'seed': 43, 'labels': 'v4b', 'file': 'E_prior_s43_v4ball.pt', 'sha256': '09e19ab5c0664e796ad31d53760e82c9092a707e459cb5e1f9a103970ca5cc99', 'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v4ball-s43-20261020', 'dataset_version': 1, 'slot': 1},
+]
 # A100 fp16 probe-36 references per member list (scripts/lanep9/merge_references.py; the P7 file for the P7 and P9 lists).
 S6C_REFERENCE_BY_LIST = {
     'S6C_MODELS_P9S2': {'path': OUT / 'lanep9-20261020/references/reference-p9s2.json',
                         'sha256': '5271208226cde661aaf86dddea3ede3a89a0868a7a2835fe4f5de8b262e030dc'},   # P7 three + v3-s44 (cad13b6d...)
+    'S6C_MODELS_P10': {'path': OUT / 'lanep9-20261020/references/reference-p10.json', 'sha256': 'ca700f1f9c180f3e2d9cbc49d32af19a72250ceb222bf7cf7dfbd5cf6d97ce11'},   # eight members, 36 probe studies
 }
 S6C_MODELS_BY_VARIANT = {'p7': 'S6C_MODELS', 'p9': 'S6C_MODELS_P9', 'p9r': 'S6C_MODELS_P9', 'p9s': 'S6C_MODELS_P9', 'p9sr': 'S6C_MODELS_P9',
                          **{k: 'S6C_MODELS_P9S2' for k in R6F.VARIANTS if k.startswith('p9s2')},
