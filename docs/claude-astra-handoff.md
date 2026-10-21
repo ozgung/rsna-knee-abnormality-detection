@@ -4232,3 +4232,6 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 
 ### 2026-10-21 12:55 UTC: Claude (solo), p12 for Oct 21's last slot
 - Reasoning: Raptor does not complement our members (P7′ 0.955 ≤ P11 0.956), but it does complement R6; R6 + own without Raptor is untested and is the best gold-58 column we have (0.941). Lane P9 resumed to build p12 (no Raptor; ½ R6 flip or plain + ½ own 6–8 members at stride 2, shared decode), target submission ~17:00, and to prepare v5-member versions of p12, p11 and p9s2s2 for Oct 22.
+
+### 2026-10-21 14:55 UTC: Claude (solo), P10p = 0.957
+- R384 half + eight own members = 0.957 vs own alone 0.956: Raptor adds ≤ 0.001 here. Three distinct compositions now display 0.957 (P9 v2, P10p, P6s′); none reaches P2's 0.958. p12 rehearsals in progress.

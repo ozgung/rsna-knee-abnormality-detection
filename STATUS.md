@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-21 12:55 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
+Updated **2026-10-21 14:55 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
 
 ## Current snapshot
 
@@ -9,7 +9,7 @@ Updated **2026-10-21 12:55 UTC** (Claude, solo; Codex unavailable until Oct 22).
 
   | Entry | Submission | Public |
   |---|---|---|
-  | P10p (R384 half + own-only 8-member compact, no R224, no R6) | 57472040 | pending (Oct 21 ~14:45) |
+  | P10p (R384 half + own-only 8-member compact, no R224, no R6) | 57472040 | **0.957** |
   | P11 (own-only compact, mean logit of 8 members, no Raptor, no R6) | 57471109 | **0.956** |
   | P9 v2 (`p9s2s2`: four own members at stride 2, w 0.5, no R224) | 57464435 | **0.957** |
   | v4b-s43 solo probe (round 2, s6solo packet as C1) | 57463519 | **0.956** (C1 v3-s43 solo 0.955; V2 solo 0.950) |
@@ -38,6 +38,7 @@ Updated **2026-10-21 12:55 UTC** (Claude, solo; Codex unavailable until Oct 22).
 - **Cut-offs moved (user, Oct 21 11:20 UTC):** last new submission Oct 22 14:00 UTC, final selection locked by 23:00 UTC (both checkboxes need the Kaggle UI) (hidden runs ≤ 9 h end by 23:00, one hour before the deadline). Member export deadline moved to Oct 22 06:00, VM hard stop 06:30; Lane F fills its slots with further v5 seeds until then.
 - **Oct 21 12:00–12:24: all three Lane F runtimes reclaimed while the laptop was closed** (Pro+ background execution did not protect CLI-created runtimes; tokens had been refreshed at 11:31–11:35). Progress lost about one epoch each; fits resume from per-epoch backups on new A100s (lanef13, lanef14 up; the third requested every 5 min after `Service Unavailable`). Keep the Mac awake while fits run. **P11 = 0.956:** eight own members alone equal the v4b solo (0.956) and sit below P9 v2 (0.957).
 - **Plan for the last six slots (parent, 12:55):** Oct 21 slot 5 = **p12**, no Raptor, compact ½ rank(R6 flip, or plain if flip does not fit) + ½ rank(own 6–8 members, stride 2, shared decode); the only untested composition with a plausible gain (R6 + own without Raptor; gold-58 0.941 for this mix) and the only one with no OAI-derived weights except via R6's anchors. Oct 22 (by 14:00): the best of {p12, p11, p9s2s2} rebuilt with v5 members, chosen after P10p and p12 score; at least one slot kept for a retry. Final picks: final 1 = highest display with gates passed (P2 unless something shows ≥ 0.959); final 2 = the most decorrelated entry within 0.002 of final 1 (P11/p12 family over P9).
+- **P10p = 0.957 (14:50):** R384 + the same eight own members scores +0.001 over P11 (own alone, 0.956). Raptor adds at most a little to an eight-member own compact. Current board: P2 0.958; P6s′, P9 v2, P10p, A′-w 0.957; P11, v4b solo 0.956. p12 (R6 + own, no Raptor) rehearsals running since 13:58.
 - **Selection rule amendment (replaces plan §4 rule 1 and 2 for new entries):** final 1 = the entry with the highest display among {P2, P9 family, p10, p11} that passed every non-projection gate with visible fallback 0, ties broken toward the entry with the stronger out-of-fold support for its compact (own-heavy over R6-only); final 2 = the highest-display remaining entry with the lowest Spearman to final 1 (p11 or p10 if ≥ final 1 − 0.002, else P2 or P9). A 0.001 display difference alone never overrides an out-of-fold result.
 
 ## Lanes running since Oct 20 15:50 UTC (Claude subagents, own worktrees)
