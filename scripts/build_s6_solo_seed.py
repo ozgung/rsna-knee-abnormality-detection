@@ -28,16 +28,20 @@ _ORIGINAL_ARMS, _ORIGINAL_METADATA = B.arms, B.metadata
 
 
 SOURCE = {'kind': 'model'}       # 'dataset': the solo fixture links input/<mount> one level deep, so a C1 packet uses a dataset copy
+# Lane P9 (2026-10-21, parent's slot-4 solo probe of a v4b member): the export's names and the slug date can be overridden, and the
+# expected epoch count too; everything else of the C1 contract (recipe, pool membership, strict CPU load) is unchanged.
+OVERRIDES = {'dataset': None, 'checkpoint': None, 'slug_date': '20261020', 'epochs': 16}
 
 
 def names(tag, seed):
-    ck = 'E_prior_s%d_%sall.pt' % (seed, tag)
-    ref = ('ozgung/knee-s6-%sall-s%d-20261020' % (tag, seed) if SOURCE['kind'] == 'dataset'
-           else 'ozgung/knee-s6-lanec-seeds-20261019/pyTorch/%s-s%d' % (tag, seed))
+    ck = OVERRIDES['checkpoint'] or 'E_prior_s%d_%sall.pt' % (seed, tag)
+    ref = OVERRIDES['dataset'] or ('ozgung/knee-s6-%sall-s%d-20261020' % (tag, seed) if SOURCE['kind'] == 'dataset'
+                                   else 'ozgung/knee-s6-lanec-seeds-20261019/pyTorch/%s-s%d' % (tag, seed))
+    date = OVERRIDES['slug_date']
     return {'dir': LANE / ('%s-s%d' % (tag, seed)), 'dataset': ref,
             'checkpoint': ck,
             'alias': 'E_prior_s%d_f0.pt' % seed, 'membership': 'membership_E_prior_s%d_f0.json' % seed,
-            'rehearsal_slug': 's6solo-%ss%d-qual-20261020' % (tag, seed), 'entry_slug': 's6solo-%ss%d-entry-20261020' % (tag, seed)}
+            'rehearsal_slug': 's6solo-%ss%d-qual-%s' % (tag, seed, date), 'entry_slug': 's6solo-%ss%d-entry-%s' % (tag, seed, date)}
 
 
 def accept(tag, seed, version, python=sys.executable):
@@ -46,13 +50,24 @@ def accept(tag, seed, version, python=sys.executable):
     d = n['dir'] / 'dl'
     d.mkdir(parents=True, exist_ok=True)
     files = [n['checkpoint']] + [x % seed if '%d' in x else x for x in SEED_SOURCES]
-    if not all((d / f).is_file() for f in files):      # private Kaggle Model variation version (dataset quota exhausted)
-        subprocess.run(['kaggle', 'models', 'instances', 'versions', 'download', '%s/%d' % (n['dataset'], version), '-p', str(d),
-                        '--untar', '-q', '--force'], check=True)
-        for z in list(d.glob('*.tar.gz')) + list(d.glob('*.zip')):
+    if not all((d / f).is_file() for f in files):
+        if SOURCE['kind'] == 'dataset':                   # private dataset copy: file by file (the checkpoint, the receipts, SHA256SUMS)
             import shutil
-            shutil.unpack_archive(str(z), str(d))
-            z.unlink()
+            for f in files:
+                if (d / f).is_file():
+                    continue
+                subprocess.run(['kaggle', 'datasets', 'download', '-f', f, '-p', str(d), '--force', '-q', n['dataset']], check=True)
+                z = d / (f + '.zip')
+                if z.exists():
+                    shutil.unpack_archive(str(z), str(d))
+                    z.unlink()
+        else:                                             # private Kaggle Model variation version (dataset quota exhausted)
+            subprocess.run(['kaggle', 'models', 'instances', 'versions', 'download', '%s/%d' % (n['dataset'], version), '-p', str(d),
+                            '--untar', '-q', '--force'], check=True)
+            for z in list(d.glob('*.tar.gz')) + list(d.glob('*.zip')):
+                import shutil
+                shutil.unpack_archive(str(z), str(d))
+                z.unlink()
     require(all((d / f).is_file() for f in files), 'SEED_EXPORT_FILES')
     sums = {}
     for line in (d / 'SHA256SUMS').read_text().splitlines():
@@ -63,7 +78,7 @@ def accept(tag, seed, version, python=sys.executable):
         require(file_sha(d / name) == sha, 'SEED_SHA256SUMS_' + name)
     rc = json.loads((d / 'run_config.json').read_text())
     want = {'arms': 'E_prior', 'backbone': 'convnext_small', 'crop': 288, 'slices': 3, 'phys_mm': 3.5, 'spatial_attn': True,
-            'extent': False, 'state_spec': None, 'freeze_blocks': 16, 'epochs': 16, 'seed_base': seed, 'seeds': 1,
+            'extent': False, 'state_spec': None, 'freeze_blocks': 16, 'epochs': OVERRIDES['epochs'], 'seed_base': seed, 'seeds': 1,
             'include_review_holdout': False, 'pool_studies': 4345, 'gold_studies': 58, 'labels': PAIR.TARGETS,
             'batch': 2, 'train_windows': 64, 'lr': 1e-4, 'only_folds': '0'}
     bad = {k: (rc.get(k), v) for k, v in want.items() if rc.get(k) != v}
@@ -153,13 +168,18 @@ def install(tag, seed):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument('command', choices=['accept', 'rehearsal', 'verify', 'entry'])
-    p.add_argument('--tag', required=True, choices=['v2', 'v3'])
+    p.add_argument('--tag', required=True, help='label table of the export: v2, v3 (Lane C), v4a, v4b (Lane F)')
     p.add_argument('--seed', type=int, required=True)
     p.add_argument('--python', default=sys.executable, help='interpreter with torch/timm for the CPU check')
     p.add_argument('--rehearsal-result')
     p.add_argument('--version', type=int, default=1, help='Kaggle Model variation / dataset version of the export')
     p.add_argument('--source', choices=['model', 'dataset'], default='model')
+    p.add_argument('--dataset', help='export ref override (default ozgung/knee-s6-<tag>all-s<seed>-20261020 or the Lane C Model)')
+    p.add_argument('--checkpoint', help='checkpoint file name override (default E_prior_s<seed>_<tag>all.pt)')
+    p.add_argument('--slug-date', default='20261020', help='kernel slug date (a new date = a new kernel id)')
+    p.add_argument('--epochs', type=int, default=16, help='expected epochs in the export\'s run_config (C1 contract: 16)')
     a = p.parse_args(argv)
+    OVERRIDES.update(dataset=a.dataset, checkpoint=a.checkpoint, slug_date=a.slug_date, epochs=a.epochs)
     SOURCE['kind'] = a.source
     if a.command == 'accept':
         print(json.dumps({k: v for k, v in accept(a.tag, a.seed, a.version, python=a.python).items() if k not in ('run_config_expect',)}, indent=1))
