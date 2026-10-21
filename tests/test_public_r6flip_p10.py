@@ -87,8 +87,8 @@ class GridSpecTests(unittest.TestCase):
         self.assertTrue(all(len(B.slug_for(k, 'rehearsal')) <= 50 for k in R6F.VARIANTS))
         for k in R6F.VARIANTS:
             self.assertIn(B.S6C_MODELS_BY_VARIANT.get(k, 'S6C_MODELS'), ('S6C_MODELS', 'S6C_MODELS_P9', 'S6C_MODELS_P9S2', 'S6C_MODELS_P10',
-                                                                         'S6C_MODELS_P12N', 'S6C_MODELS_V5', 'S6C_MODELS_P9B'))
-        self.assertTrue(all(B.S6C_MODELS_BY_VARIANT[k] == 'S6C_MODELS_P10' for k in R6F.VARIANTS if k.startswith(('p10', 'p11')) and k != 'p11v5'))
+                                                                         'S6C_MODELS_P12N', 'S6C_MODELS_V5', 'S6C_MODELS_P9B', 'S6C_MODELS_E1'))
+        self.assertTrue(all(B.S6C_MODELS_BY_VARIANT[k] == 'S6C_MODELS_P10' for k in R6F.VARIANTS if k.startswith(('p10', 'p11')) and k not in ('p11v5', 'p10v5', 'p10pv5')))
         self.assertTrue(all(B.S6C_MODELS_BY_VARIANT[k] == 'S6C_MODELS_P9S2' for k in R6F.VARIANTS if k.startswith('p9s2') and k != 'p9s2s2b'))
 
 
@@ -359,6 +359,11 @@ class SharedStride2Tests(unittest.TestCase):
             self.assertEqual((g['member_cost']['stride'], g['member_cost']['windows_per_study'], g['member_cost']['stride1_windows_per_study']), (2, 3., 6.))
             self.assertEqual(len(g['member_cost']['per_member_study_seconds']), 2)
             self.assertEqual(len(g['member_cost']['stride1_check_per_member_study_seconds']), 2)
+            c3 = copy.deepcopy(cfg)                                                                  # no member with a separate-pass read-out
+            c3['p9_reference']['aliases'] = ['E_prior_s99_f0.pt']
+            g3 = S6C.require_shared(r, c3, stride=2)
+            self.assertEqual((g3['parity_applicable'], g3['separate_pass_max_abs']), (False, None))
+            self.assertTrue(g['parity_applicable'])
             with self.assertRaises(ValueError) as cm:
                 S6C.require_shared(r, cfg, stride=1)                                                # the sealed stride must match the receipts
             self.assertEqual(str(cm.exception), 'S6C_SHARED_WORKER_PASS')

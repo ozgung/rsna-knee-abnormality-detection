@@ -28,7 +28,9 @@ MAIN = PROJECT.parent.parent.parent if PROJECT.name.startswith('lanep9') else PR
 ROOTS = [MAIN / 'outputs/lanef-20261020/members', MAIN / 'outputs/lanel4-20261020/members']
 PLAN = {'student': (42, 1, 'v3'), 'v3-s42': (42, 0, 'v3'), 'v3-s43': (43, 0, 'v3'), 'v3-s44': (44, 0, 'v3'), 'v3-s45': (45, 0, 'v3'),
         'v4b-s42': (42, 2, 'v4b'), 'v4b-s43': (43, 1, 'v4b'), 'r1-f0': (42, 5, 'v3'), 'r1-f1': (42, 6, 'v3'), 'r1-f2': (42, 7, 'v3'),
-        'r1-f3': (42, 8, 'v3')}
+        'r1-f3': (42, 8, 'v3'), 'v4b-s45': (45, 2, 'v4b'),
+        'v5-s42': (42, 3, 'v5'), 'v5-s43': (43, 3, 'v5'), 'v5-s44': (44, 3, 'v5'), 'v5-s45': (45, 3, 'v5'), 'v5-s46': (46, 3, 'v5'),
+        'v5-s47': (47, 3, 'v5'), 'v5-s48': (48, 3, 'v5'), 'v5-s49': (49, 3, 'v5')}
 # members already sealed earlier (no READY.json folder of their own)
 KNOWN = {'student': {'file': 'E_prior_s42_fmall.pt', 'sha256': '6a13f52e424cbfd4945883273fd081dfb2f25b171adb5b6521fab4d382466b57',
                      'bytes': 200186923, 'dataset': 'ozgung/knee-laned-fmall-s42-20261020', 'dataset_version': 1,
@@ -78,6 +80,11 @@ def entry_from_ready(name, path):
                 ref_alias = next(iter(json.loads(Path(ref_path).read_text())['probabilities']))
         if not ref_path:                                   # Lane F: compact_infer --dump-logits of the probe-36 read-out (one model)
             logits = path.parent / 'ds' / 'probe36_fp16_logits.json'
+            fp = (r.get('probe36_fp16_reference') or {}).get('path')     # later exports name the read-out folder in READY.json
+            if fp and (Path(fp).parent / 'probe36_fp16_logits.json').is_file():
+                logits = Path(fp).parent / 'probe36_fp16_logits.json'
+                S6C.require(__import__('hashlib').sha256(logits.read_bytes()).hexdigest() == r['probe36_fp16_reference']['logits_sha256'],
+                            'PROBE_LOGITS_SHA_' + name)
             if not logits.is_file() and ds.get('status') == 'ready':      # the read-out may live only in the export dataset
                 (path.parent / 'ds').mkdir(exist_ok=True)
                 for fname in ('probe36_fp16_logits.json', 'probe36_fp16_receipt.json'):
@@ -96,7 +103,7 @@ def entry_from_ready(name, path):
                     S6C.require(len(zs) == 1 and len(zs[0]) == 12, 'PROBE_LOGITS_ONE_MODEL_' + name)
                     rows[sid] = [1.0 / (1.0 + math.exp(-float(v))) for v in zs[0]]
                 rec = {}
-                receipt = path.parent / 'ds' / 'probe36_fp16_receipt.json'
+                receipt = logits.parent / 'probe36_fp16_receipt.json'
                 if receipt.is_file():
                     rec = json.loads(receipt.read_text())
                     S6C.require(rec.get('amp') == 'fp16' and rec.get('scored') == len(rows) and not rec.get('fallback'), 'PROBE_RECEIPT_' + name)

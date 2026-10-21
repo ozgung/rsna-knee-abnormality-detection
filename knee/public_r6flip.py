@@ -381,6 +381,9 @@ VARIANTS.update({'p12': no_raptor_blend(False), 'p12f': no_raptor_blend(True), '
                  'p12v5': no_raptor_blend(False), 'p12fv5': no_raptor_blend(True),
                  'p11v5': own_compact_blend('none', 'mean_logit'), 'p9s2s2b': own_dual_blend(0.5, False, 2)})
 COMPACT_VARIANTS['p11v5'] = 's6c'
+# Oct 22 wave 1 E1 (parent 21:45): P10 with R224 on the E1 list; p10pv5 = the R384-only fallback
+VARIANTS.update({'p10v5': own_compact_blend('both', 'mean_logit'), 'p10pv5': own_compact_blend('r384', 'mean_logit')})
+COMPACT_VARIANTS.update({'p10v5': 's6c', 'p10pv5': 's6c'})
 PRECISION = {'old320': 'float64', 'r6': '%.9g', 'crop224': 'float32 CSV', 'nafull': 'float64', 'r7': '%.9g', 's6c': '%.9g'}
 BLEND_KEYS = {'raptor_arms', 'weights', 'default_weight'}
 COMPACT_KEYS = {'compact_arms', 'compact_flip'}

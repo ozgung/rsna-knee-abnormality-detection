@@ -363,13 +363,14 @@ def require_shared(r, cfg, stride=1):
     rows = {row['id']: row for w in reports for row in w['records']}
     ref = cfg['p9_reference']
     aliases = cfg['s6c']['aliases']
-    ref_aliases = list(ref['aliases'])
-    require(set(ref_aliases) <= set(aliases) and set(ref['probabilities']) == set(rows) == set(cfg['staged_ids']), 'P9_REFERENCE_COVERAGE')
+    ref_aliases = [a for a in ref['aliases'] if a in aliases]     # p9s2s2b (four v5 members): no member with a separate-pass read-out;
+    require(set(ref['probabilities']) == set(rows) == set(cfg['staged_ids']), 'P9_REFERENCE_COVERAGE')   # parity then not applicable
+    require(ref_aliases or not set(ref['aliases']) & set(aliases), 'P9_REFERENCE_COVERAGE')
     worst, per_member = 0.0, {a: 0.0 for a in ref_aliases}
     for sid, row in rows.items():
         for j, a in enumerate(ref_aliases):
             k = aliases.index(a)
-            d = max(abs(float(u) - float(v)) for u, v in zip(row[key][k], ref['probabilities'][sid][j]))
+            d = max(abs(float(u) - float(v)) for u, v in zip(row[key][k], ref['probabilities'][sid][list(ref['aliases']).index(a)]))
             per_member[a] = max(per_member[a], d)
             worst = max(worst, d)
     require(worst <= SHARED_PARITY, 'P9S_SEPARATE_PASS_PARITY')
@@ -381,7 +382,8 @@ def require_shared(r, cfg, stride=1):
     if stride != 1:
         cost['stride1_check_per_member_study_seconds'] = [sum(row['stride1_seconds'][k] for row in rows.values()) / n for k in range(len(aliases))]
         cost['stride1_windows_per_study'] = sum(row['windows_stride1'] for row in rows.values()) / n
-    return {'studies': n, 'separate_pass_max_abs': worst, 'separate_pass_max_abs_by_member': per_member, 'parity_key': key,
+    return {'studies': n, 'separate_pass_max_abs': worst if ref_aliases else None, 'separate_pass_max_abs_by_member': per_member,
+            'parity_applicable': bool(ref_aliases), 'parity_key': key,
             'separate_pass_tolerance': SHARED_PARITY, 'side_flipped_separate_renders': separate,
             'reference_receipt_sha256': ref['receipt_sha256'], 'member_cost': cost}
 

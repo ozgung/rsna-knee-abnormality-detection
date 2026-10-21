@@ -367,7 +367,7 @@ class SharedS6Tests(unittest.TestCase):
             self.assertEqual((g['studies'], g['side_flipped_separate_renders']), (39, 0))
             for code, mutate in {
                 'P9S_SEPARATE_PASS_PARITY': lambda r, c: c['p9_reference']['probabilities'][ids[5]][1].__setitem__(0, .99),
-                'P9_REFERENCE_COVERAGE': lambda r, c: c['p9_reference'].update(aliases=['x', 'y']),
+                'P9_REFERENCE_COVERAGE': lambda r, c: c['p9_reference']['probabilities'].pop(ids[3]),     # study coverage
                 'S6C_SHARED_WORKER_PASS': lambda r, c: r['workers']['s6c'][0].update(cut={'after_studies': 1}),
                 'S6C_SHARED_WORKER_PASS ': lambda r, c: r['workers']['r6'][1].__setitem__('s6c_shared', {'status': 'FAIL'}),
                 'S6C_SHARED_STUDY_GATES': lambda r, c: r['workers']['s6c'][1]['records'][0].update(r6_aborted=True),

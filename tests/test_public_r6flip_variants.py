@@ -459,7 +459,7 @@ class VariantPacketTests(unittest.TestCase):
             self.assertEqual(pack['cfg']['r6flip_binding']['entry_variant']['name'], variant)
             date = {'p6': '20261019', 'p6p': '20261019', 'p6s': '20261020', 'p6sp': '20261020', 'p9': '20261020', 'p9r': '20261020',
                     'p9s': '20261020', 'p9sr': '20261020', 'p11v5': '20261022', 'p9s2s2b': '20261022', 'p12v5': '20261022',
-                    'p12fv5': '20261022'}.get(variant, '20261021' if variant.startswith(('p9s2', 'p10', 'p11', 'p12')) else '20261018')
+                    'p12fv5': '20261022', 'p10v5': '20261022', 'p10pv5': '20261022'}.get(variant, '20261021' if variant.startswith(('p9s2', 'p10', 'p11', 'p12')) else '20261018')
             slug = self.B.slug_for(variant, 'rehearsal')
             self.assertEqual(slug, 'r6flip-%s-rehearsal-%s' % (variant, date))
             self.assertEqual(self.B.slug_for(variant, 'entry'), 'r6flip-%s-entry-%s' % (variant, date))
