@@ -4241,3 +4241,8 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 
 ### 2026-10-21 16:55 UTC: Claude (solo), P12 submitted (57490415)
 - `p12` = no Raptor, ½ rank(R6 plain) + ½ rank(own-8 mean logit) at stride 2 from the shared decode; point 22,895 s, all non-projection gates PASS, visible fallback 0, no guard-trim risk. The flip version (30,941 s) did not fit with ≥ 4 members. v5 variants (p12v5, p12fv5, p11v5, p9s2s2b) are sealed with empty member lists, waiting for v5 exports. Rehearsal outputs are ~10 GB because member checkpoints are copied into every pass; `outputs/lanep9-20261020/fetch_small.py` pulls the rest in under a minute.
+
+### 2026-10-21 21:50 UTC: Claude (solo), P12 = 0.950; v5 members arrived; Oct 22 wave 1 sealed
+- P12 (R6 plain + own-8, no Raptor) = 0.950 against own-8 alone 0.956: Raptor is essential beside R6. Sanity check of P12's column requested before reusing shared code.
+- Lane F's supervisor worked once Colab stabilised: v4b-s45 and v5 seeds 42, 43, 44, 46 exported (gold 0.931–0.939); three more v5 seeds training.
+- Wave 1 for Oct 22: E1 = R384 + R224 + own-6 (v5 ×4, v4b-s45, v4b-s43); E2 = P9 v2 structure with four v5 members. Rehearsals now, submissions right after 00:00 UTC.
