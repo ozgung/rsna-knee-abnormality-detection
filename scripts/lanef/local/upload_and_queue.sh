@@ -16,7 +16,7 @@ subprocess.run("mkdir -p /content/targets && cp /content/targets_V5_all.csv /con
 for f in ['targets/targets_V5_all.csv','targets/targets_V4B_all.csv','compact_train_s6v2.py','vm_train.sh','vm_seed_fit_lanef.sh','lanef_after_fit.sh','v5_seed_queue.sh']:
     print(f, hashlib.sha256(open('/content/'+f,'rb').read()).hexdigest()[:16])
 pre = "bash /content/resume_v4b45.sh > /content/resume45.log 2>&1 && " if "${RESUME45:-0}" == "1" else ""
-subprocess.Popen(['bash','-c', pre + 'DEADLINE_EPOCH=1792634400 bash /content/v5_seed_queue.sh $ARGS'], stdout=open('/content/queue_main.log','wb'), stderr=subprocess.STDOUT, start_new_session=True)
+subprocess.Popen(['bash','-c', pre + 'DEADLINE_EPOCH=1792648800 bash /content/v5_seed_queue.sh $ARGS'], stdout=open('/content/queue_main.log','wb'), stderr=subprocess.STDOUT, start_new_session=True)
 print('queue launched: $ARGS')
 PY
 ./c.sh exec -s $SES -f /tmp/lanef_uq_$SES.py --timeout 120

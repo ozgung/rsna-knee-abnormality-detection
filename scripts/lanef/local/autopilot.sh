@@ -3,7 +3,7 @@
 # targets (sha from READY.json, check_targets, 4,345-row pool), stage + upload them, start the v5 seed queues (lanef9: 42 44 46 at
 # once; lanef8: 43 45 47 after v4b-s45); (2) for every finished job (READOUT_EXPORT_DONE in /content/after_<tag>_s<seed>.log)
 # without a local members/<tag>-s<seed>/READY.json, run member_export.sh; (3) surface failures; (4) at the deadline (Oct 22
-# 02:30 UTC; Oct 22 00:00 + 9000 s) regardless; each VM is stopped as soon as its queues are done and its members handed off, stop both VMs and the refreshers.  Exits on every event so the
+# 06:30 UTC; Oct 22 00:00 + 23400 s) regardless; each VM is stopped as soon as its queues are done and its members handed off, stop both VMs and the refreshers.  Exits on every event so the
 # agent is notified; rerun to continue.  Log: autopilot.log; state: autopilot.state (v5 handled flag).
 cd "$(dirname "$0")"; SESSIONS=${SESSIONS:-"lanef10 lanef11 lanef12"}; ROOT=/Users/ozgun/Dev/rsna-knee-abnormality-detection; L=$ROOT/outputs/lanef-20261020
 export QPY=/Users/ozgun/miniconda3/envs/fastgen/bin/python
@@ -61,7 +61,7 @@ PY
   now=$(date +%s)
   alive=0; for S in $SESSIONS; do grep -qx "stopped:$S" autopilot.state || alive=$((alive+1)); done
   [ $alive -eq 0 ] && { log "ALL_STOPPED"; echo "EVENT all_stopped"; exit 0; }
-  if [ $now -ge $((DEADLINE + 9000)) ]; then
+  if [ $now -ge $((DEADLINE + 23400)) ]; then
     for S in $SESSIONS; do ./c.sh stop -s $S 2>&1 | tail -1 | xargs -I{} echo "$(date -u +%FT%TZ) stop $S: {}" >> autopilot.log; pkill -f "refresher.sh $S"; done
     log "DEADLINE: VMs stopped (running fits at deadline: $running)"; echo "EVENT deadline_stop"; exit 0
   fi
