@@ -2,7 +2,7 @@
 # Lane F round 3 (VM side): run all-data 16-epoch S6 fits for <tag> on the given seeds one after another on this VM, each with
 # the per-epoch Model backup, the read-outs (gold-58 once, probe-36 fp16 reference) and the export (vm_seed_boot_lanef.sh +
 # lanef_after_fit.sh).  A seed starts only after the previous job on this VM has exported and read out, and only if it can
-# finish before the deadline (default Oct 22 06:00 UTC; a fit + read-outs takes about 4.0 h).
+# finish before the deadline and the local unit guard has not written /content/STOP_NEW_SEEDS; it must (default Oct 22 06:00 UTC; a fit + read-outs takes about 4.0 h).
 # usage: v5_seed_queue.sh <tag> <targets csv> <wait-for "tag:seed" or none> <seed> [seed...]     log: /content/<tag>_queue.log
 set -uo pipefail
 TAG=$1; TG=$2; WAIT=$3; shift 3
@@ -14,6 +14,7 @@ if [ "$WAIT" != none ]; then
   echo "$(date -u +%FT%TZ) previous job $WAIT finished: $(tail -n 1 /content/fit_${WT}_s${WS}.log)"
 fi
 for SEED in "$@"; do
+  if [ -f /content/STOP_NEW_SEEDS ]; then echo "$(date -u +%FT%TZ) seed $SEED NOT started: unit guard ($(cat /content/STOP_NEW_SEEDS))"; continue; fi
   now=$(date +%s)
   if [ $((now + NEED)) -gt $DEADLINE ]; then echo "$(date -u +%FT%TZ) seed $SEED NOT started: would end after the deadline"; continue; fi
   echo "$(date -u +%FT%TZ) starting $TAG seed $SEED"

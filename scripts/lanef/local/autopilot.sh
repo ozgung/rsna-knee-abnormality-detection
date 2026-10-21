@@ -35,7 +35,7 @@ while true; do
   running=0
   for S in $SESSIONS; do
     grep -qx "stopped:$S" autopilot.state && continue
-    r=$(probe $S); log "$S $r"
+    r=$(probe $S); log "$S $r"; echo "$r" | grep -q '^{' && echo "$r" > /tmp/lanef_ap_last_$S.json || rm -f /tmp/lanef_ap_last_$S.json
     echo "$r" | grep -q "appears to be lost\|not found\|Timeout" && { ev="$ev $S:unreachable"; continue; }
     python3 - "$S" "$r" <<'PY' > /tmp/lanef_ap_actions.txt 2>/dev/null
 import json, sys, os
@@ -57,6 +57,26 @@ PY
       esac
     done < /tmp/lanef_ap_actions.txt
   done
+  # (3b) unit guard (parent 11:35): a new seed costs about 20 units; keep >= 15 after all running fits finish
+  if ! grep -q "^units_stop" autopilot.state; then
+    bal=$(LB_COLAB_CONFIG=~/.config/colab-cli/sessions-lanef-20261020.json /Users/ozgun/.local/share/uv/tools/google-colab-cli/bin/python $ROOT/scripts/laneb/ccu_info.py 2>/dev/null | grep -o '"currentBalance": [0-9.]*' | awk '{print $2}')
+    need=$(grep -h "running" /tmp/lanef_ap_last_*.json 2>/dev/null | python3 -c "
+import sys, json, re
+tot = 0.0
+for line in sys.stdin:
+    r = json.loads(line)
+    es = [max([int(m) for m in re.findall(r'epoch (\d+) loss', x)] or [-1]) for x in r.get('running', [])]
+    live = [e for e in es if e < 15]
+    if r.get('gpu_procs', 0) > 0:
+        e = min(live) if live else 15
+        tot += 5.3 * ((15 - e) * 0.22 + 0.35)
+print(round(tot, 1))" 2>/dev/null)
+    log "unit guard: balance ${bal:-?} units, running fits still need about ${need:-?}, new seed 20, floor 15"
+    if [ -n "$bal" ] && [ -n "$need" ] && python3 -c "import sys; sys.exit(0 if $bal - $need - 20 < 15 else 1)"; then
+      for S in $SESSIONS; do grep -qx "stopped:$S" autopilot.state || printf 'open("/content/STOP_NEW_SEEDS","w").write("balance %s, running need %s")\nprint("guard set")\n' "$bal" "$need" > /tmp/lanef_guard.py && ./c.sh exec -s $S -f /tmp/lanef_guard.py --timeout 60 > /dev/null 2>&1; done
+      echo "units_stop $(date -u +%FT%TZ) balance $bal need $need" >> autopilot.state; log "UNIT GUARD SET on all VMs"; ev="$ev units_guard_set"
+    fi
+  fi
   # (4) deadline
   now=$(date +%s)
   alive=0; for S in $SESSIONS; do grep -qx "stopped:$S" autopilot.state || alive=$((alive+1)); done
