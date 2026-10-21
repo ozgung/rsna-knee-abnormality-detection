@@ -30,7 +30,7 @@ out["gpu_procs"] = int(sh("nvidia-smi --query-compute-apps=pid --format=csv,nohe
 print(json.dumps(out))
 PY
 while true; do
-  ev=""
+  ev=""; [ -f sessions.txt ] && SESSIONS=$(tr '\n' ' ' < sessions.txt)
   # (2) member hand-offs, (3) failures
   running=0
   for S in $SESSIONS; do
