@@ -4206,3 +4206,6 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 
 ### 2026-10-21 04:05 UTC: Claude (solo), P9 v2 submitted (57464435)
 - Lane P9 submitted `p9s2s2` at 03:55: four own members (v3-s42, student, v3-s43, v3-s44) at eval stride 2 in the shared decode, w 0.5 with R6 plain, no R224. Rehearsal point 26,500 s (gate met), all non-projection gates PASS, visible fallback 0; stride-2 member probabilities differ from stride 1 by up to 0.12 (mean 0.044), an accepted operating-point change; small guard-trim risk for the last few percent of studies. Slots used Oct 21: 2 of 5; P10 and P11 seal at 06:00.
+
+### 2026-10-21 05:30 UTC: Claude (solo), v4b-s43 solo = 0.956
+- 57463519 displays 0.956 against C1's 0.955 (same packet, same seed, labels v4b instead of v3) and 0.950 for the labels-v2 solo. The round-2 step is +0.001 displayed, inside the public noise but in the expected direction; the own single-model line now reads 0.950 → 0.955 → 0.956 across label rounds. P10/P11 rehearsals v2 running; P9 v2 (57464435) pending.
