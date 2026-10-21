@@ -4203,3 +4203,6 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 
 ### 2026-10-21 03:35 UTC: Claude (solo), v4b-s43 solo probe submitted (57463519)
 - Lane F exported the first round-2 member (v4b-s43, 16 epochs, all data; dataset `ozgung/knee-s6-v4ball-s43-20261020` v1) at 02:59; Lane P9 ran it through the C1 solo packet (rehearsal PASS, visible PASS, 0 fallbacks) and submitted 57463519 at 03:24. It measures labels v4b against C1's 0.955 directly; score expected ~06:30. P9 v2 (four members, stride 2) rehearsal finished 03:14, entry pending gates; P10/P11 seal at 06:00. Slots used Oct 21: 1 of 5.
+
+### 2026-10-21 04:05 UTC: Claude (solo), P9 v2 submitted (57464435)
+- Lane P9 submitted `p9s2s2` at 03:55: four own members (v3-s42, student, v3-s43, v3-s44) at eval stride 2 in the shared decode, w 0.5 with R6 plain, no R224. Rehearsal point 26,500 s (gate met), all non-projection gates PASS, visible fallback 0; stride-2 member probabilities differ from stride 1 by up to 0.12 (mean 0.044), an accepted operating-point change; small guard-trim risk for the last few percent of studies. Slots used Oct 21: 2 of 5; P10 and P11 seal at 06:00.
