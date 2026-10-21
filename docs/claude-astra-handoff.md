@@ -4196,3 +4196,7 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 
 ### 2026-10-20 23:50 UTC: Claude (solo), compositions sealed; P9 v2 chain started
 - Lane P9 reported its variants ready (p9s2 grid with w ∈ {0.5, 0.6, 0.7}, optional R224 and member stride 2; p10/p10p and p11 with mean-logit own compacts, up to 8 members; 146 tests OK). Parent sealed: P9 v2 = four members {v3-s43, student, v3-s44, v3-s42} at w 0.5, stride 1, no R224 (isolates the member effect against v1); P10 and P11 = {v3-s43, student, v4b-s42, v4b-s43, f0–f3}, sealed at 06:00 with fallbacks; evening variant pre-decided on P9 v1's display.
+
+### 2026-10-21 01:15 UTC: Claude (solo), P9 v1 = 0.955; own-member plateau
+- 57451284 displays 0.955 (hidden run about 5.3 h). Paired with P6s′ 0.957 (R7 plain in the same slot) it is −0.002; with P7′ = C1 = 0.955 the pattern is that any compact containing our S6 members displays 0.955 on the public set. The out-of-fold lead over R6 (+0.014, report truth) did not transfer; gold-58 parity was the honest estimate. P2 remains final 1.
+- Lane P9's member-cost figure was corrected (about 3,200 s of projected point per extra member at stride 1); the sealed four-member P9 v2 missed the point gate, so the pre-registered rule dropped the last member: P9 v2 = three members (student, v3-s43, v3-s44), rehearsal running, submission about 02:15. P10/P11 (8 members, separate worker) still fit and seal at 06:00. Added: a v4b-member solo probe (slot 4) to measure round 2 against C1 directly.

@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-20 23:50 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
+Updated **2026-10-21 01:15 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
 
 ## Current snapshot
 
@@ -9,7 +9,7 @@ Updated **2026-10-20 23:50 UTC** (Claude, solo; Codex unavailable until Oct 22).
 
   | Entry | Submission | Public |
   |---|---|---|
-  | P9 v1 (`p9s`, shared decode) | 57451284 | pending (Oct 21 ~04:30) |
+  | P9 v1 (`p9s`, shared decode) | 57451284 | **0.955** (scored by 01:00) |
   | P2 (R6F-pure v2) | 57340072 | **0.958** |
   | A′-w | 57324282 | 0.957 |
   | P3 / P4 / P5 | 57366765 / 57368819 / 57368388 | 0.957 each |
@@ -28,6 +28,7 @@ Updated **2026-10-20 23:50 UTC** (Claude, solo; Codex unavailable until Oct 22).
 - **User (Oct 21 00:00 local): decide without asking.** Decisions taken: (1) P9 v2 keeps w = 0.5 own vs R6 plain and takes up to four own members at stride 1 (or six at stride 2); (2) the four round-1 fold models are exported as an R6-style 4-fold bundle and count as members; (3) variants p10 (Raptor half + own-only compact) and p11 (own-only compact, no Raptor) are built and get Oct 21 slots as the decorrelated candidates; (4) Oct 21 slots: P9 v2 ~08:00, p10 ~10:00, p11 ~12:00, two kept for retries or round-2 variants; Oct 22: the last two by 10:00 UTC; (5) third A100 slot stays with Lane L4 for fits (v4b seed 44 after v3 seed 45); (6) checkpoint averaging of the last three epochs is tested out of fold by Lane F and applied to round-2 members if ≥ +0.001 with CI > 0; (7) no ConvNeXt-base or mirror-augmentation experiments without extra GPU capacity (Colab caps the account at 3 A100 sessions; 4 VM losses on Oct 20).
 - **Labels v4b READY (22:57, Lane L4):** v3 construction with teacher = calibrated mean of {own OOF r1, R6 flip OOF, R7 plain OOF} at weight 0.5 (MCL 0.25); gold-58 0.9341 vs v3 0.9254 and v2 0.9202 (teacher alone 0.938; exposed, one read); Pearson to v3 0.97–0.99 per finding. Targets `targets_V4B_all.csv` bffeeee0…. Round-2 fits (v4b seeds 42, 43 on Lane F; seed 44 on Lane L4 after v3 seed 45) start now; exports expected Oct 21 03:00–05:00.
 - **Sealed compositions (23:45, parent):** P9 v2 = `p9s2` (stride 1, w 0.5, no R224) with {v3-s43, student, v3-s44, v3-s42}, chain started, submit ~01:00 Oct 21. P10 (`p10`/`p10p`, Raptor half + own-only compact, mean logit) and P11 (`p11`, own-only compact, mean logit) share one 8-member list {v3-s43, student, v4b-s42, v4b-s43, round-1 fold models f0–f3}, sealed at 06:00 with fallbacks v3-s44/v3-s45/v3-s42, submitted ~08:00. Evening slots: `p9s2r` stride 2 with six members if P9 v1 displays ≤ 0.957, else `p9s2` with the four best new members. Each new member ships a probe-36 reference or is marked no_reference.
+- **P9 v1 = 0.955 (01:00 UTC).** Paired against P6s′ (0.957, same arms with R7 plain instead of our two members) this is −0.002, and P7′ = C1 = 0.955 before it: every composition with our members in the compact displays 0.955, whether solo, own-only compact, or half of a dual compact. Reading: on the public set our members are R7-class at best; the +0.014 out of fold was alignment with the report-derived truth, and gold-58 parity is the honest signal. P2 stays final 1. Remaining slots answer the open questions: P9 v2 (three members), P10 and P11 (own-8 with and without Raptor), a v4b-member solo probe against C1's 0.955. P(any entry ≥ 0.959 by Oct 22) now about 0.1 [estimate].
 - **Selection rule amendment (replaces plan §4 rule 1 and 2 for new entries):** final 1 = the entry with the highest display among {P2, P9 family, p10, p11} that passed every non-projection gate with visible fallback 0, ties broken toward the entry with the stronger out-of-fold support for its compact (own-heavy over R6-only); final 2 = the highest-display remaining entry with the lowest Spearman to final 1 (p11 or p10 if ≥ final 1 − 0.002, else P2 or P9). A 0.001 display difference alone never overrides an out-of-fold result.
 
 ## Lanes running since Oct 20 15:50 UTC (Claude subagents, own worktrees)
