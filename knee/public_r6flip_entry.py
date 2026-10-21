@@ -305,10 +305,7 @@ def launch_guarded(cfg, out, arm, deadline, pass_name='production', ids_by_board
                 log.close()
                 folders.append(out / name / ('old' if arm == 'nafull' else arm))   # the A-triple-prime worker writes under old/ (s6c under s6c/)
             while any(c.poll() is None for c in children):
-                s = resource_snapshot(out)
-                for k in high:
-                    high[k] = max(high[k], s[k])
-                minimum = min(minimum, s['disk_free_bytes'])
+                minimum = sample_resources(out, high, minimum, resource_snapshot)
                 if time.monotonic() > deadline and not deadline_hit:
                     deadline_hit = True
                     for c in children:
@@ -339,6 +336,18 @@ def launch_guarded(cfg, out, arm, deadline, pass_name='production', ids_by_board
             reports.append({'status': 'NO_RECEIPT'})
     return reports, {'wall_seconds': time.monotonic() - start, 'sample_interval_seconds': .5, 'peaks': high,
                      'minimum_disk_free_bytes': minimum, 'deadline_hit': deadline_hit, 'exit_codes': codes}
+
+
+def sample_resources(out, high, minimum, snapshot):
+    """One resource sample of the stage; a worker may delete a per-study temp folder while the walk runs (P11 rehearsal v2,
+    2026-10-21: FileNotFoundError from compact_infer's tmp tree aborted the controller), so an OSError skips the sample."""
+    try:
+        s = snapshot(out)
+    except OSError:
+        return minimum
+    for k in high:
+        high[k] = max(high[k], s[k])
+    return min(minimum, s['disk_free_bytes'])
 
 
 def salvage(ids, out, arm, folder_names):

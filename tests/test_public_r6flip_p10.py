@@ -363,6 +363,24 @@ class SharedStride2Tests(unittest.TestCase):
             self.assertEqual(str(cm.exception), 'S6C_SHARED_WORKER_PASS')
 
 
+class ResourceSampleTests(unittest.TestCase):
+    def test_a_vanishing_temp_file_skips_the_sample_instead_of_aborting_the_stage(self):
+        calls = []
+
+        def snapshot(out):
+            calls.append(out)
+            if len(calls) == 1:
+                raise FileNotFoundError('/o/board0-s6c-production/s6c/tmp/s_x/series/y.npy')
+            return {'host_rss_bytes': 5, 'output_disk_bytes': 7, 'disk_free_bytes': 100}
+        high = {'host_rss_bytes': 1, 'output_disk_bytes': 9}
+        minimum = ENTRY.sample_resources('/o', high, 500, snapshot)
+        self.assertEqual((minimum, high), (500, {'host_rss_bytes': 1, 'output_disk_bytes': 9}))      # skipped, nothing changed
+        minimum = ENTRY.sample_resources('/o', high, minimum, snapshot)
+        self.assertEqual((minimum, high), (100, {'host_rss_bytes': 5, 'output_disk_bytes': 9}))
+        with self.assertRaises(RuntimeError):                                                           # only OS errors are skipped
+            ENTRY.sample_resources('/o', high, minimum, lambda out: (_ for _ in ()).throw(RuntimeError('x')))
+
+
 def staged():
     try:
         from scripts import build_r6flip_entry as B
