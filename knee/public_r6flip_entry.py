@@ -187,9 +187,18 @@ def projection(setup_seconds, phases, workers, merge_seconds, development_window
         overhead[arm] = phases[arm]['wall_seconds'] - production[arm]
     compact = [arm for arm in ('r6', 'r7', 's6c') if arm in workers and arm in phases]   # r7: P6 only (P6s times R7 inside r6); s6c: P9
     window_counts = {}
+    # P9s at member stride 2: the rehearsal-only stride-1 check forwards run inside R6's production; they are rehearsal work, counted
+    # once as overhead (like the sentinel passes), not scaled with the hidden population
+    check = [0.0, 0.0]
+    if 's6c' in workers and 's6c' not in phases:
+        for board, w in enumerate(workers['s6c'][:2]):
+            check[board] = sum(sum(float(t) for t in (x.get('stride1_seconds') or [])) for x in (w.get('records') or []) if x.get('status') == 'genuine')
     for arm in compact:
         genuine = [[x for x in w['records'] if x['status'] == 'genuine'] for w in workers[arm]]
-        production[arm] = max(sum(float(x['production_seconds']) for x in g) for g in genuine)
+        sums = [sum(float(x['production_seconds']) for x in g) for g in genuine]
+        if arm == 'r6':
+            sums = [s_ - c for s_, c in zip(sums, check)]
+        production[arm] = max(sums)
         window_counts[arm] = sum(x['windows'] for g in genuine for x in g)
         require(0 < production[arm] <= phases[arm]['wall_seconds'] and window_counts[arm] > 0, 'MEASURED_PHASE_PRODUCTION_' + arm)
         overhead[arm] = phases[arm]['wall_seconds'] - production[arm]
@@ -215,6 +224,7 @@ def projection(setup_seconds, phases, workers, merge_seconds, development_window
             'measured_studies': studies, 'measured_r6_windows': windows, 'r6_sentinel_pass_wall_seconds': sentinel_walls,
             **({'measured_r7_windows': window_counts['r7']} if 'r7' in compact else {}),
             **({'measured_s6c_windows': window_counts['s6c'], 's6c_sentinel_pass_wall_seconds': own_sentinel_walls} if 's6c' in compact else {}),
+            **({'s6c_stride1_check_seconds': check} if any(check) else {}),
             'setup_seconds': setup_seconds, 'merge_seconds': merge_seconds, 'scenarios': scenarios,
             'point_seconds': pick(1., 1.), 'conservative_seconds': conservative, 'gate_seconds': PROJECTION_GATE_SECONDS,
             'gate_pass': conservative <= PROJECTION_GATE_SECONDS, 'actual_limit_seconds': MAX_SECONDS,

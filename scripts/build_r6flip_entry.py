@@ -144,11 +144,13 @@ S6C_MODELS_P9 = [
      'dataset': 'ozgung/knee-laned-fmall-s42-20261020', 'dataset_version': 1},
     {'seed': 43, 'labels': 'v3', 'file': 'E_prior_s43_v3all.pt', 'sha256': 'a99ad89705f8297ac86659ce8e5a092cd626d851d7d51331c59f1b6920c69690',
      'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v3all-s43-20261020', 'dataset_version': 1}]
-# P9S2 (parent, sealed 2026-10-20 23:45 UTC with four members; v3-s42 dropped 2026-10-21 00:35 under the pre-registered budget rule
-# after the four-member rehearsal projected 28,461 s > 27,000 s): P9 v2 = p9s2, w 0.5, no R224; labels-v3 family, loader order.
-# Sources: the fastMRI student and v3-s43 private datasets (P9s v1), v3-s44 private dataset copy (Lane L4 READY.json
-# 2026-10-20 22:56, SHA256SUMS read by scripts/lanep9/member_entry.py). v3-s42 (Kaggle Model, sha 03da2cac...) is the four-member record.
+# P9S2 (parent, sealed 2026-10-20 23:45 UTC): four labels-v3-family members in loader order. Four members at stride 1 projected
+# 28,461 s and three 27,845 s (> 27,000 s); under the budget rule the set runs at member eval stride 2 (p9s2s2), where four fit.
+# Sources: v3-s42 Kaggle Model (Lane C export), the fastMRI student and v3-s43 private datasets (P9s v1), v3-s44 private dataset
+# copy (Lane L4 READY.json 2026-10-20 22:56, SHA256SUMS read by scripts/lanep9/member_entry.py).
 S6C_MODELS_P9S2 = [
+    {'seed': 42, 'labels': 'v3', 'file': 'E_prior_s42_v3all.pt', 'sha256': '03da2cacdbc12305519e05c8e9a5626f14eb71f49bc26d56e3f2ced35f997e43',
+     'bytes': 200188027, 'dataset': 'ozgung/knee-s6-lanec-seeds-20261019/pyTorch/v3-s42', 'dataset_version': 1},
     {'seed': 42, 'slot': 1, 'labels': 'v3', 'file': 'E_prior_s42_fmall.pt',
      'sha256': '6a13f52e424cbfd4945883273fd081dfb2f25b171adb5b6521fab4d382466b57', 'bytes': 200186923,
      'dataset': 'ozgung/knee-laned-fmall-s42-20261020', 'dataset_version': 1},

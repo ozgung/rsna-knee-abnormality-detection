@@ -240,6 +240,25 @@ class StagePlanTests(unittest.TestCase):
         report, calls, _ = run_entry(cfg, cols)
         self.assertEqual((calls, report['status']), ([], 'EMERGENCY_CONSTANT'))
 
+    def test_projection_counts_the_stride1_check_once_as_overhead(self):
+        def shard(seconds, windows=10, extra=None):
+            rec = {'production_seconds': seconds, 'status': 'genuine', 'windows': windows}
+            if extra is not None:
+                rec = {**rec, **extra}
+            return {'records': [dict(rec) for _ in range(5)], 'peak_cuda_bytes': 7}
+        phase = lambda: {'wall_seconds': 100., 'peaks': {'host_rss_bytes': 1, 'output_disk_bytes': 1}, 'minimum_disk_free_bytes': 1}
+        phases = {a: phase() for a in ('old', 'r6', 'r6_sentinel1', 'r6_sentinel2')}
+        windows = [10] * 870
+        base = {'old': [shard(2.), shard(3.)], 'r6': [shard(4.), shard(5.)], 's6c': [shard(1., 20), shard(1., 20)]}
+        p0 = ENTRY.projection(10., phases, base, 5., windows)
+        checked = {**base, 's6c': [shard(1., 20, {'stride1_seconds': [.3, .2]}), shard(1., 20, {'stride1_seconds': [.3, .2]})]}
+        p1 = ENTRY.projection(10., phases, checked, 5., windows)
+        self.assertEqual(p1['s6c_stride1_check_seconds'], [2.5, 2.5])
+        self.assertNotIn('s6c_stride1_check_seconds', p0)
+        # R6 production 25 s -> 22.5 s (scaled x 1300 x 10 / 100 = 130); the 2.5 s check stays once in the fixed overhead (100 - 22.5)
+        self.assertAlmostEqual(p0['point_seconds'] - p1['point_seconds'], 2.5 * 130 - 2.5, places=6)
+        self.assertEqual(p1['measured_production_wall_seconds']['r6'], 22.5)
+
     def test_worker_config_seals_the_member_stride_and_the_stride1_check(self):
         cfg, cols = stub_cfg('p9s2s2', S6C.block(members(2, ('v3',))), mode='rehearsal')
         cfg.update(boards=[{'uuid': 'a'}, {'uuid': 'b'}], staged='st', staged_ids=['s1'], stage_binding={}, code='c', source_pins={},
