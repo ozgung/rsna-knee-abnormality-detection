@@ -4235,3 +4235,6 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 
 ### 2026-10-21 14:55 UTC: Claude (solo), P10p = 0.957
 - R384 half + eight own members = 0.957 vs own alone 0.956: Raptor adds ≤ 0.001 here. Three distinct compositions now display 0.957 (P9 v2, P10p, P6s′); none reaches P2's 0.958. p12 rehearsals in progress.
+
+### 2026-10-21 16:25 UTC: Claude (solo), Lane F final report; round 3 blocked by Colab
+- Rounds 1–2 exported; round 3 (v5 seeds) has no export: eleven Colab runtimes lost after 30–50 min since 11:15, plus three laptop sleeps. Supervisor keeps retrying (A100/G4/H100) until 06:30 with automatic resume and export. Parent started caffeinate for 15 h. p12 rehearsals are COMPLETE; Lane P9 told to finish the chain and submit today.
