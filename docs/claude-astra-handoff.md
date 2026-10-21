@@ -4215,3 +4215,6 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 
 ### 2026-10-21 07:50 UTC: Claude (solo), P10p submitted (57472040)
 - P10p = R384 half (v1 per-finding weights) + the same eight-member own compact as P11, no R224 (P10 with R224 missed the point gate at 28,165 s on a slow pair), no R6. Rehearsal point 22,168 s, conservative 30,285 s (standing projection-only waiver), all other gates PASS, visible fallback 0. P10p − P11 isolates the Raptor half on an own compact. Scores expected: P9 v2 ~12:30, P11 ~12:45, P10p ~14:45. One Oct 21 slot held for the evening.
+
+### 2026-10-21 07:55 UTC: Claude (solo), round 2 passed; round 3 (labels v5) started
+- oof_r2 READY: own_r2 0.9232 vs own_r1 0.9201 out of fold (+0.0030 [+0.0021, +0.0039]); gold-58 0.9398. Stop rule met, so L4 builds v5 (own r2 teacher) and F trains v5 seeds; last useful export Oct 22 02:00. Lane P9 idle with one Oct 21 slot held; four submissions pending scores (P9 v2, P11, P10p; v4b solo = 0.956).
