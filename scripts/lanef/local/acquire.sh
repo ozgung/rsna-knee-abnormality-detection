@@ -4,11 +4,11 @@
 cd "$(dirname "$0")"; t0=$(date +%s); END=$(date -u -j -f "%Y-%m-%d %H:%M" "2026-10-22 01:30" +%s)
 launch() {
   case $1 in
-    lanef16) RESUME_SPEC=v5:42 ./upload_and_queue.sh lanef16 v5 /content/targets/targets_V5_all.csv none 42 45 48 > uq_lanef16.log 2>&1;;
-    lanef17) RESUME_SPEC=v5:43 ./upload_and_queue.sh lanef17 v5 /content/targets/targets_V5_all.csv none 43 46 49 > uq_lanef17.log 2>&1;;
-    lanef18) RESUME_SPEC=v4b:45 ./upload_and_queue.sh lanef18 v4b /content/targets/targets_V4B_all.csv none 45 > uq_lanef18.log 2>&1
+    lanef16|lanef19|lanef21) RESUME_SPEC=v5:42 ./upload_and_queue.sh $1 v5 /content/targets/targets_V5_all.csv none 42 45 48 > uq_$1.log 2>&1;;
+    lanef17|lanef20|lanef23) RESUME_SPEC=v5:43 ./upload_and_queue.sh $1 v5 /content/targets/targets_V5_all.csv none 43 46 49 > uq_$1.log 2>&1;;
+    lanef18|lanef22|lanef24) RESUME_SPEC=v4b:45 ./upload_and_queue.sh $1 v4b /content/targets/targets_V4B_all.csv none 45 > uq_$1.log 2>&1
              printf 'import subprocess\nsubprocess.Popen(["bash","-c","DEADLINE_EPOCH=1792648800 bash /content/v5_seed_queue.sh v5 /content/targets/targets_V5_all.csv v4b:45 44 47 50"], stdout=open("/content/queue_v5.log","wb"), stderr=subprocess.STDOUT, start_new_session=True)\nprint("v5 44 47 50 queued after v4b-s45")\n' > /tmp/lanef_q18.py
-             ./c.sh exec -s lanef18 -f /tmp/lanef_q18.py --timeout 60 >> uq_lanef18.log 2>&1;;
+             ./c.sh exec -s $1 -f /tmp/lanef_q18.py --timeout 60 >> uq_$1.log 2>&1;;
     lanef14) RESUME_SPEC=v5:43 ./upload_and_queue.sh lanef14 v5 /content/targets/targets_V5_all.csv none 43 46 49 > uq_lanef14.log 2>&1;;
     lanef15) RESUME_SPEC=v4b:45 ./upload_and_queue.sh lanef15 v4b /content/targets/targets_V4B_all.csv none 45 > uq_lanef15.log 2>&1
              printf 'import subprocess\nsubprocess.Popen(["bash","-c","DEADLINE_EPOCH=1792648800 bash /content/v5_seed_queue.sh v5 /content/targets/targets_V5_all.csv v4b:45 44 47 50"], stdout=open("/content/queue_v5.log","wb"), stderr=subprocess.STDOUT, start_new_session=True)\nprint("v5 44 47 50 queued after v4b-s45")\n' > /tmp/lanef_q15.py
@@ -19,7 +19,7 @@ launch() {
 for N in ${@:-lanef14 lanef15}; do
   while true; do
     [ $(date +%s) -ge $END ] && { echo "$(date -u +%T) GIVE_UP $N"; exit 1; }
-    ./c.sh new -s $N --gpu A100 > new_$N.log 2>&1
+    G=$(echo "${GPUS:-}" | tr ',' '\n' | grep "^$N=" | cut -d= -f2); ./c.sh new -s $N --gpu ${G:-A100} > new_$N.log 2>&1
     ep=$(./c.sh sessions 2>&1 | grep "^\[$N\]" | awk '{print $2}')
     if [ -n "$ep" ]; then
       if [[ $ep == *-usc1* ]] || [ $(( $(date +%s) - t0 )) -ge ${USC_ONLY_S:-1800} ]; then
