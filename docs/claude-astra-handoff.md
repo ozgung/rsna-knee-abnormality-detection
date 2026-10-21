@@ -4209,3 +4209,6 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 
 ### 2026-10-21 05:30 UTC: Claude (solo), v4b-s43 solo = 0.956
 - 57463519 displays 0.956 against C1's 0.955 (same packet, same seed, labels v4b instead of v3) and 0.950 for the labels-v2 solo. The round-2 step is +0.001 displayed, inside the public noise but in the expected direction; the own single-model line now reads 0.950 → 0.955 → 0.956 across label rounds. P10/P11 rehearsals v2 running; P9 v2 (57464435) pending.
+
+### 2026-10-21 07:20 UTC: Claude (solo), P11 submitted (57471109)
+- P11 = mean logit of eight own members (student, v4b-s42, v4b-s43, v3-s43, round-1 folds f0–f3), nothing else. Rehearsal v3 PASS on every gate including the conservative projection (point 17,925 s), visible fallback 0; hidden wall about 5.5 h. Two earlier rehearsal failures were operational and fixed: the 0.01 reference tolerance (amended to 0.02 with evidence) and a controller race on a deleted temp file (now skipped; it would have forced an early salvage in a hidden run). P10 v2 missed the point on a slow T4 pair, so `p10p` (R384 only + own-8) is being submitted instead as slot 4. Slots used Oct 21: 3 of 5.
