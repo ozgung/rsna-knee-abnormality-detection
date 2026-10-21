@@ -27,7 +27,7 @@ fi
 for i in $(seq 1 20); do st=$(kaggle datasets status ozgung/$DS 2>&1 | tail -1); echo "$st" | grep -q ready && break; sleep 30; done
 echo "$(date -u +%T) dataset ozgung/$DS: $st"
 # strict CPU acceptance (files already in dl/, so no download); lane F slug, lane F dir
-(cd $WT && $PY scripts/build_s6_solo_seed.py accept --tag $TAG --seed $SEED --version $VER --model-slug knee-s6-lanef-20261020 --lane-dir $LANE --python $PY > $M/accept.log 2>&1) && ACC=PASS || ACC=FAIL
+(cd $WT && $PY scripts/build_s6_solo_seed.py accept --tag $TAG --seed $SEED --version $VER --model-slug knee-s6-lanef-20261020 --lane-dir $LANE --python ${QPY:-$PY} > $M/accept.log 2>&1) && ACC=PASS || ACC=FAIL
 echo "$(date -u +%T) accept $ACC ($(grep -o '"state_sha256": "[0-9a-f]\{16\}' $LANE/$NAME/seed-acceptance.json 2>/dev/null))"
 # gold-58 macro from the VM read-out (exposed; the predictions.csv came from one bf16 compact_infer pass)
 mkdir -p $M/ro_gold && cp $DL/gold58_predictions.csv $M/ro_gold/predictions.csv && cp $DL/gold58_receipt.json $M/ro_gold/receipt.json && cp $DL/gold58_logits.json $M/ro_gold/logits.json
