@@ -4218,3 +4218,6 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 
 ### 2026-10-21 07:55 UTC: Claude (solo), round 2 passed; round 3 (labels v5) started
 - oof_r2 READY: own_r2 0.9232 vs own_r1 0.9201 out of fold (+0.0030 [+0.0021, +0.0039]); gold-58 0.9398. Stop rule met, so L4 builds v5 (own r2 teacher) and F trains v5 seeds; last useful export Oct 22 02:00. Lane P9 idle with one Oct 21 slot held; four submissions pending scores (P9 v2, P11, P10p; v4b solo = 0.956).
+
+### 2026-10-21 11:35 UTC: Claude (solo, now Opus 5.5), usage-limit interruption; v5 built; Lane F resumed
+- Lanes F and L4 died at ~08:40 on the Fable usage limit; all Colab runtimes were lost by 10:00. Parent built labels v5 locally (gold-58 0.9351), resumed Lane F for v5 seeds 42/43 plus v4b-s45, and left L4 stopped. P9 v2 = 0.957. Members exported: v3-s43/44/45, student, v4b-s42/43/44, r1-f0..f3, r2-f0..f3. Pending scores: P11 (~12:45), P10p (~14:45). One Oct 21 slot left.
