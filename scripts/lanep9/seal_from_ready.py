@@ -78,6 +78,16 @@ def entry_from_ready(name, path):
                 ref_alias = next(iter(json.loads(Path(ref_path).read_text())['probabilities']))
         if not ref_path:                                   # Lane F: compact_infer --dump-logits of the probe-36 read-out (one model)
             logits = path.parent / 'ds' / 'probe36_fp16_logits.json'
+            if not logits.is_file() and ds.get('status') == 'ready':      # the read-out may live only in the export dataset
+                (path.parent / 'ds').mkdir(exist_ok=True)
+                for fname in ('probe36_fp16_logits.json', 'probe36_fp16_receipt.json'):
+                    subprocess.run(['/Users/ozgun/miniconda3/bin/kaggle', 'datasets', 'download', '-f', fname, '-p', str(path.parent / 'ds'),
+                                    '--force', '-q', ds['ref']], capture_output=True, text=True)
+                    z = path.parent / 'ds' / (fname + '.zip')
+                    if z.exists():
+                        import shutil
+                        shutil.unpack_archive(str(z), str(path.parent / 'ds'))
+                        z.unlink()
             if logits.is_file():
                 import math
                 z = json.loads(logits.read_text())

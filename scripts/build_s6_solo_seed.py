@@ -73,9 +73,10 @@ def accept(tag, seed, version, python=sys.executable):
     for line in (d / 'SHA256SUMS').read_text().splitlines():
         sha, name = line.split(None, 1)
         sums[name.strip()] = sha
-    require(set(sums) == set(files) - {'SHA256SUMS'}, 'SEED_SHA256SUMS_COVERAGE')
+    require(set(files) - {'SHA256SUMS'} <= set(sums), 'SEED_SHA256SUMS_COVERAGE')   # later exports also list their read-outs
     for name, sha in sums.items():
-        require(file_sha(d / name) == sha, 'SEED_SHA256SUMS_' + name)
+        if name in files or (d / name).is_file():
+            require(file_sha(d / name) == sha, 'SEED_SHA256SUMS_' + name)
     rc = json.loads((d / 'run_config.json').read_text())
     want = {'arms': 'E_prior', 'backbone': 'convnext_small', 'crop': 288, 'slices': 3, 'phys_mm': 3.5, 'spatial_attn': True,
             'extent': False, 'state_spec': None, 'freeze_blocks': 16, 'epochs': OVERRIDES['epochs'], 'seed_base': seed, 'seeds': 1,
