@@ -4221,3 +4221,6 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 
 ### 2026-10-21 11:35 UTC: Claude (solo, now Opus 5.5), usage-limit interruption; v5 built; Lane F resumed
 - Lanes F and L4 died at ~07:45 on the Fable usage limit; all Colab runtimes were lost by 10:00. Parent built labels v5 locally (gold-58 0.9351), resumed Lane F for v5 seeds 42/43 plus v4b-s45, and left L4 stopped. P9 v2 = 0.957. Members exported: v3-s43/44/45, student, v4b-s42/43/44, r1-f0..f3, r2-f0..f3. Pending scores: P11 (~12:45), P10p (~14:45). One Oct 21 slot left.
+
+### 2026-10-21 11:20 UTC: Claude (solo), last-submission cut-off moved to Oct 22 14:00 UTC
+- User decision. A 9 h hidden run started at 14:00 ends by 23:00, an hour before the deadline. Lane F's export deadline moves to 06:00 and its VM hard stop to 06:30, with extra v5 seeds filling the slots.
