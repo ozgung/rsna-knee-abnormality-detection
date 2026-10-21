@@ -58,7 +58,7 @@ class GridSpecTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             R6F.resolve_blend({**copy.deepcopy(R6F.VARIANTS['p9']), 'own_stride': 2})           # stride needs the shared decode
         with self.assertRaises(ValueError):
-            R6F.resolve_blend({**copy.deepcopy(R6F.VARIANTS['p9s2']), 'own_stride': 3})
+            R6F.resolve_blend({**copy.deepcopy(R6F.VARIANTS['p9s2']), 'own_stride': 4})
 
     def test_p10_and_p11_blends(self):
         p10, p11 = R6F.VARIANTS['p10'], R6F.VARIANTS['p11']
@@ -87,7 +87,8 @@ class GridSpecTests(unittest.TestCase):
         self.assertTrue(all(len(B.slug_for(k, 'rehearsal')) <= 50 for k in R6F.VARIANTS))
         for k in R6F.VARIANTS:
             self.assertIn(B.S6C_MODELS_BY_VARIANT.get(k, 'S6C_MODELS'), ('S6C_MODELS', 'S6C_MODELS_P9', 'S6C_MODELS_P9S2', 'S6C_MODELS_P10',
-                                                                         'S6C_MODELS_P12N', 'S6C_MODELS_V5', 'S6C_MODELS_P9B', 'S6C_MODELS_E1'))
+                                                                         'S6C_MODELS_P12N', 'S6C_MODELS_V5', 'S6C_MODELS_P9B', 'S6C_MODELS_E1',
+                                                                         'S6C_MODELS_C1K3', 'S6C_MODELS_C1K2', 'S6C_MODELS_S4'))
         self.assertTrue(all(B.S6C_MODELS_BY_VARIANT[k] == 'S6C_MODELS_P10' for k in R6F.VARIANTS if k.startswith(('p10', 'p11')) and k not in ('p11v5', 'p10v5', 'p10pv5')))
         self.assertTrue(all(B.S6C_MODELS_BY_VARIANT[k] == 'S6C_MODELS_P9S2' for k in R6F.VARIANTS if k.startswith('p9s2') and k != 'p9s2s2b'))
 
@@ -522,3 +523,33 @@ class P12Tests(unittest.TestCase):
         c = ENTRY.r6_worker_config(cfg, 0, 'production', ['s1'], Path('/o/board0-r6-production'), None)
         self.assertNotIn('flip', c)                                             # R6 flip TTA (P2's worker path)
         self.assertEqual((c['s6c_shared']['geometry']['eval_stride'], c['s6c_shared']['stride1_check']), (2, True))
+
+
+# ---- P13 (parent pre-registration 2026-10-21 22:00): P2 exactly + own members in the compact via the shared decode -------------
+class P13Tests(unittest.TestCase):
+    def test_spec_lists_and_rehearsal_reuse(self):
+        from scripts import build_r6flip_entry as B
+        for name, w, stride, k in (('p13a', .5, 2, 3), ('p13b', .5, 3, 3), ('p13c', .5, 3, 2), ('p13aw65', .65, 2, 3), ('p13bw65', .65, 3, 3)):
+            b = R6F.VARIANTS[name]
+            self.assertEqual(R6F.resolve_blend(b)[0], R6F.RAPTOR_ARMS)                     # P2's Raptor half
+            self.assertEqual(R6F.raptor_weight_vector(blend=b), R6F.raptor_weight_vector())  # v1 per-finding weights
+            self.assertEqual(R6F.resolve_compact(b), ((('r6', round(1 - w, 2)), ('s6c', w)), True))   # R6 FLIP
+            self.assertEqual((R6F.own_stride(b), R6F.own_aggregation(b), R6F.own_shared(b)), (stride, 'mean_logit', True))
+            self.assertEqual(len(B.s6c_models(name)), k)
+        self.assertEqual([m['file'] for m in B.s6c_models('p13c')], ['E_prior_s43_v4ball.pt', 'E_prior_s44_v5all.pt'])
+        self.assertTrue(B.same_stages('p13a', 'p13aw65') and B.same_stages('p13b', 'p13bw65'))   # slot 4 reuses C1's rehearsal
+        self.assertFalse(B.same_stages('p13a', 'p13b') or B.same_stages('p13b', 'p13c'))
+        with self.assertRaises(ValueError):
+            R6F.resolve_blend({**copy.deepcopy(R6F.VARIANTS['p13a']), 'own_stride': 4})
+
+    @unittest.skipIf(torch is None or np is None, 'torch/numpy not installed')
+    def test_stride_three_child_render(self):
+        from knee import public_s6c_shared as SH
+        from tests.test_public_r6flip_p9s import fake_modules
+        mods = fake_modules(n_slices=10)
+        with mock.patch.dict(sys.modules, mods):
+            ds = types.SimpleNamespace(builder=mods['px_cache'].StudySlices('/c', [], 384, 'v4'), native=object())
+            SH.install_child(ds, {**SH.CHILD_GEOMETRY, 'eval_stride': 3, 'stride1_check': True})
+            ds.builder.build('u1')
+            item = SH.attach(ds, {'uid': 'u1'})
+            self.assertEqual((item['s6c_images'].shape[0], item['s6c_images_ref'].shape[0], item['s6c_note']['eval_stride']), (3, 8, 3))

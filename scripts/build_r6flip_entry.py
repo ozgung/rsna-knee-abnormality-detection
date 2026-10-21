@@ -51,6 +51,7 @@ VARIANT_DATES = {'p6': '20261019', 'p6p': '20261019', 'p6s': '20261020', 'p6sp':
                  'p9s': '20261020', 'p9sr': '20261020'}
 VARIANT_DATES.update({k: '20261021' for k in R6F.VARIANTS if k not in VARIANT_DATES and k[:4] in ('p9s2', 'p10', 'p10m', 'p10p', 'p11', 'p11m')})
 VARIANT_DATES.update({'p10v5': '20261022', 'p10pv5': '20261022'})
+VARIANT_DATES.update({k: '20261022' for k in ('p13a', 'p13b', 'p13c', 'p13aw65', 'p13bw65', 'p13cw65', 'p10s4', 'p10s4s')})
 VARIANT_DATES.update({'p12': '20261021', 'p12f': '20261021', 'p12fn': '20261021', 'p12v5': '20261022', 'p12fv5': '20261022',
                       'p11v5': '20261022', 'p9s2s2b': '20261022'})
 
@@ -178,6 +179,10 @@ S6C_MODELS_P10 = [
 S6C_REFERENCE_BY_LIST = {
     'S6C_MODELS_P9S2': {'path': OUT / 'lanep9-20261020/references/reference-p9s2.json',
                         'sha256': '5271208226cde661aaf86dddea3ede3a89a0868a7a2835fe4f5de8b262e030dc'},   # P7 three + v3-s44 (cad13b6d...)
+    'S6C_MODELS_C1K3': {'path': OUT / 'lanep9-20261020/references/reference-e1.json',
+                        'sha256': 'ae69f601ec068a439d2dc1e48e70556d8468a31374f0785938a1ec1b3d4ffd79'},   # subset of the E1 six
+    'S6C_MODELS_C1K2': {'path': OUT / 'lanep9-20261020/references/reference-e1.json',
+                        'sha256': 'ae69f601ec068a439d2dc1e48e70556d8468a31374f0785938a1ec1b3d4ffd79'},
     'S6C_MODELS_E1': {'path': OUT / 'lanep9-20261020/references/reference-e1.json', 'sha256': 'ae69f601ec068a439d2dc1e48e70556d8468a31374f0785938a1ec1b3d4ffd79'},
     'S6C_MODELS_P9B': {'path': OUT / 'lanep9-20261020/references/reference-p9b.json', 'sha256': '12afba2aef31aa2406ad2ca88547fbd145c2e2ab84553660c38ce70b0cb24605'},
     'S6C_MODELS_P12N': {'path': OUT / 'lanep9-20261020/references/reference-p10.json',
@@ -198,6 +203,13 @@ S6C_MODELS_E1 = [
     {'seed': 45, 'labels': 'v4b', 'file': 'E_prior_s45_v4ball.pt', 'sha256': '864aad4ebd6ea413aed3f6e68dc0e61a5f92f506a1decdd16115a2bec8ddd229', 'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v4ball-s45-20261020', 'dataset_version': 1, 'slot': 2},
     {'seed': 46, 'labels': 'v5', 'file': 'E_prior_s46_v5all.pt', 'sha256': 'b63224751711b4eb2c6481db29358f77cb5a01fea40f161cdf0e886085e4e9fd', 'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v5all-s46-20261020', 'dataset_version': 1, 'slot': 3},
 ]
+# C1 = P13 (parent, pre-registered 2026-10-21 22:00 UTC): members in drop order v4b-s43, v5-s44, v5-s43, v5-s46; k=3 / k=2 lists
+# (loader order), entries copied from the sealed E1 list.
+S6C_MODELS_C1K3 = [{'seed': 43, 'labels': 'v4b', 'file': 'E_prior_s43_v4ball.pt', 'sha256': '09e19ab5c0664e796ad31d53760e82c9092a707e459cb5e1f9a103970ca5cc99', 'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v4ball-s43-20261020', 'dataset_version': 1, 'slot': 1}, {'seed': 43, 'labels': 'v5', 'file': 'E_prior_s43_v5all.pt', 'sha256': '6e26e9a8fd5f6870d74e984c111038cb5fe0f810abe1fd514ea2511d6190e116', 'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v5all-s43-20261020', 'dataset_version': 1, 'slot': 3}, {'seed': 44, 'labels': 'v5', 'file': 'E_prior_s44_v5all.pt', 'sha256': '20908d6a9eb3e9ccbe2aa75f24553ba279531e954e5601a25252b69a4efa155d', 'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v5all-s44-20261020', 'dataset_version': 1, 'slot': 3}]
+S6C_MODELS_C1K2 = [{'seed': 43, 'labels': 'v4b', 'file': 'E_prior_s43_v4ball.pt', 'sha256': '09e19ab5c0664e796ad31d53760e82c9092a707e459cb5e1f9a103970ca5cc99', 'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v4ball-s43-20261020', 'dataset_version': 1, 'slot': 1}, {'seed': 44, 'labels': 'v5', 'file': 'E_prior_s44_v5all.pt', 'sha256': '20908d6a9eb3e9ccbe2aa75f24553ba279531e954e5601a25252b69a4efa155d', 'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v5all-s44-20261020', 'dataset_version': 1, 'slot': 3}]
+# S4 (slot 5, parent 22:00 UTC): R384 + R224 + own-only compact, mean logit, own-8 = v5-s42/43/44/46/47/49 + v4b-s45 + v4b-s43
+# (v4b-s44 replaces a missing v5-s47/s49 if it has a reference, else own-7/own-6); sealed when the exports exist.
+S6C_MODELS_S4 = None
 S6C_MODELS_P9B = [
     {'seed': 42, 'labels': 'v5', 'file': 'E_prior_s42_v5all.pt', 'sha256': 'a2661d6754d3a765f81b35b57fdd4dfa0d8ec79582916c6d34e95ff9396968d0', 'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v5all-s42-20261020', 'dataset_version': 1, 'slot': 3},
     {'seed': 43, 'labels': 'v5', 'file': 'E_prior_s43_v5all.pt', 'sha256': '6e26e9a8fd5f6870d74e984c111038cb5fe0f810abe1fd514ea2511d6190e116', 'bytes': 200188027, 'dataset': 'ozgung/knee-s6-v5all-s43-20261020', 'dataset_version': 1, 'slot': 3},
@@ -210,7 +222,10 @@ S6C_MODELS_BY_VARIANT = {'p7': 'S6C_MODELS', 'p9': 'S6C_MODELS_P9', 'p9r': 'S6C_
                          'p10v5': 'S6C_MODELS_E1', 'p10pv5': 'S6C_MODELS_E1',
                          **{k: 'S6C_MODELS_P9S2' for k in R6F.VARIANTS if k.startswith('p9s2')},
                          **{k: 'S6C_MODELS_P10' for k in R6F.VARIANTS if k.startswith('p10') or k.startswith('p11')}}
-S6C_MODELS_BY_VARIANT.update({'p11v5': 'S6C_MODELS_V5', 'p9s2s2b': 'S6C_MODELS_P9B', 'p10v5': 'S6C_MODELS_E1', 'p10pv5': 'S6C_MODELS_E1'})     # explicit lists win over the prefix rules
+S6C_MODELS_BY_VARIANT.update({'p11v5': 'S6C_MODELS_V5', 'p9s2s2b': 'S6C_MODELS_P9B', 'p10v5': 'S6C_MODELS_E1', 'p10pv5': 'S6C_MODELS_E1',
+                              'p13a': 'S6C_MODELS_C1K3', 'p13b': 'S6C_MODELS_C1K3', 'p13c': 'S6C_MODELS_C1K2',
+                              'p13aw65': 'S6C_MODELS_C1K3', 'p13bw65': 'S6C_MODELS_C1K3', 'p13cw65': 'S6C_MODELS_C1K2',
+                              'p10s4': 'S6C_MODELS_S4', 'p10s4s': 'S6C_MODELS_S4'})     # explicit lists win over the prefix rules
 # P9s shared-decode fixture: the P9 rehearsal's separate s6c worker output on the frozen 39 (per-member probabilities, private).
 P9_REHEARSAL_OUT = OUT / 'kaggle/r6flip-p9-rehearsal-20261020-out/r6flip'
 P9_REHEARSAL_RECEIPT_SHA = 'bf5e235d5c55bf2327529ae4f61d16bc906e041a277b973ec7896f4dd811063c'   # v2 result: FAIL_PROJECTION_ONLY, every other gate PASS

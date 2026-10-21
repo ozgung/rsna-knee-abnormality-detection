@@ -165,7 +165,7 @@ class SharedS6:
         self.out = Path(self.cfg['out']) / S6C.FOLDER
         self.geometry = dict(self.cfg.get('geometry') or CHILD_GEOMETRY)
         require(set(self.geometry) == set(CHILD_GEOMETRY) and all(self.geometry[k] == CHILD_GEOMETRY[k] for k in CHILD_GEOMETRY if k != 'eval_stride')
-                and int(self.geometry['eval_stride']) in (1, 2), 'S6C_SHARED_GEOMETRY')
+                and int(self.geometry['eval_stride']) in (1, 2, 3), 'S6C_SHARED_GEOMETRY')
         self.stride1_check = bool(self.cfg.get('stride1_check')) and int(self.geometry['eval_stride']) != 1
         self.models, self.staged, self.entries, self.checksums = [], [], [], []
         self.active, self.cut = True, None

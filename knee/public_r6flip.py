@@ -384,6 +384,19 @@ COMPACT_VARIANTS['p11v5'] = 's6c'
 # Oct 22 wave 1 E1 (parent 21:45): P10 with R224 on the E1 list; p10pv5 = the R384-only fallback
 VARIANTS.update({'p10v5': own_compact_blend('both', 'mean_logit'), 'p10pv5': own_compact_blend('r384', 'mean_logit')})
 COMPACT_VARIANTS.update({'p10v5': 's6c', 'p10pv5': 's6c'})
+
+
+def p2_own_blend(w, stride):
+    """P13 (parent, pre-registered 2026-10-21 22:00 UTC): P2 exactly -- R384 0.65 + R224 0.35, v1 per-finding weights, R6 FLIP -- with
+    the compact slot (1 - w) rank(R6 flip) + w rank(own mean logit); members from the shared decode inside the R6 worker."""
+    return {'raptor_arms': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]], 'weights': dict(RAPTOR_WEIGHTS),
+            'default_weight': DEFAULT_RAPTOR_WEIGHT, 'compact_arms': [['r6', round(1.0 - w, 2)], ['s6c', round(w, 2)]], 'compact_flip': True,
+            'own_shared': True, 'own_stride': int(stride), 'own_aggregation': 'mean_logit'}
+
+
+# p13a: k=3 at stride 2; p13b: k=3 at stride 3; p13c: k=2 at stride 3; *w65: slot 4 (0.65 own / 0.35 R6 flip), same members/stride
+VARIANTS.update({'p13a': p2_own_blend(.5, 2), 'p13b': p2_own_blend(.5, 3), 'p13c': p2_own_blend(.5, 3),
+                 'p13aw65': p2_own_blend(.65, 2), 'p13bw65': p2_own_blend(.65, 3), 'p13cw65': p2_own_blend(.65, 3)})
 PRECISION = {'old320': 'float64', 'r6': '%.9g', 'crop224': 'float32 CSV', 'nafull': 'float64', 'r7': '%.9g', 's6c': '%.9g'}
 BLEND_KEYS = {'raptor_arms', 'weights', 'default_weight'}
 COMPACT_KEYS = {'compact_arms', 'compact_flip'}
@@ -396,7 +409,8 @@ def resolve_blend(blend=None):
     require(set(blend) in (BLEND_KEYS, BLEND_KEYS | COMPACT_KEYS, BLEND_KEYS | COMPACT_KEYS | {'compact_shared'},
                            BLEND_KEYS | COMPACT_KEYS | {'own_shared'}, BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride'},
                            BLEND_KEYS | {'own_aggregation'}, BLEND_KEYS | {'own_aggregation', 'own_only'},
-                           BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride', 'own_aggregation', 'no_raptor'}), 'BLEND_SCHEMA')
+                           BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride', 'own_aggregation', 'no_raptor'},
+                           BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride', 'own_aggregation'}), 'BLEND_SCHEMA')
     arms = tuple((str(a), float(w)) for a, w in blend['raptor_arms'])
     names = [a for a, _ in arms]
     if blend.get('own_only'):
@@ -409,7 +423,7 @@ def resolve_blend(blend=None):
     if 'own_aggregation' in blend:
         require(blend['own_aggregation'] in ('mean_logit', 'mean_rank'), 'OWN_AGGREGATION')
     if 'own_stride' in blend:
-        require(blend.get('own_shared') is True and blend['own_stride'] in (1, 2), 'OWN_STRIDE')
+        require(blend.get('own_shared') is True and blend['own_stride'] in (1, 2, 3), 'OWN_STRIDE')   # 3 = S6's training eval stride
     weights = {str(k): float(v) for k, v in blend['weights'].items()}
     default = float(blend['default_weight'])
     require(set(weights) <= set(LABELS) and all(0.0 <= v <= 1.0 for v in weights.values()) and 0.0 <= default <= 1.0, 'BLEND_WEIGHTS')
