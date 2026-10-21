@@ -4212,3 +4212,6 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 
 ### 2026-10-21 07:20 UTC: Claude (solo), P11 submitted (57471109)
 - P11 = mean logit of eight own members (student, v4b-s42, v4b-s43, v3-s43, round-1 folds f0–f3), nothing else. Rehearsal v3 PASS on every gate including the conservative projection (point 17,925 s), visible fallback 0; hidden wall about 5.5 h. Two earlier rehearsal failures were operational and fixed: the 0.01 reference tolerance (amended to 0.02 with evidence) and a controller race on a deleted temp file (now skipped; it would have forced an early salvage in a hidden run). P10 v2 missed the point on a slow T4 pair, so `p10p` (R384 only + own-8) is being submitted instead as slot 4. Slots used Oct 21: 3 of 5.
+
+### 2026-10-21 07:50 UTC: Claude (solo), P10p submitted (57472040)
+- P10p = R384 half (v1 per-finding weights) + the same eight-member own compact as P11, no R224 (P10 with R224 missed the point gate at 28,165 s on a slow pair), no R6. Rehearsal point 22,168 s, conservative 30,285 s (standing projection-only waiver), all other gates PASS, visible fallback 0. P10p − P11 isolates the Raptor half on an own compact. Scores expected: P9 v2 ~12:30, P11 ~12:45, P10p ~14:45. One Oct 21 slot held for the evening.
