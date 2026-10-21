@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-21 11:20 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
+Updated **2026-10-21 12:45 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
 
 ## Current snapshot
 
@@ -10,7 +10,7 @@ Updated **2026-10-21 11:20 UTC** (Claude, solo; Codex unavailable until Oct 22).
   | Entry | Submission | Public |
   |---|---|---|
   | P10p (R384 half + own-only 8-member compact, no R224, no R6) | 57472040 | pending (Oct 21 ~14:45) |
-  | P11 (own-only compact, mean logit of 8 members, no Raptor, no R6) | 57471109 | pending (Oct 21 ~13:00) |
+  | P11 (own-only compact, mean logit of 8 members, no Raptor, no R6) | 57471109 | **0.956** |
   | P9 v2 (`p9s2s2`: four own members at stride 2, w 0.5, no R224) | 57464435 | **0.957** |
   | v4b-s43 solo probe (round 2, s6solo packet as C1) | 57463519 | **0.956** (C1 v3-s43 solo 0.955; V2 solo 0.950) |
   | P9 v1 (`p9s`, shared decode) | 57451284 | **0.955** (scored by 01:00) |
@@ -36,6 +36,7 @@ Updated **2026-10-21 11:20 UTC** (Claude, solo; Codex unavailable until Oct 22).
 - **Round 2 passed the stop rule (Lane F, 07:40):** own fold models on labels v4b score 0.9232 out of fold vs 0.9201 for the labels-v3 fold models (+0.0030 [+0.0021, +0.0039], n = 4,345); gold-58 four-fold mean 0.9398 (r1 0.9394; R6 flip 0.9368). Round 3 is on: L4 builds labels v5 (v4b construction with the own r2 teacher), F trains v5 seeds 42/43 (export by Oct 22 02:00 at the latest), L4 adds v5 seed 44 after v4b seed 44. v4b seed 45 is training on F's other slot. Members exported so far: v3-s43, v3-s44, v3-s45, student, v4b-s42, v4b-s43, r1-f0..f3 (bundle).
 - **Oct 21 07:45–11:30 interruption:** Lanes F and L4 stopped on an API usage limit (Fable) at about 07:45 UTC; all three Colab runtimes were lost by 10:00 without their agents (the v4b-s45 fit on lanef8 was lost mid-run). Parent switched to Opus 5.5, built labels v5 itself (L4's `build_v4b.sh` with the r2 four-fold own teacher; `outputs/lanel4-20261020/labels_v5/`, targets 765198c2…, gold-58 0.9351 vs v4b 0.9341, exposed), and resumed Lane F alone to run v5 seeds 42/43 and v4b-s45 (resume) on three new A100s; Colab balance 130.6 units. Lane L4 stays stopped. P9 v2 displayed 0.957 (+0.002 over P9 v1 with four members instead of two).
 - **Cut-offs moved (user, Oct 21 11:20 UTC):** last new submission Oct 22 14:00 UTC, final selection locked by 23:00 UTC (both checkboxes need the Kaggle UI) (hidden runs ≤ 9 h end by 23:00, one hour before the deadline). Member export deadline moved to Oct 22 06:00, VM hard stop 06:30; Lane F fills its slots with further v5 seeds until then.
+- **Oct 21 12:00–12:24: all three Lane F runtimes reclaimed while the laptop was closed** (Pro+ background execution did not protect CLI-created runtimes; tokens had been refreshed at 11:31–11:35). Progress lost about one epoch each; fits resume from per-epoch backups on new A100s (lanef13, lanef14 up; the third requested every 5 min after `Service Unavailable`). Keep the Mac awake while fits run. **P11 = 0.956:** eight own members alone equal the v4b solo (0.956) and sit below P9 v2 (0.957).
 - **Selection rule amendment (replaces plan §4 rule 1 and 2 for new entries):** final 1 = the entry with the highest display among {P2, P9 family, p10, p11} that passed every non-projection gate with visible fallback 0, ties broken toward the entry with the stronger out-of-fold support for its compact (own-heavy over R6-only); final 2 = the highest-display remaining entry with the lowest Spearman to final 1 (p11 or p10 if ≥ final 1 − 0.002, else P2 or P9). A 0.001 display difference alone never overrides an out-of-fold result.
 
 ## Lanes running since Oct 20 15:50 UTC (Claude subagents, own worktrees)

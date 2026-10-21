@@ -4225,3 +4225,7 @@ The Lane D2 agent's permission policy refused the T4 shim even with the user's a
 ### 2026-10-21 11:20 UTC: Claude (solo), last-submission cut-off moved to Oct 22 14:00 UTC
 - User decision. A 9 h hidden run started at 14:00 ends by 23:00, an hour before the deadline. Lane F's export deadline moves to 06:00 and its VM hard stop to 06:30, with extra v5 seeds filling the slots.
 - 11:25 UTC, user: final-selection lock moved from 22:00 to 23:00 UTC.
+
+### 2026-10-21 12:45 UTC: Claude (solo), P11 = 0.956; runtimes reclaimed during laptop sleep
+- P11 (own-only, eight members, mean logit) = 0.956: the same as the single v4b solo, below P9 v2 (0.957) and P2 (0.958). Ensembling own members does not lift the public display; the own line's gains come from label rounds (0.950 → 0.955 → 0.956).
+- All three Lane F A100s were reclaimed 12:00–12:24 while the laptop was closed, despite Pro+ and fresh tokens. Fits resume from backups (two A100s back, third retried every 5 min). Balance about 315 units.
