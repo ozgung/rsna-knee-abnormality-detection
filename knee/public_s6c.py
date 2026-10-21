@@ -45,7 +45,10 @@ AGGREGATIONS = {'mean_rank': 'mean over members of per-member average percentile
 SEED_OWNERS = ('ozgung', 'nartaa')   # our exports; nartaa's S6fall control only for smoke runs. Never a heliosli bundle.
 RECONSTRUCTION_ATOL = 2e-6       # CSV '%.6f' of sigmoid(mean seed logits) vs the dumped float32 seed logits
 CROSS_TOLERANCE = 1e-3           # fresh process / other board, per seed probability
-REFERENCE_ATOL = 0.01            # A100 fp16 reference vs T4 fp16; measured s42 A100 vs s6solo T4: max 0.0047 on 36 probes
+REFERENCE_ATOL = 0.02            # A100 fp16 reference vs T4 fp16, max over 36 probe studies x 12 findings. 0.01 was set from one
+                                 # measurement (s42: 0.0047); the P9 v2 / P10 / P11 rehearsals (2026-10-21) measured 0.0087 (v3-s44),
+                                 # 0.0105 (r1-f1) and 0.0140 (r1-f3) with means <= 0.0005: fp16 noise across GPUs, while a wrong
+                                 # checkpoint or geometry shows >= 0.1. Widened to 0.02 by the dated amendment in the lane note.
 LABELS = ['ACL', 'MCL', 'Medial Meniscus', 'Lateral Meniscus', 'Medial OA', 'Lateral OA', 'PF OA', 'Effusion',
           'Synovitis', "Baker's", 'Contusion', 'Fracture']
 AGGREGATION = 'mean over seeds of per-seed average percentile ranks over the genuine rows of the scored population'
