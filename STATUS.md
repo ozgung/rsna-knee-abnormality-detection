@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-21 01:15 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
+Updated **2026-10-21 03:35 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
 
 ## Current snapshot
 
@@ -9,6 +9,7 @@ Updated **2026-10-21 01:15 UTC** (Claude, solo; Codex unavailable until Oct 22).
 
   | Entry | Submission | Public |
   |---|---|---|
+  | v4b-s43 solo probe (round 2, s6solo packet as C1) | 57463519 | pending (Oct 21 ~06:30) |
   | P9 v1 (`p9s`, shared decode) | 57451284 | **0.955** (scored by 01:00) |
   | P2 (R6F-pure v2) | 57340072 | **0.958** |
   | A′-w | 57324282 | 0.957 |
