@@ -89,7 +89,7 @@ class GridSpecTests(unittest.TestCase):
             self.assertIn(B.S6C_MODELS_BY_VARIANT.get(k, 'S6C_MODELS'), ('S6C_MODELS', 'S6C_MODELS_P9', 'S6C_MODELS_P9S2', 'S6C_MODELS_P10',
                                                                          'S6C_MODELS_P12N', 'S6C_MODELS_V5', 'S6C_MODELS_P9B', 'S6C_MODELS_E1',
                                                                          'S6C_MODELS_C1K3', 'S6C_MODELS_C1K2', 'S6C_MODELS_S4'))
-        self.assertTrue(all(B.S6C_MODELS_BY_VARIANT[k] == 'S6C_MODELS_P10' for k in R6F.VARIANTS if k.startswith(('p10', 'p11')) and k not in ('p11v5', 'p10v5', 'p10pv5')))
+        self.assertTrue(all(B.S6C_MODELS_BY_VARIANT[k] == 'S6C_MODELS_P10' for k in R6F.VARIANTS if k.startswith(('p10', 'p11')) and k not in ('p11v5', 'p10v5', 'p10pv5', 'p10s4', 'p10s4s')))
         self.assertTrue(all(B.S6C_MODELS_BY_VARIANT[k] == 'S6C_MODELS_P9S2' for k in R6F.VARIANTS if k.startswith('p9s2') and k != 'p9s2s2b'))
 
 
@@ -553,3 +553,27 @@ class P13Tests(unittest.TestCase):
             ds.builder.build('u1')
             item = SH.attach(ds, {'uid': 'u1'})
             self.assertEqual((item['s6c_images'].shape[0], item['s6c_images_ref'].shape[0], item['s6c_note']['eval_stride']), (3, 8, 3))
+
+
+class S4StrideTests(unittest.TestCase):
+    def test_block_variants_and_command(self):
+        from knee import public_s6c_worker as W
+        ms = members(2, ('v5',))
+        self.assertNotIn('eval_stride', S6C.block(ms))                                   # every earlier block unchanged
+        self.assertEqual(S6C.block(ms, eval_stride=2)['eval_stride'], 2)
+        with self.assertRaises(ValueError):
+            S6C.block(ms, eval_stride=4)
+        self.assertEqual((R6F.own_stride(R6F.VARIANTS['p10s4']), R6F.own_stride(R6F.VARIANTS['p10s4s'])), (2, 3))
+        self.assertTrue(R6F.COMPACT_VARIANTS['p10s4'] == R6F.COMPACT_VARIANTS['p10s4s'] == 's6c')
+        self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p10s4'])[0], R6F.RAPTOR_ARMS)
+        cmd = ['py', '-u', 'L', '--eval-stride', '1', '--assignment', 'a.json', '--output', 'o', '--tmp', 't', '--dump-logits', 'o/l.json']
+        self.assertEqual(W.with_args(cmd, eval_stride=2)[3:5], ['--eval-stride', '2'])
+        c1 = W.with_args(cmd, eval_stride=1, assignment='r.json', output='o2', tmp='t2', dump_logits='o2/l.json')
+        self.assertEqual(c1[4:], ['1', '--assignment', 'r.json', '--output', 'o2', '--tmp', 't2', '--dump-logits', 'o2/l.json'])
+        with self.assertRaises(ValueError):
+            W.with_args(cmd, chunk=96)                                                   # unknown flags refuse
+        from scripts import build_r6flip_entry as B
+        with mock.patch.object(B, 'S6C_MODELS_S4', members(2, ('v5',))), mock.patch.object(B, 'S6C_REFERENCE', None):
+            self.assertEqual(B.s6c_block('p10s4')[0]['eval_stride'], 2)
+            self.assertEqual(B.s6c_block('p10s4s')[0]['eval_stride'], 3)
+            self.assertNotIn('eval_stride', B.s6c_block('p10v5')[0] if B.S6C_MODELS_E1 else {})

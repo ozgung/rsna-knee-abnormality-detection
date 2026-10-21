@@ -101,16 +101,21 @@ def validate_models(models, allow_mixed_labels=False):
     return names
 
 
-def block(models, reference=None, aggregation='mean_rank', allow_mixed_labels=False):
-    """cfg['s6c'] (paths are added by the notebook bootstrap). aggregation: AGGREGATIONS key (P7-prime: mean_rank)."""
+def block(models, reference=None, aggregation='mean_rank', allow_mixed_labels=False, eval_stride=1):
+    """cfg['s6c'] (paths are added by the notebook bootstrap). aggregation: AGGREGATIONS key (P7-prime: mean_rank). eval_stride: the
+    separate worker's window stride (1 = the captured B command; S4 may seal 2 or 3, the rehearsal then also reads the reference
+    studies at stride 1 for the A100 reference gate)."""
     names = validate_models(models, allow_mixed_labels)
     require(aggregation in AGGREGATIONS, 'S6C_AGGREGATION')
+    require(eval_stride in (1, 2, 3), 'S6C_EVAL_STRIDE')
     tables = sorted({m['labels'] for m in models})
     b = {'version': VERSION, 'labels': tables[0] if len(tables) == 1 else '+'.join(tables), 'models': [dict(m) for m in models], 'aliases': names,
          'code': {'dataset': CODE_DATASET, 'version': CODE_VERSION, 'files': CODE_FILES}, 'helios': HELIOS,
          'anatomy_sha256': ANATOMY_SHA256, 'captured_sha256': CAPTURED_SHA256, 'source_pins': SOURCE_PINS,
          'geometry': GEOMETRY, 'amp': AMP, 'loader_workers': LOADER_WORKERS, 'aggregation': AGGREGATIONS[aggregation],
          'aggregation_key': aggregation, 'mixed_labels_allowed': bool(allow_mixed_labels), 'flip_tta': False}
+    if eval_stride != 1:                      # absent key = stride 1: every earlier block (P7, P9, P10, P11) is byte-identical
+        b['eval_stride'] = int(eval_stride)
     if reference is not None:
         require(set(reference) == {'source', 'probabilities'} and isinstance(reference['probabilities'], dict), 'S6C_REFERENCE_SCHEMA')
         for name, rows in reference['probabilities'].items():

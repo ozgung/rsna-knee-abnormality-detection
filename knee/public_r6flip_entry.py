@@ -977,7 +977,8 @@ def require_rehearsal(r, cfg, out, csv_path):
     compact = cfg.get('s6c')
     own = R6F.own_compact_arm(blend)
     own_sh = R6F.own_shared(blend)
-    r6 = require_r6(r, cfg) if compact is None or own else _s6c().require_compact(r, cfg)
+    r6 = require_r6(r, cfg) if compact is None or own else _s6c().require_compact(
+        r, cfg, reference_key='seed_probabilities' if int(compact.get('eval_stride', 1)) == 1 else 'seed_probabilities_stride1')
     s6c = None
     if own:                              # P9: the own stage's gates under its own worker key; P9s adds the shared-decode parity gates
         stride = R6F.own_stride(blend)

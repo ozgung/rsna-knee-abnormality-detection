@@ -394,6 +394,10 @@ def p2_own_blend(w, stride):
             'own_shared': True, 'own_stride': int(stride), 'own_aggregation': 'mean_logit'}
 
 
+# S4 (slot 5): P10 with R224 on the S4 list, members in the separate worker at stride 2 (p10s4) or 3 (p10s4s)
+VARIANTS.update({'p10s4': {**own_compact_blend('both', 'mean_logit'), 'own_stride': 2},
+                 'p10s4s': {**own_compact_blend('both', 'mean_logit'), 'own_stride': 3}})
+COMPACT_VARIANTS.update({'p10s4': 's6c', 'p10s4s': 's6c'})
 # p13a: k=3 at stride 2; p13b: k=3 at stride 3; p13c: k=2 at stride 3; *w65: slot 4 (0.65 own / 0.35 R6 flip), same members/stride
 VARIANTS.update({'p13a': p2_own_blend(.5, 2), 'p13b': p2_own_blend(.5, 3), 'p13c': p2_own_blend(.5, 3),
                  'p13aw65': p2_own_blend(.65, 2), 'p13bw65': p2_own_blend(.65, 3), 'p13cw65': p2_own_blend(.65, 3)})
@@ -409,6 +413,7 @@ def resolve_blend(blend=None):
     require(set(blend) in (BLEND_KEYS, BLEND_KEYS | COMPACT_KEYS, BLEND_KEYS | COMPACT_KEYS | {'compact_shared'},
                            BLEND_KEYS | COMPACT_KEYS | {'own_shared'}, BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride'},
                            BLEND_KEYS | {'own_aggregation'}, BLEND_KEYS | {'own_aggregation', 'own_only'},
+                           BLEND_KEYS | {'own_aggregation', 'own_stride'},
                            BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride', 'own_aggregation', 'no_raptor'},
                            BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride', 'own_aggregation'}), 'BLEND_SCHEMA')
     arms = tuple((str(a), float(w)) for a, w in blend['raptor_arms'])
@@ -423,7 +428,7 @@ def resolve_blend(blend=None):
     if 'own_aggregation' in blend:
         require(blend['own_aggregation'] in ('mean_logit', 'mean_rank'), 'OWN_AGGREGATION')
     if 'own_stride' in blend:
-        require(blend.get('own_shared') is True and blend['own_stride'] in (1, 2, 3), 'OWN_STRIDE')   # 3 = S6's training eval stride
+        require((blend.get('own_shared') is True or 'own_aggregation' in blend) and blend['own_stride'] in (1, 2, 3), 'OWN_STRIDE')
     weights = {str(k): float(v) for k, v in blend['weights'].items()}
     default = float(blend['default_weight'])
     require(set(weights) <= set(LABELS) and all(0.0 <= v <= 1.0 for v in weights.values()) and 0.0 <= default <= 1.0, 'BLEND_WEIGHTS')

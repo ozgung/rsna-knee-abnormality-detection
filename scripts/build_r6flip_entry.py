@@ -568,7 +568,9 @@ def s6c_block(variant='p7'):
         R6F.require(all(S6C.model_alias(m) in reference['probabilities'] or m.get('no_reference') is True for m in models),
                     'S6C_REFERENCE_COVERS_SEALED_MEMBERS')
         reference = {'source': reference['source'], 'probabilities': {k: v for k, v in reference['probabilities'].items() if k in aliases}}
-    block = S6C.block(models, reference, aggregation=R6F.own_aggregation(R6F.VARIANTS[variant]), allow_mixed_labels=variant != 'p7')
+    blend = R6F.VARIANTS[variant]
+    block = S6C.block(models, reference, aggregation=R6F.own_aggregation(blend), allow_mixed_labels=variant != 'p7',
+                      eval_stride=R6F.own_stride(blend) if variant in R6F.COMPACT_VARIANTS else 1)   # shared decode: stride in the blend
     raw = S6C_CAPTURED.read_bytes()
     R6F.require(hashlib.sha256(raw).hexdigest() == S6C.CAPTURED_SHA256, 'S6C_CAPTURED_SOURCE')
     sources = {S6C.CAPTURED: raw.decode()}
