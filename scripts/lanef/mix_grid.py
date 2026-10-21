@@ -44,11 +44,12 @@ def main():
     ap.add_argument("--oof", required=True); ap.add_argument("--out", required=True)
     ap.add_argument("--laneb", default=str(MAIN / "outputs/laneb-20261019/analysis"))
     ap.add_argument("--w", default="0.3,0.5,0.6,0.7,0.8,1.0")
+    ap.add_argument("--name", default="own", help="column prefix of the own OOF columns (analyze_oof.py --name)")
     ap.add_argument("--blend", default=str(BLEND)); ap.add_argument("--train", default=str(TRAIN))
     a = ap.parse_args()
     ws = [float(x) for x in a.w.split(",")]
     oof = Path(a.oof)
-    own = read_cols(oof / "oof_columns.csv", "own")
+    own = read_cols(oof / "oof_columns.csv", a.name)
     lb6 = read_cols(Path(a.laneb) / "oof_columns.csv", "R6 flip")
     lb7 = read_cols(Path(a.laneb) / "oof_columns.csv", "R7 plain")
     blend = {}
