@@ -401,6 +401,9 @@ COMPACT_VARIANTS.update({'p10s4': 's6c', 'p10s4s': 's6c'})
 # p13a: k=3 at stride 2; p13b: k=3 at stride 3; p13c: k=2 at stride 3; *w65: slot 4 (0.65 own / 0.35 R6 flip), same members/stride
 VARIANTS.update({'p13a': p2_own_blend(.5, 2), 'p13b': p2_own_blend(.5, 3), 'p13c': p2_own_blend(.5, 3),
                  'p13aw65': p2_own_blend(.65, 2), 'p13bw65': p2_own_blend(.65, 3), 'p13cw65': p2_own_blend(.65, 3)})
+# p13n (parent redirect 2026-10-22 00:05 UTC): P13 without the R224 arm (R384 with its v1 weights), k=3 at stride 3; p13nk2 = k=2
+VARIANTS.update({k: {**p2_own_blend(w, 3), 'raptor_arms': [['old320', 1.0]]}
+                 for k, w in (('p13n', .5), ('p13nk2', .5), ('p13nw65', .65), ('p13nk2w65', .65))})
 PRECISION = {'old320': 'float64', 'r6': '%.9g', 'crop224': 'float32 CSV', 'nafull': 'float64', 'r7': '%.9g', 's6c': '%.9g'}
 BLEND_KEYS = {'raptor_arms', 'weights', 'default_weight'}
 COMPACT_KEYS = {'compact_arms', 'compact_flip'}

@@ -51,7 +51,8 @@ VARIANT_DATES = {'p6': '20261019', 'p6p': '20261019', 'p6s': '20261020', 'p6sp':
                  'p9s': '20261020', 'p9sr': '20261020'}
 VARIANT_DATES.update({k: '20261021' for k in R6F.VARIANTS if k not in VARIANT_DATES and k[:4] in ('p9s2', 'p10', 'p10m', 'p10p', 'p11', 'p11m')})
 VARIANT_DATES.update({'p10v5': '20261022', 'p10pv5': '20261022'})
-VARIANT_DATES.update({k: '20261022' for k in ('p13a', 'p13b', 'p13c', 'p13aw65', 'p13bw65', 'p13cw65', 'p10s4', 'p10s4s')})
+VARIANT_DATES.update({k: '20261022' for k in ('p13a', 'p13b', 'p13c', 'p13aw65', 'p13bw65', 'p13cw65', 'p10s4', 'p10s4s',
+                                               'p13n', 'p13nk2', 'p13nw65', 'p13nk2w65')})
 VARIANT_DATES.update({'p12': '20261021', 'p12f': '20261021', 'p12fn': '20261021', 'p12v5': '20261022', 'p12fv5': '20261022',
                       'p11v5': '20261022', 'p9s2s2b': '20261022'})
 
@@ -235,7 +236,8 @@ S6C_MODELS_BY_VARIANT = {'p7': 'S6C_MODELS', 'p9': 'S6C_MODELS_P9', 'p9r': 'S6C_
 S6C_MODELS_BY_VARIANT.update({'p11v5': 'S6C_MODELS_V5', 'p9s2s2b': 'S6C_MODELS_P9B', 'p10v5': 'S6C_MODELS_E1', 'p10pv5': 'S6C_MODELS_E1',
                               'p13a': 'S6C_MODELS_C1K3', 'p13b': 'S6C_MODELS_C1K3', 'p13c': 'S6C_MODELS_C1K2',
                               'p13aw65': 'S6C_MODELS_C1K3', 'p13bw65': 'S6C_MODELS_C1K3', 'p13cw65': 'S6C_MODELS_C1K2',
-                              'p10s4': 'S6C_MODELS_S4', 'p10s4s': 'S6C_MODELS_S4'})     # explicit lists win over the prefix rules
+                              'p10s4': 'S6C_MODELS_S4', 'p10s4s': 'S6C_MODELS_S4',
+                              'p13n': 'S6C_MODELS_C1K3', 'p13nw65': 'S6C_MODELS_C1K3', 'p13nk2': 'S6C_MODELS_C1K2', 'p13nk2w65': 'S6C_MODELS_C1K2'})     # explicit lists win over the prefix rules
 # P9s shared-decode fixture: the P9 rehearsal's separate s6c worker output on the frozen 39 (per-member probabilities, private).
 P9_REHEARSAL_OUT = OUT / 'kaggle/r6flip-p9-rehearsal-20261020-out/r6flip'
 P9_REHEARSAL_RECEIPT_SHA = 'bf5e235d5c55bf2327529ae4f61d16bc906e041a277b973ec7896f4dd811063c'   # v2 result: FAIL_PROJECTION_ONLY, every other gate PASS

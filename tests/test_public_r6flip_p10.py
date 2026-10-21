@@ -593,3 +593,16 @@ class ReplayModeTests(unittest.TestCase):
         self.assertEqual(R6F.recover_guarded(a, st, blend=R6F.VARIANTS['p13a'])['mode'], 'variant_complete_population')
         self.assertEqual(R6F.recover_guarded({k: a[k] for k in ('old320', 'crop224', 'r6')}, {k: st[k] for k in ('old320', 'crop224', 'r6')})['mode'],
                          'aprime_complete_population')
+
+
+class P13nTests(unittest.TestCase):
+    def test_p13n_drops_only_r224(self):
+        from scripts import build_r6flip_entry as B
+        for name, w, k in (('p13n', .5, 3), ('p13nk2', .5, 2), ('p13nw65', .65, 3), ('p13nk2w65', .65, 2)):
+            b = R6F.VARIANTS[name]
+            self.assertEqual(R6F.resolve_blend(b)[0], (('old320', 1.0),))
+            self.assertEqual(R6F.raptor_weight_vector(blend=b), R6F.raptor_weight_vector())
+            self.assertEqual(R6F.resolve_compact(b), ((('r6', round(1 - w, 2)), ('s6c', w)), True))
+            self.assertEqual((R6F.own_stride(b), R6F.own_aggregation(b), len(B.s6c_models(name))), (3, 'mean_logit', k))
+        self.assertTrue(B.same_stages('p13n', 'p13nw65') and B.same_stages('p13nk2', 'p13nk2w65'))
+        self.assertFalse(B.same_stages('p13n', 'p13b') or B.same_stages('p13n', 'p13nk2'))
