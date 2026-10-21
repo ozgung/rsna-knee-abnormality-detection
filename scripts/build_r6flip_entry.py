@@ -50,6 +50,8 @@ VARIANT_DATE = '20261018'
 VARIANT_DATES = {'p6': '20261019', 'p6p': '20261019', 'p6s': '20261020', 'p6sp': '20261020', 'p9': '20261020', 'p9r': '20261020',
                  'p9s': '20261020', 'p9sr': '20261020'}
 VARIANT_DATES.update({k: '20261021' for k in R6F.VARIANTS if k not in VARIANT_DATES and k[:4] in ('p9s2', 'p10', 'p10m', 'p10p', 'p11', 'p11m')})
+VARIANT_DATES.update({'p12': '20261021', 'p12f': '20261021', 'p12fn': '20261021', 'p12v5': '20261022', 'p12fv5': '20261022',
+                      'p11v5': '20261022', 'p9s2s2b': '20261022'})
 
 
 def slug_for(variant, mode):
@@ -175,11 +177,21 @@ S6C_MODELS_P10 = [
 S6C_REFERENCE_BY_LIST = {
     'S6C_MODELS_P9S2': {'path': OUT / 'lanep9-20261020/references/reference-p9s2.json',
                         'sha256': '5271208226cde661aaf86dddea3ede3a89a0868a7a2835fe4f5de8b262e030dc'},   # P7 three + v3-s44 (cad13b6d...)
+    'S6C_MODELS_P12N': {'path': OUT / 'lanep9-20261020/references/reference-p10.json',
+                        'sha256': 'ca700f1f9c180f3e2d9cbc49d32af19a72250ceb222bf7cf7dfbd5cf6d97ce11'},   # a subset of the P10 eight
     'S6C_MODELS_P10': {'path': OUT / 'lanep9-20261020/references/reference-p10.json', 'sha256': 'ca700f1f9c180f3e2d9cbc49d32af19a72250ceb222bf7cf7dfbd5cf6d97ce11'},   # eight members, 36 probe studies
 }
+# P12 subset (R6 flip + as many P10 members as fit; sealed from the p12f rehearsal's measured member cost, pre-registered drop order)
+S6C_MODELS_P12N = None
+# Oct 22 lists (v5 members swapped in as they are exported; sealed later) and the four best members for p9s2s2b
+S6C_MODELS_V5 = None
+S6C_MODELS_P9B = None
 S6C_MODELS_BY_VARIANT = {'p7': 'S6C_MODELS', 'p9': 'S6C_MODELS_P9', 'p9r': 'S6C_MODELS_P9', 'p9s': 'S6C_MODELS_P9', 'p9sr': 'S6C_MODELS_P9',
+                         'p12': 'S6C_MODELS_P10', 'p12f': 'S6C_MODELS_P10', 'p12fn': 'S6C_MODELS_P12N', 'p12v5': 'S6C_MODELS_V5',
+                         'p12fv5': 'S6C_MODELS_V5', 'p11v5': 'S6C_MODELS_V5', 'p9s2s2b': 'S6C_MODELS_P9B',
                          **{k: 'S6C_MODELS_P9S2' for k in R6F.VARIANTS if k.startswith('p9s2')},
                          **{k: 'S6C_MODELS_P10' for k in R6F.VARIANTS if k.startswith('p10') or k.startswith('p11')}}
+S6C_MODELS_BY_VARIANT.update({'p11v5': 'S6C_MODELS_V5', 'p9s2s2b': 'S6C_MODELS_P9B'})     # explicit lists win over the prefix rules
 # P9s shared-decode fixture: the P9 rehearsal's separate s6c worker output on the frozen 39 (per-member probabilities, private).
 P9_REHEARSAL_OUT = OUT / 'kaggle/r6flip-p9-rehearsal-20261020-out/r6flip'
 P9_REHEARSAL_RECEIPT_SHA = 'bf5e235d5c55bf2327529ae4f61d16bc906e041a277b973ec7896f4dd811063c'   # v2 result: FAIL_PROJECTION_ONLY, every other gate PASS
@@ -574,6 +586,11 @@ def variant_deviations(variant):
                    % (variant, 'the mean member logit (sigmoid of the mean; the fold-mean convention inside every S6 run, chosen because the '
                                 'members share architecture, geometry and training recipe)' if agg == 'mean_logit' else
                       'the mean of per-member average percentile ranks (P7-prime\'s rule; robust to calibration differences across label tables)'))
+    if R6F.VARIANTS[variant].get('no_raptor'):
+        out.append('P12: no Raptor stage; compact = %s rank(R6 %s) + %s rank(own mean logit), both from the shared decode (members at eval '
+                   'stride %d, cut first at the guard; studies without members keep rank(R6)); the official column is the compact slot.'
+                   % (R6F.VARIANTS[variant]['compact_arms'][0][1], 'flip TTA' if R6F.VARIANTS[variant]['compact_flip'] else 'plain',
+                      R6F.VARIANTS[variant]['compact_arms'][1][1], R6F.own_stride(R6F.VARIANTS[variant])))
     if R6F.own_only(R6F.VARIANTS[variant]):
         out.append('P11: no Raptor stage and no R6; the official column is the average percentile rank of the own compact alone '
                    '(recover_arms with an empty Raptor arm set; the public fallback gives 0.5 only when nothing at all was scored).')

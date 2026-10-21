@@ -993,7 +993,7 @@ def r6_worker(config_path):
             save(out / 'receipt.json', r)
         elif cfg.get('s6c_shared'):          # P9s: our members from the same decode, every pass (sentinels give the repeat gates)
             from knee import public_s6c_shared as SH
-            require(name == 'r6' and arm == 'r6' and not flip, 'S6C_SHARED_ON_R6_PLAIN_ONLY')
+            require(name == 'r6' and arm == 'r6', 'S6C_SHARED_ON_R6_ONLY')        # P12: with or without R6 flip TTA
             shared = SH.SharedS6(cfg, torch)
             r['s6c_shared_setup'] = shared.load()
             save(out / 'receipt.json', r)

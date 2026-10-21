@@ -58,7 +58,7 @@ def raptor_weight_vector(labels=LABELS, blend=None):
     """Per-finding Raptor-half weight in official target order (R6 gets 1 - w). blend=None is the frozen v1 table;
     otherwise the sealed cfg['blend'] (see resolve_blend)."""
     require(list(labels) == LABELS, 'OFFICIAL_TARGET_ORDER')
-    if blend is not None and blend.get('own_only'):          # P11: the Raptor half has weight 0 everywhere (there is none)
+    if blend is not None and (blend.get('own_only') or blend.get('no_raptor')):   # P11 / P12: no Raptor half, weight 0 everywhere
         resolve_blend(blend)
         return [0.0] * len(labels)
     _, weights, default = resolve_blend(blend)
@@ -362,6 +362,25 @@ VARIANTS.update({'p10': own_compact_blend('both', 'mean_logit'), 'p10mr': own_co
                  'p10p': own_compact_blend('r384', 'mean_logit'), 'p10pmr': own_compact_blend('r384', 'mean_rank'),
                  'p11': own_compact_blend('none', 'mean_logit'), 'p11mr': own_compact_blend('none', 'mean_rank')})
 COMPACT_VARIANTS = {'p7': 's6c', **{k: 's6c' for k in VARIANTS if k.startswith('p10') or k.startswith('p11')}}   # compact slot not the R6 bundle
+
+
+def no_raptor_blend(flip, stride=2, w=0.5):
+    """P12 (parent, 2026-10-21 12:55 UTC): no Raptor stage; compact = (1 - w) rank(R6 [flip|plain]) + w rank(own mean logit), both from
+    the shared decode, members at eval stride 2, cut first at the guard."""
+    b = {'raptor_arms': [], 'weights': dict(RAPTOR_WEIGHTS), 'default_weight': DEFAULT_RAPTOR_WEIGHT,
+         'compact_arms': [['r6', round(1.0 - w, 2)], ['s6c', round(w, 2)]], 'compact_flip': bool(flip), 'own_shared': True,
+         'own_aggregation': 'mean_logit', 'no_raptor': True}
+    if stride != 1:
+        b['own_stride'] = int(stride)
+    return b
+
+
+# p12 = R6 plain + the P10 eight; p12f = R6 flip + the P10 eight; p12fn = R6 flip + a sealed subset (as many as fit the gate);
+# p12v5 / p12fv5 = the Oct 22 member swap (v5 members), sealed when the exports exist
+VARIANTS.update({'p12': no_raptor_blend(False), 'p12f': no_raptor_blend(True), 'p12fn': no_raptor_blend(True),
+                 'p12v5': no_raptor_blend(False), 'p12fv5': no_raptor_blend(True),
+                 'p11v5': own_compact_blend('none', 'mean_logit'), 'p9s2s2b': own_dual_blend(0.5, False, 2)})
+COMPACT_VARIANTS['p11v5'] = 's6c'
 PRECISION = {'old320': 'float64', 'r6': '%.9g', 'crop224': 'float32 CSV', 'nafull': 'float64', 'r7': '%.9g', 's6c': '%.9g'}
 BLEND_KEYS = {'raptor_arms', 'weights', 'default_weight'}
 COMPACT_KEYS = {'compact_arms', 'compact_flip'}
@@ -373,11 +392,14 @@ def resolve_blend(blend=None):
         return RAPTOR_ARMS, dict(RAPTOR_WEIGHTS), DEFAULT_RAPTOR_WEIGHT
     require(set(blend) in (BLEND_KEYS, BLEND_KEYS | COMPACT_KEYS, BLEND_KEYS | COMPACT_KEYS | {'compact_shared'},
                            BLEND_KEYS | COMPACT_KEYS | {'own_shared'}, BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride'},
-                           BLEND_KEYS | {'own_aggregation'}, BLEND_KEYS | {'own_aggregation', 'own_only'}), 'BLEND_SCHEMA')
+                           BLEND_KEYS | {'own_aggregation'}, BLEND_KEYS | {'own_aggregation', 'own_only'},
+                           BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride', 'own_aggregation', 'no_raptor'}), 'BLEND_SCHEMA')
     arms = tuple((str(a), float(w)) for a, w in blend['raptor_arms'])
     names = [a for a, _ in arms]
     if blend.get('own_only'):
         require(blend['own_only'] is True and not arms and 'own_aggregation' in blend, 'OWN_ONLY_NO_RAPTOR_ARMS')
+    elif blend.get('no_raptor'):                    # P12: no Raptor stage; the compact slot (R6 + own) is the whole column
+        require(blend['no_raptor'] is True and not arms and 'compact_arms' in blend and blend.get('own_shared') is True, 'NO_RAPTOR_NEEDS_SHARED_COMPACT')
     else:
         require(names and 'old320' in names and names == [x for x in BLEND_ARM_NAMES if x in names], 'BLEND_ARM_ORDER')
         require(all(0.0 < w <= 1.0 for _, w in arms) and abs(sum(w for _, w in arms) - 1.0) <= 1e-12, 'BLEND_ARM_WEIGHTS_SUM_TO_ONE')
@@ -455,7 +477,9 @@ def own_compact_arm(blend=None):
     names = compact_arm_names(blend)
     if 's6c' not in names:
         return False
-    require(names == ['r6', 's6c'] and resolve_compact(blend)[1] is False and not compact_shared(blend), 'OWN_COMPACT_NEEDS_R6_PLAIN_PAIR')
+    # R6 flip TTA is allowed only with the shared decode (P12): the members get their own 320 px windows, R6 its plain + mirror passes
+    require(names == ['r6', 's6c'] and (resolve_compact(blend)[1] is False or blend.get('own_shared') is True) and not compact_shared(blend),
+            'OWN_COMPACT_NEEDS_R6_PLAIN_PAIR')
     return True
 
 

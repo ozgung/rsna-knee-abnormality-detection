@@ -52,7 +52,7 @@ class GridSpecTests(unittest.TestCase):
         self.assertEqual((R6F.own_stride(R6F.VARIANTS['p9s2s2']), R6F.own_stride(R6F.VARIANTS['p9s2']), R6F.own_stride(None)), (2, 1, 1))
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p9s2rw60s2'])[0], R6F.RAPTOR_ARMS)
         self.assertEqual(R6F.resolve_compact(R6F.VARIANTS['p9s2rw60s2']), ((('r6', .4), ('s6c', .6)), False))
-        grid = sorted(k for k in R6F.VARIANTS if k.startswith('p9s2'))
+        grid = sorted(k for k in R6F.VARIANTS if k.startswith('p9s2') and k != 'p9s2s2b')      # p9s2s2b: the Oct 22 four-best list
         self.assertEqual(len(grid), 12)
         self.assertTrue(all(R6F.own_shared(R6F.VARIANTS[k]) and R6F.own_compact_arm(R6F.VARIANTS[k]) for k in grid))
         with self.assertRaises(ValueError):
@@ -86,9 +86,10 @@ class GridSpecTests(unittest.TestCase):
         self.assertFalse(B.same_stages('p10', 'p10mr') or B.same_stages('p10', 'p10p') or B.same_stages('p11', 'p11mr') or B.same_stages('p10', 'p11'))
         self.assertTrue(all(len(B.slug_for(k, 'rehearsal')) <= 50 for k in R6F.VARIANTS))
         for k in R6F.VARIANTS:
-            self.assertIn(B.S6C_MODELS_BY_VARIANT.get(k, 'S6C_MODELS'), ('S6C_MODELS', 'S6C_MODELS_P9', 'S6C_MODELS_P9S2', 'S6C_MODELS_P10'))
-        self.assertTrue(all(B.S6C_MODELS_BY_VARIANT[k] == 'S6C_MODELS_P10' for k in R6F.VARIANTS if k.startswith(('p10', 'p11'))))
-        self.assertTrue(all(B.S6C_MODELS_BY_VARIANT[k] == 'S6C_MODELS_P9S2' for k in R6F.VARIANTS if k.startswith('p9s2')))
+            self.assertIn(B.S6C_MODELS_BY_VARIANT.get(k, 'S6C_MODELS'), ('S6C_MODELS', 'S6C_MODELS_P9', 'S6C_MODELS_P9S2', 'S6C_MODELS_P10',
+                                                                         'S6C_MODELS_P12N', 'S6C_MODELS_V5', 'S6C_MODELS_P9B'))
+        self.assertTrue(all(B.S6C_MODELS_BY_VARIANT[k] == 'S6C_MODELS_P10' for k in R6F.VARIANTS if k.startswith(('p10', 'p11')) and k != 'p11v5'))
+        self.assertTrue(all(B.S6C_MODELS_BY_VARIANT[k] == 'S6C_MODELS_P9S2' for k in R6F.VARIANTS if k.startswith('p9s2') and k != 'p9s2s2b'))
 
 
 class MemberRuleTests(unittest.TestCase):
@@ -463,3 +464,56 @@ class PacketTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+# ---- P12 (parent 2026-10-21 12:55): no Raptor; compact = 1/2 rank(R6 flip|plain) + 1/2 rank(own mean logit), shared decode -----
+class P12Tests(unittest.TestCase):
+    def test_spec(self):
+        for name, flip in (('p12', False), ('p12f', True), ('p12fn', True)):
+            b = R6F.VARIANTS[name]
+            self.assertEqual((R6F.blend_arm_names(b), R6F.resolve_compact(b)), ([], ((('r6', .5), ('s6c', .5)), flip)))
+            self.assertTrue(R6F.own_compact_arm(b) and R6F.own_shared(b))
+            self.assertEqual((R6F.own_stride(b), R6F.own_aggregation(b), R6F.raptor_weight_vector(blend=b)), (2, 'mean_logit', [0.0] * 12))
+            self.assertNotIn(name, R6F.COMPACT_VARIANTS)                         # the R6 bundle runs
+        with self.assertRaises(ValueError):                                      # flip with an own arm needs the shared decode
+            R6F.own_compact_arm({**copy.deepcopy(R6F.VARIANTS['p9']), 'compact_flip': True})
+        with self.assertRaises(ValueError):
+            R6F.resolve_blend({**copy.deepcopy(R6F.VARIANTS['p12f']), 'raptor_arms': [['old320', 1.0]]})
+        from scripts import build_r6flip_entry as B
+        self.assertEqual((B.S6C_MODELS_BY_VARIANT['p12f'], B.S6C_MODELS_BY_VARIANT['p12fn'], B.slug_for('p12f', 'entry')),
+                         ('S6C_MODELS_P10', 'S6C_MODELS_P12N', 'r6flip-p12f-entry-20261021'))
+        self.assertFalse(B.same_stages('p12', 'p12f') or B.same_stages('p12f', 'p12fn'))
+
+    @unittest.skipIf(np is None or pd is None, 'numpy/pandas not installed')
+    def test_arithmetic_and_guard_fallback(self):
+        from knee.public_ws2_recovery import quantize9
+        pct = lambda v: pd.DataFrame(np.asarray(v, dtype=np.float64)).rank(method='average', pct=True).to_numpy()
+        rng = np.random.default_rng(12)
+        n = 40
+        a = {'r6': rng.random((n, 12)), 's6c': S6C.mean_logit(rng.random((n, 8, 12)), np.ones(n, bool))}
+        st = {k: ['genuine'] * n for k in a}
+        rec = R6F.recover_guarded(a, st, blend=R6F.VARIANTS['p12f'])
+        self.assertEqual((rec['mode'], rec['fallback_studies']), ('variant_complete_population', 0))
+        self.assertTrue(np.allclose(rec['blend'], .5 * pct(quantize9(a['r6'])) + .5 * pct(quantize9(a['s6c'])), rtol=0, atol=1e-12))
+        st['s6c'] = ['genuine'] * 30 + ['unavailable'] * 10                     # members cut at the guard: rank(R6) alone
+        a['s6c'][30:] = np.nan
+        fb = R6F.recover_guarded(a, st, blend=R6F.VARIANTS['p12f'])
+        self.assertEqual(fb['compact_fallback'], {'partial_compact': 10, 'r6_only': 10, 's6c_only': 0})
+        self.assertTrue(np.allclose(fb['blend'][30:], pct(quantize9(a['r6']))[30:], rtol=0, atol=1e-12))
+
+    @unittest.skipIf(np is None or pd is None, 'numpy/pandas not installed')
+    def test_stage_plan_and_worker_config(self):
+        block = S6C.block(members(3), None, aggregation='mean_logit', allow_mixed_labels=True)
+        seen = []
+        cfg, cols = stub_cfg('p12f', block)
+        report, calls, written = run_entry(cfg, cols, lambda out, arm, pass_name='production': seen.append((arm, pass_name)) or [{'status': 'NO_RECEIPT'}] * 2)
+        self.assertEqual(calls, [('r6', 'production')])
+        self.assertEqual(seen, [('s6c', 'production')])
+        self.assertEqual(sorted(report['arm_merge']), ['r6', 's6c'])
+        self.assertTrue(np.all(written['rows'] == .5))
+        cfg.update(mode='rehearsal', boards=[{'uuid': 'a'}, {'uuid': 'b'}], staged='st', staged_ids=['s1'], stage_binding={}, code='c',
+                   source_pins={}, r6_mount='m', anatomy='an', deadline_epoch=1.)
+        cfg['r6flip_binding']['r6'] = {'manifest': {}, 'cpu_pins': {}}
+        c = ENTRY.r6_worker_config(cfg, 0, 'production', ['s1'], Path('/o/board0-r6-production'), None)
+        self.assertNotIn('flip', c)                                             # R6 flip TTA (P2's worker path)
+        self.assertEqual((c['s6c_shared']['geometry']['eval_stride'], c['s6c_shared']['stride1_check']), (2, True))
