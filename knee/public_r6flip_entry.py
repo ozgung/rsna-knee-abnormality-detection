@@ -1002,7 +1002,8 @@ def require_rehearsal(r, cfg, out, csv_path):
     require(0 < r['elapsed_seconds'] < MAX_SECONDS, 'ACTUAL_NINE_HOUR_LIMIT')
     arrays, statuses, _ = arm_table(ids, r['workers'], Path(out), entry=False, blend=blend, compact=compact)
     rec = R6F.recover_guarded(arrays, statuses, blend=blend)
-    frozen_arms = R6F.resolve_blend(blend)[0] == R6F.RAPTOR_ARMS
+    # the frozen A-prime path needs P2's arms AND P2's compact slot (recover_guarded's own rule); P13 has P2's arms with a dual compact
+    frozen_arms = R6F.resolve_blend(blend)[0] == R6F.RAPTOR_ARMS and R6F.resolve_compact(blend)[0] == R6F.DEFAULT_COMPACT
     require(rec['mode'] == ('aprime_complete_population' if frozen_arms else 'variant_complete_population')
             and rec['fallback_studies'] == 0
             and R6F.guarded_receipt(rec) == r['recovery'], 'REPLAY_RECOVERY')

@@ -577,3 +577,19 @@ class S4StrideTests(unittest.TestCase):
             self.assertEqual(B.s6c_block('p10s4')[0]['eval_stride'], 2)
             self.assertEqual(B.s6c_block('p10s4s')[0]['eval_stride'], 3)
             self.assertNotIn('eval_stride', B.s6c_block('p10v5')[0] if B.S6C_MODELS_E1 else {})
+
+
+class ReplayModeTests(unittest.TestCase):
+    def test_replay_expects_the_mode_recover_guarded_uses(self):
+        import inspect
+        src = inspect.getsource(ENTRY.require_rehearsal)
+        self.assertIn("R6F.resolve_compact(blend)[0] == R6F.DEFAULT_COMPACT", src)     # P13 rehearsal v1 failed REPLAY_RECOVERY on this
+        if np is None or pd is None:
+            return
+        rng = np.random.default_rng(13)
+        n = 40
+        a = {'old320': rng.random((n, 12)), 'crop224': rng.random((n, 12)), 'r6': rng.random((n, 12)), 's6c': rng.random((n, 12))}
+        st = {k: ['genuine'] * n for k in a}
+        self.assertEqual(R6F.recover_guarded(a, st, blend=R6F.VARIANTS['p13a'])['mode'], 'variant_complete_population')
+        self.assertEqual(R6F.recover_guarded({k: a[k] for k in ('old320', 'crop224', 'r6')}, {k: st[k] for k in ('old320', 'crop224', 'r6')})['mode'],
+                         'aprime_complete_population')
