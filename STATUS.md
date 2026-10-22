@@ -1,6 +1,6 @@
 # Project status and session handoff
 
-Updated **2026-10-22 12:55 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
+Updated **2026-10-22 17:35 UTC** (Claude, solo; Codex unavailable until Oct 22). Read this snapshot first, then the [shared handoff](docs/claude-astra-handoff.md). Rules are in [AGENTS.md](AGENTS.md) and setup in [README.md](README.md). The previous detailed snapshot, with its recovery records for older jobs, is in the [archive](docs/status-archive/status-before-20261019-final-push.md).
 
 ## Current snapshot
 
@@ -9,7 +9,7 @@ Updated **2026-10-22 12:55 UTC** (Claude, solo; Codex unavailable until Oct 22).
 
   | Entry | Submission | Public |
   |---|---|---|
-  | C1 fixed `p13nf` (C1's composition with the 'combined' member-cut rule, 6e10f14; speed-normalized point 25,984 s; members kept on every rehearsal study) | 57519689 (Oct 22 09:53:01) | pending (~18:00) |
+  | C1 fixed `p13nf` (C1's composition with the 'combined' member-cut rule, 6e10f14; speed-normalized point 25,984 s; members kept on every rehearsal study) | 57519689 (Oct 22 09:53:01) | **0.957** (scored 17:29) |
   | C1 `p13n` (P2 minus R224: R384 v1 weights + ½ rank(R6 flip) + ½ rank(own-3 mean logit: v4b-s43, v5-s43, v5-s44) at stride 3; speed-normalized point 25,750 s) | 57506666 (Oct 22 02:47:35) | **0.957** (members most likely cut: ≈ P2 without R224) |
   | C1 w0.65 `p13nw65` (same, compact 0.35 R6 flip + 0.65 own) | 57506593 (Oct 22 02:44:54) | **0.957** (same) |
   | S4 `p10s4` (R384 + R224 + own-8 mean logit at stride 2: v5-s42/43/44/46/47/49, v4b-s45, v4b-s43; point 23,172 s after the stride-window correction) | 57504011 (Oct 22 01:08:47) | **0.958** |
