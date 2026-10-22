@@ -31,6 +31,8 @@ VERSION = 's6c-shared-decode-v1'
 CHILD_GEOMETRY = dict(S6C.GEOMETRY_CHILD)
 CHUNK = S6C.GEOMETRY['chunk']
 CUT_SAFETY = 1.3                 # members stop when the remaining studies at the R6-only pace x 1.3 would pass the deadline
+COMBINED_SAFETY = 1.05           # 'combined' rule: members stop only when R6 + members at their measured paces would not fit
+COMBINED_WINDOW = 10             # ... with each pace the larger of the stage mean and the mean of the last 10 studies
 CUT_MIN_STUDIES = 3
 PARITY_TOLERANCE = 1e-3          # per member vs the separate s6c worker on the frozen 39 (the fresh-process tolerance)
 
@@ -167,6 +169,8 @@ class SharedS6:
         require(set(self.geometry) == set(CHILD_GEOMETRY) and all(self.geometry[k] == CHILD_GEOMETRY[k] for k in CHILD_GEOMETRY if k != 'eval_stride')
                 and int(self.geometry['eval_stride']) in (1, 2, 3), 'S6C_SHARED_GEOMETRY')
         self.stride1_check = bool(self.cfg.get('stride1_check')) and int(self.geometry['eval_stride']) != 1
+        self.cut_rule = self.cfg.get('cut_rule', 'r6_only')
+        require(self.cut_rule in ('r6_only', 'combined'), 'S6C_SHARED_CUT_RULE')
         self.models, self.staged, self.entries, self.checksums = [], [], [], []
         self.active, self.cut = True, None
         self.rows = {}
@@ -227,8 +231,10 @@ class SharedS6:
         with torch.autocast('cuda', dtype=torch.float16):
             return m(img, meta, mask, chunk=CHUNK).float()
 
-    def r6_only_pace(self, obs):
+    def r6_only_pace(self, obs, window=None):
         rows = [(s, self.rows.get(s['id'], {})) for s in obs.studies if not s.get('aborted')]
+        if window:
+            rows = rows[-window:]
         paces = [s['handle_seconds'] + (0. if s['first_of_loader'] else s['wait_seconds']) - x.get('s6c_seconds', 0.) for s, x in rows]
         return sum(paces) / len(paces) if len(paces) >= CUT_MIN_STUDIES else None
 
@@ -240,10 +246,24 @@ class SharedS6:
             return False
         remaining = len(self.ids) - len(obs.studies)
         now = time.time() if now is None else now
-        if now + remaining * max(pace, 0.) * CUT_SAFETY > self.deadline:
+        if getattr(self, 'cut_rule', 'r6_only') == 'combined':
+            # P13nf (2026-10-22): cut only when the whole stage (R6 + members) would not fit; R6 alone then still fits while the
+            # paces hold, since its pace is below the combined pace. The 'r6_only' rule (x 1.3 on R6 alone) cut members on any
+            # machine > 1.10x P2's rehearsal speed for R384 + R6 flip entries, i.e. on almost every hidden run. Running paces are the
+            # larger of the whole-stage mean and the mean of the last COMBINED_WINDOW studies, so a slowdown is seen quickly.
+            pace = max(pace, self.r6_only_pace(obs, window=COMBINED_WINDOW) or 0.)
+            rows = [self.rows[s['id']] for s in obs.studies if not s.get('aborted') and 's6c_seconds' in self.rows.get(s['id'], {})]
+            member = sum(x['s6c_seconds'] for x in rows) / len(rows) if rows else 0.0
+            recent = rows[-COMBINED_WINDOW:]
+            member = max(member, sum(x['s6c_seconds'] for x in recent) / len(recent) if recent else 0.0)
+            projected = remaining * (max(pace, 0.) + max(member, 0.)) * COMBINED_SAFETY
+        else:
+            member = None
+            projected = remaining * max(pace, 0.) * CUT_SAFETY
+        if now + projected > self.deadline:
             self.active = False
             self.cut = {'after_studies': len(obs.studies), 'remaining': remaining, 'r6_only_pace_seconds': pace, 'epoch': now,
-                        'deadline_epoch': self.deadline}
+                        'deadline_epoch': self.deadline, 'rule': getattr(self, 'cut_rule', 'r6_only'), 'member_pace_seconds': member}
             return True
         return False
 
@@ -387,7 +407,7 @@ class SharedS6:
                            'sha256': dict(S6C.SOURCE_PINS), 'chunk': CHUNK, 'scored': statuses.count('genuine'), 'studies': len(self.ids)},
                'code': self.code_receipt, 'anatomy_sha256': S6C.ANATOMY_SHA256, 'geometry': {**S6C.GEOMETRY, **self.geometry},
                'stride1_check': self.stride1_check, 'flip': {'enabled': False},
-               'cut': self.cut, 'shared_with': 'r6 plain production worker (same process; members rendered at 320 px from R6\'s native cache)',
+               'cut': self.cut, 'cut_rule': getattr(self, 'cut_rule', 'r6_only'), 'shared_with': 'r6 plain production worker (same process; members rendered at 320 px from R6\'s native cache)',
                'ledger_sha256': file_sha(ledger), 'fp32_recoveries': sum(x.get('fp32_rescues', 0) for x in records),
                'peak_rss_bytes': resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024,
                'peak_cuda_bytes': self.torch.cuda.max_memory_allocated() if cuda else 0}

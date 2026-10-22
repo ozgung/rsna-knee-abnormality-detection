@@ -389,6 +389,8 @@ def require_shared(r, cfg, stride=1):
         cost['stride1_windows_per_study'] = sum(row['windows_stride1'] for row in rows.values()) / n
     return {'studies': n, 'separate_pass_max_abs': worst if ref_aliases else None, 'separate_pass_max_abs_by_member': per_member,
             'parity_applicable': bool(ref_aliases), 'parity_key': key,
+            'members_kept_every_study': all(row['status'] == 'genuine' for row in rows.values()) and all(x.get('cut') is None for x in reports),
+            'cut_rules': sorted({str(x.get('cut_rule', 'r6_only')) for x in reports}),
             'separate_pass_tolerance': SHARED_PARITY, 'side_flipped_separate_renders': separate,
             'reference_receipt_sha256': ref['receipt_sha256'], 'member_cost': cost}
 

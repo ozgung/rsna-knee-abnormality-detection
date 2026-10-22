@@ -401,6 +401,9 @@ COMPACT_VARIANTS.update({'p10s4': 's6c', 'p10s4s': 's6c'})
 # p13a: k=3 at stride 2; p13b: k=3 at stride 3; p13c: k=2 at stride 3; *w65: slot 4 (0.65 own / 0.35 R6 flip), same members/stride
 VARIANTS.update({'p13a': p2_own_blend(.5, 2), 'p13b': p2_own_blend(.5, 3), 'p13c': p2_own_blend(.5, 3),
                  'p13aw65': p2_own_blend(.65, 2), 'p13bw65': p2_own_blend(.65, 3), 'p13cw65': p2_own_blend(.65, 3)})
+# p13nf / p13nfw65 (2026-10-22 08:40): p13n with the 'combined' members-first cut rule
+VARIANTS.update({'p13nf': {**p2_own_blend(.5, 3), 'raptor_arms': [['old320', 1.0]], 'own_cut': 'combined'},
+                 'p13nfw65': {**p2_own_blend(.65, 3), 'raptor_arms': [['old320', 1.0]], 'own_cut': 'combined'}})
 # p13n (parent redirect 2026-10-22 00:05 UTC): P13 without the R224 arm (R384 with its v1 weights), k=3 at stride 3; p13nk2 = k=2
 VARIANTS.update({k: {**p2_own_blend(w, 3), 'raptor_arms': [['old320', 1.0]]}
                  for k, w in (('p13n', .5), ('p13nk2', .5), ('p13nw65', .65), ('p13nk2w65', .65))})
@@ -418,7 +421,10 @@ def resolve_blend(blend=None):
                            BLEND_KEYS | {'own_aggregation'}, BLEND_KEYS | {'own_aggregation', 'own_only'},
                            BLEND_KEYS | {'own_aggregation', 'own_stride'},
                            BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride', 'own_aggregation', 'no_raptor'},
-                           BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride', 'own_aggregation'}), 'BLEND_SCHEMA')
+                           BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride', 'own_aggregation'},
+                           BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride', 'own_aggregation', 'own_cut'}), 'BLEND_SCHEMA')
+    if 'own_cut' in blend:
+        require(blend.get('own_shared') is True and blend['own_cut'] in ('r6_only', 'combined'), 'OWN_CUT')
     arms = tuple((str(a), float(w)) for a, w in blend['raptor_arms'])
     names = [a for a, _ in arms]
     if blend.get('own_only'):
@@ -476,6 +482,12 @@ def own_shared(blend=None):
         return False
     require(blend['own_shared'] is True and own_compact_arm(blend), 'OWN_SHARED_NEEDS_OWN_COMPACT_ARM')
     return True
+
+
+def own_cut(blend=None):
+    """The shared-decode members-first cut rule ('r6_only' = R6-only pace x 1.3, the default; 'combined' = R6 + members x 1.05)."""
+    resolve_blend(blend)
+    return (blend or {}).get('own_cut', 'r6_only')
 
 
 def own_stride(blend=None):

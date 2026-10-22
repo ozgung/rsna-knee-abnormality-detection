@@ -606,3 +606,83 @@ class P13nTests(unittest.TestCase):
             self.assertEqual((R6F.own_stride(b), R6F.own_aggregation(b), len(B.s6c_models(name))), (3, 'mean_logit', k))
         self.assertTrue(B.same_stages('p13n', 'p13nw65') and B.same_stages('p13nk2', 'p13nk2w65'))
         self.assertFalse(B.same_stages('p13n', 'p13b') or B.same_stages('p13n', 'p13nk2'))
+
+
+class CombinedCutTests(unittest.TestCase):
+    """Synthetic clock: per study R6 takes r6 s and the members m s (when active); should_cut is evaluated before each study, as
+    on_study does. Deadline 1,000 s, 100 studies on the board."""
+
+    def simulate(self, rule, r6, m, start=0., n=100, deadline=1000.):
+        from knee import public_s6c_shared as SH
+        sh = SH.SharedS6.__new__(SH.SharedS6)
+        sh.ids = ['s%d' % i for i in range(n)]
+        sh.deadline, sh.active, sh.cut, sh.rows = deadline, True, None, {}
+        if rule is not None:
+            sh.cut_rule = rule
+        obs = types.SimpleNamespace(studies=[])
+        t, kept = start, 0
+        for i in range(n):
+            sh.should_cut(obs, now=t)
+            r6_i = r6(i) if callable(r6) else r6
+            took = r6_i + (m if sh.active else 0.)
+            if sh.active:
+                kept += 1
+                sh.rows['s%d' % i] = {'s6c_seconds': m}
+            else:
+                sh.rows['s%d' % i] = {'status': 'deadline'}
+            obs.studies.append({'id': 's%d' % i, 'handle_seconds': took, 'wait_seconds': 0., 'first_of_loader': i == 0})
+            t += took
+        return kept, t, sh
+
+    def test_a_whole_stage_fits_members_kept_for_every_study(self):
+        # R6 8 s + members 1 s per study, 100 studies from t=0: 900 s <= 1,000 s
+        kept, end, sh = self.simulate('combined', 8., 1.)
+        self.assertEqual((kept, sh.cut), (100, None))
+        self.assertLessEqual(end, 1000.)
+        kept_old, _, sh_old = self.simulate('r6_only', 8., 1.)        # the old rule: 1.3 x 8 x 97 = 1,009 > 1,000 -> cut at once
+        self.assertEqual(kept_old, 3)
+        self.assertEqual(sh_old.cut['rule'], 'r6_only')
+
+    def test_b_slow_pace_cuts_members_at_the_right_point_and_r6_completes(self):
+        # constant paces that cannot fit (R6 9 s + members 2 s = 1,100 s): the cut comes at the first check and R6 completes
+        kept, end, sh = self.simulate('combined', 9., 2.)
+        self.assertEqual((kept, sh.cut['after_studies']), (3, 3))
+        self.assertLessEqual(end, 1000.)
+        # the board slows down halfway (R6 7 s -> 10 s; members 2 s): all with members 1,050 s > 1,000 s, R6 alone 850 s
+        slow = lambda i: 7. if i < 50 else 10.
+        kept, end, sh = self.simulate('combined', slow, 2.)
+        self.assertIsNotNone(sh.cut)
+        self.assertGreaterEqual(sh.cut['after_studies'], 50)           # members kept through the fast half
+        self.assertLess(kept, 100)
+        self.assertLessEqual(end, 1000.)                               # R6 still finishes
+        c = sh.cut                                                     # the projection with members first exceeded the deadline
+        self.assertGreater(c['epoch'] + c['remaining'] * (c['r6_only_pace_seconds'] + c['member_pace_seconds']) * 1.05, 1000.)
+        # an abrupt 70 % slowdown can still outrun any running estimate: the 29,640 s self-stop and recovery remain the backstop
+        kept, end, sh = self.simulate('combined', lambda i: 7. if i < 50 else 12., 1.)
+        self.assertIsNotNone(sh.cut)
+
+    def test_default_rule_unchanged_for_p9_p12_and_shared_r7(self):
+        # no cut_rule attribute/config -> the original R6-only x 1.3 rule, byte for byte the same decisions as before
+        kept_default, end_default, sh_default = self.simulate(None, 9., 2.)
+        kept_old, end_old, sh_old = self.simulate('r6_only', 9., 2.)
+        self.assertEqual((kept_default, end_default), (kept_old, end_old))
+        self.assertEqual(sh_default.cut['after_studies'], 3)
+        from knee import public_s6c_shared as SH
+        self.assertEqual(SH.CUT_SAFETY, 1.3)
+        for name in ('p9s', 'p9s2s2', 'p9s2s2b', 'p12', 'p12f', 'p13n', 'p13nk2', 'p13a'):
+            self.assertEqual(R6F.own_cut(R6F.VARIANTS[name]), 'r6_only', name)
+
+    def test_variant_and_worker_config(self):
+        self.assertEqual((R6F.own_cut(R6F.VARIANTS['p13nf']), R6F.own_cut(R6F.VARIANTS['p13n']), R6F.own_cut(None)), ('combined', 'r6_only', 'r6_only'))
+        self.assertEqual({k: v for k, v in R6F.VARIANTS['p13nf'].items() if k != 'own_cut'}, R6F.VARIANTS['p13n'])
+        with self.assertRaises(ValueError):
+            R6F.resolve_blend({**copy.deepcopy(R6F.VARIANTS['p13nf']), 'own_cut': 'never'})
+        from scripts import build_r6flip_entry as B
+        self.assertTrue(B.same_stages('p13nf', 'p13nfw65'))
+        cfg, cols = stub_cfg('p13nf', S6C.block(members(2, ('v5',))), mode='entry')
+        cfg.update(boards=[{'uuid': 'a'}, {'uuid': 'b'}], staged='st', staged_ids=['s1'], stage_binding={}, code='c', source_pins={},
+                   r6_mount='m', anatomy='an', deadline_epoch=1.)
+        cfg['r6flip_binding']['r6'] = {'manifest': {}, 'cpu_pins': {}}
+        self.assertEqual(ENTRY.r6_worker_config(cfg, 0, 'production', ['s1'], Path('/o/x'), None)['s6c_shared']['cut_rule'], 'combined')
+        cfg['blend'] = copy.deepcopy(R6F.VARIANTS['p13n'])
+        self.assertNotIn('cut_rule', ENTRY.r6_worker_config(cfg, 0, 'production', ['s1'], Path('/o/x'), None)['s6c_shared'])

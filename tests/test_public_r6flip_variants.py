@@ -460,7 +460,7 @@ class VariantPacketTests(unittest.TestCase):
             date = {'p6': '20261019', 'p6p': '20261019', 'p6s': '20261020', 'p6sp': '20261020', 'p9': '20261020', 'p9r': '20261020',
                     'p9s': '20261020', 'p9sr': '20261020', 'p11v5': '20261022', 'p9s2s2b': '20261022', 'p12v5': '20261022',
                     'p12fv5': '20261022', 'p10v5': '20261022', 'p10pv5': '20261022', 'p10s4': '20261022', 'p10s4s': '20261022',
-                    **{k: '20261022' for k in ('p13a', 'p13b', 'p13c', 'p13aw65', 'p13bw65', 'p13cw65', 'p13n', 'p13nk2', 'p13nw65', 'p13nk2w65')}}.get(variant, '20261021' if variant.startswith(('p9s2', 'p10', 'p11', 'p12')) else '20261018')
+                    **{k: '20261022' for k in ('p13a', 'p13b', 'p13c', 'p13aw65', 'p13bw65', 'p13cw65', 'p13n', 'p13nk2', 'p13nw65', 'p13nk2w65', 'p13nf', 'p13nfw65')}}.get(variant, '20261021' if variant.startswith(('p9s2', 'p10', 'p11', 'p12')) else '20261018')
             slug = self.B.slug_for(variant, 'rehearsal')
             self.assertEqual(slug, 'r6flip-%s-rehearsal-%s' % (variant, date))
             self.assertEqual(self.B.slug_for(variant, 'entry'), 'r6flip-%s-entry-%s' % (variant, date))

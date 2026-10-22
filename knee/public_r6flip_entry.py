@@ -86,6 +86,8 @@ def r6_worker_config(cfg, board, pass_name, ids, folder, inject_uid, arm='r6'):
                            'out': str(Path(folder).parent / ('board%d-s6c-%s' % (board, pass_name))),
                            'geometry': {**_s6c().GEOMETRY_CHILD, 'eval_stride': stride},
                            'stride1_check': cfg['mode'] == 'rehearsal' and stride != 1}   # stride 2: the parity/reference checks run at stride 1
+        if R6F.own_cut(cfg.get('blend')) != 'r6_only':     # absent key = the original rule (earlier packets unchanged)
+            c['s6c_shared']['cut_rule'] = R6F.own_cut(cfg.get('blend'))
     return c
 
 
