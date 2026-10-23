@@ -31,14 +31,15 @@ SOURCE = {'kind': 'model'}       # 'dataset': the solo fixture links input/<moun
 # Lane P9 (2026-10-21, parent's slot-4 solo probe of a v4b member): the export's names and the slug date can be overridden, and the
 # expected epoch count too; everything else of the C1 contract (recipe, pool membership, strict CPU load) is unchanged.
 OVERRIDES = {'dataset': None, 'checkpoint': None, 'slug_date': '20261020', 'epochs': 16}
+MODEL = {'slug': 'knee-s6-lanec-seeds-20261019', 'lane': LANE}   # lane F (Oct 20) passes --model-slug knee-s6-lanef-20261020 --lane-dir
 
 
 def names(tag, seed):
     ck = OVERRIDES['checkpoint'] or 'E_prior_s%d_%sall.pt' % (seed, tag)
     ref = OVERRIDES['dataset'] or ('ozgung/knee-s6-%sall-s%d-20261020' % (tag, seed) if SOURCE['kind'] == 'dataset'
-                                   else 'ozgung/knee-s6-lanec-seeds-20261019/pyTorch/%s-s%d' % (tag, seed))
+                                   else 'ozgung/%s/pyTorch/%s-s%d' % (MODEL['slug'], tag, seed))
     date = OVERRIDES['slug_date']
-    return {'dir': LANE / ('%s-s%d' % (tag, seed)), 'dataset': ref,
+    return {'dir': MODEL['lane'] / ('%s-s%d' % (tag, seed)), 'dataset': ref,
             'checkpoint': ck,
             'alias': 'E_prior_s%d_f0.pt' % seed, 'membership': 'membership_E_prior_s%d_f0.json' % seed,
             'rehearsal_slug': 's6solo-%ss%d-qual-%s' % (tag, seed, date), 'entry_slug': 's6solo-%ss%d-entry-%s' % (tag, seed, date)}
@@ -136,7 +137,7 @@ def seed_arm(tag, seed):
                         'bytes': desc['checkpoint_size'], 'arm': 'E_prior', 'dataset': desc['dataset_slug'],
                         'dataset_version': desc['dataset_version'], 'descriptor_dataset_version': desc['dataset_version'],
                         'mount': (desc['dataset_slug'].split('/')[1] if len(desc['dataset_slug'].split('/')) == 2 else
-                                  'models/ozgung/knee-s6-lanec-seeds-20261019/pytorch/%s-s%d/%d' % (tag, seed, desc['dataset_version']))},
+                                  'models/ozgung/%s/pytorch/%s-s%d/%d' % (MODEL['slug'], tag, seed, desc['dataset_version']))},
             'receipts': dict(acc['receipts']), 'json_expect': {'run_config.json': acc['run_config_expect'], n['membership']: acc['membership_expect']},
             'text_expect': {'SHA256SUMS': line},
             'cpu': {'receipt_sha256': acc['cpu_receipt_sha256'], 'state_sha256': ck['state_sha256'],
@@ -169,7 +170,7 @@ def install(tag, seed):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument('command', choices=['accept', 'rehearsal', 'verify', 'entry'])
-    p.add_argument('--tag', required=True, help='label table of the export: v2, v3 (Lane C), v4a, v4b (Lane F)')
+    p.add_argument('--tag', required=True, help='label table of the export: v2, v3 (Lane C), v4a, v4b, v5 (Lane F)')
     p.add_argument('--seed', type=int, required=True)
     p.add_argument('--python', default=sys.executable, help='interpreter with torch/timm for the CPU check')
     p.add_argument('--rehearsal-result')
@@ -179,9 +180,14 @@ def main(argv=None):
     p.add_argument('--checkpoint', help='checkpoint file name override (default E_prior_s<seed>_<tag>all.pt)')
     p.add_argument('--slug-date', default='20261020', help='kernel slug date (a new date = a new kernel id)')
     p.add_argument('--epochs', type=int, default=16, help='expected epochs in the export\'s run_config (C1 contract: 16)')
+    p.add_argument('--model-slug', default=MODEL['slug'], help='Kaggle Model holding the export (lane C default; lane F: knee-s6-lanef-20261020)')
+    p.add_argument('--lane-dir', default=None, help='local analysis directory for the seed (default: lane C)')
     a = p.parse_args(argv)
     OVERRIDES.update(dataset=a.dataset, checkpoint=a.checkpoint, slug_date=a.slug_date, epochs=a.epochs)
     SOURCE['kind'] = a.source
+    MODEL['slug'] = a.model_slug
+    if a.lane_dir:
+        MODEL['lane'] = Path(a.lane_dir)
     if a.command == 'accept':
         print(json.dumps({k: v for k, v in accept(a.tag, a.seed, a.version, python=a.python).items() if k not in ('run_config_expect',)}, indent=1))
         return 0
