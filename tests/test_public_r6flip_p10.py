@@ -32,6 +32,12 @@ except ImportError:
     torch = None
 
 
+def captured_solo():
+    """The S4 block test reads the captured publisher solo source, an ignored research artifact."""
+    from scripts import build_r6flip_entry as B
+    return B.S6C_CAPTURED.is_file()
+
+
 def members(n=3, labels=('v3', 'v3', 'v4b'), no_reference=()):
     out = []
     for i in range(n):
@@ -556,6 +562,7 @@ class P13Tests(unittest.TestCase):
 
 
 class S4StrideTests(unittest.TestCase):
+    @unittest.skipUnless(captured_solo(), 'captured publisher solo source not staged')
     def test_block_variants_and_command(self):
         from knee import public_s6c_worker as W
         ms = members(2, ('v5',))
