@@ -19,7 +19,7 @@ except ImportError:
     torch = None
 
 ROOT = Path(__file__).resolve().parents[1]
-PARENT = Path(os.environ.get('KNEE_REFERENCE_PARENT', '/Users/ozgun/Dev/rsna-knee-abnormality-detection'))
+PARENT = Path(os.environ.get('KNEE_REFERENCE_PARENT', '~/Dev/rsna-knee-abnormality-detection'))
 SOURCE = PARENT/'outputs/analysis/public-train-recipe-20261009/assets/train_knee.py'
 
 

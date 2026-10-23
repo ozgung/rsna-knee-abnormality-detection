@@ -13,8 +13,8 @@ Exit 0: every arm exported; 2: setup/boot failure; 3: short-lived VM limit; 4: a
 """
 import json, pathlib, re, subprocess, sys, time
 
-COLAB = '/Users/ozgun/.local/bin/colab'
-CPY = '/Users/ozgun/.local/share/uv/tools/google-colab-cli/bin/python'
+COLAB = '~/.local/bin/colab'
+CPY = '~/.local/share/uv/tools/google-colab-cli/bin/python'
 TERMINAL = ('exported', 'export_failed', 'failed', 'stopped_health')
 LAUNCHER = '''import json, pathlib, subprocess, sys
 s = pathlib.Path("/content/chain-boot-state.json")

@@ -1,6 +1,6 @@
 # Local64 X1a cache protocol
 
-Accepted October 15, 2026, Claude 18:31 shared handoff. Current checkpoint: first two CPU attempts failed adapter/setup bugs; r3 withdrawn for incomplete anchor-source guard; corrected r3b packets sealed below. Outcome: four private/offline CPU Kaggle cache packets, preserving exact Dread 64 source-slot semantics while changing pixels to S6-derived local views. No cache or anatomy qualification has executed. Claude owns all pushes/collectors and X1b Colab control; Codex owns implementation integration and acceptance. [Recipe](../research/finetune-recipe-20261015.md), [shared agreement](../claude-astra-handoff.md).
+Accepted October 15, 2026, Claude 18:31 shared handoff. Current checkpoint: first two CPU attempts failed adapter/setup bugs; r3 withdrawn for incomplete anchor-source guard; corrected r3b packets sealed below. Outcome: four private/offline CPU Kaggle cache packets, preserving exact Dread 64 source-slot semantics while changing pixels to S6-derived local views. No cache or anatomy qualification has executed. Claude owns all pushes/collectors and X1b Colab control; Codex owns implementation integration and acceptance. [Recipe](../research/finetune-recipe-20261015.md), [shared agreement](../archive/handoff/claude-astra-handoff.md).
 
 ## Frozen population and processing contract
 
@@ -62,10 +62,10 @@ Broad checks were run and **did not pass**: bare 1322 tests, 22 errors/757 skips
 **Owner execution, only if claimed after reconciling main-lane resources:**
 
 ```bash
-kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/local64-cache-20261015/shard0
-kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/local64-cache-20261015/shard1
-kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/local64-cache-20261015/shard2
-kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/local64-cache-20261015/shard3
+kaggle kernels push -p ~/Dev/rsna-knee-abnormality-detection/outputs/kaggle/local64-cache-20261015/shard0
+kaggle kernels push -p ~/Dev/rsna-knee-abnormality-detection/outputs/kaggle/local64-cache-20261015/shard1
+kaggle kernels push -p ~/Dev/rsna-knee-abnormality-detection/outputs/kaggle/local64-cache-20261015/shard2
+kaggle kernels push -p ~/Dev/rsna-knee-abnormality-detection/outputs/kaggle/local64-cache-20261015/shard3
 ```
 
 No `--timeout`, duplicate jobs or local full-cache downloads. Claude posts actual accepted versions/source/settings, job status and log/result paths. Collect only contract/index/receipts and K0 PNGs into `outputs/kaggle/local64-cache-20261015-result/shardN/local64_cache/`; `scripts/collect_local64_cache_metadata.py` defaults to metadata-only validation. `--verify-pixels` is for a remote staging host with all NPZ files, not this laptop. Both modes keep training promotion false until full loader/stage integration, immutable file/access verification and real K0 review pass.

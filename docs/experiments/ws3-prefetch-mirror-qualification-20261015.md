@@ -29,7 +29,7 @@ Ready plain rehearsal: `outputs/kaggle/ws3-prefetch-plain-qual-20261015-r3/`, PR
 Claude reviews the prospective gates, reconciles actual quota/owned jobs and claims the **one chosen** rehearsal. The plain packet is the fallback; create a separate mirror packet only after the official score admits it, using the same builder with `--mirror --mirror-admission <official-submissions.csv>`. Do not push both variants automatically.
 
 ```bash
-kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/ws3-prefetch-plain-qual-20261015-r3
+kaggle kernels push -p ~/Dev/rsna-knee-abnormality-detection/outputs/kaggle/ws3-prefetch-plain-qual-20261015-r3
 ```
 
 No `--timeout`. Verify accepted version/code/settings before considering the job bound. Claude collects terminal evidence to a fresh result directory; expected root `ws2-a-prime/` retains the legacy path name but records recipe `ws2-a-prime-r224-v3`. Preserve logs, eight worker ledgers (six main plus two serial control), references, comparison, resources and failure receipts. Post job/version/output/stop details in STATUS/shared handoff. Stop via owner-coordinated Kaggle UI if needed; no parent collector or blind repush.

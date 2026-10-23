@@ -29,7 +29,7 @@ from knee import public_ws2w_entry as W
 from knee.public_s6_qualification import LABELS,canonical,digest,file_sha,require,save
 
 PROJECT=Path(__file__).resolve().parents[1]
-MAIN=Path('/Users/ozgun/Dev/rsna-knee-abnormality-detection')
+MAIN=Path('~/Dev/rsna-knee-abnormality-detection')
 KAGGLE=MAIN/'outputs/kaggle'
 BUILDER_VERSION='ws2w-projection-probe-v1'
 WAIVER='aprime-w-projection-20261017'
@@ -53,7 +53,7 @@ QUAL_RESULT=KAGGLE/'ws2-r224-v2-qual-20261015-result/ws2-a-prime'
 VISIBLE=KAGGLE/'ws2-r224-probe-waiver-20261015-visible'
 VISIBLE_LEDGERS=KAGGLE/'ws2-r224-probe-waiver-20261015-visible-ledgers'
 AUTHORIZATION={'reported_by':'Claude',
-    'source':'docs/claude-astra-handoff.md, 2026-10-17 16:52 UTC (USER WAIVER DECISIONS, given directly and prospectively)',
+    'source':'docs/archive/handoff/claude-astra-handoff.md, 2026-10-17 16:52 UTC (USER WAIVER DECISIONS, given directly and prospectively)',
     'reported_user_choice':'Yes, submit A-prime-w',
     'independently_verified_direct_user_message':False,
     'scope':'one A-prime-w probe bound to the A-prime v2 failed qualification receipt; waive only the ordinary 8.3h '

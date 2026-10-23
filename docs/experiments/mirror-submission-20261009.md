@@ -41,10 +41,10 @@ Focused checks use synthetic probabilities/receipts and the genuine archived sou
 
 ```bash
 PYTHONPATH=/tmp/coverage-inference-test-deps \
-KNEE_REFERENCE_PARENT=/Users/ozgun/Dev/rsna-knee-abnormality-detection \
-KNEE_REFERENCE_SOURCE=/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py \
-KNEE_RAPTOR_SOURCE=/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/raptor-audit/knee-mri-twelve-findings-from-a-single-model.py \
-/Users/ozgun/Dev/rsna-knee-abnormality-detection/.venv/bin/python -m unittest discover -s tests -v
+KNEE_REFERENCE_PARENT=~/Dev/rsna-knee-abnormality-detection \
+KNEE_REFERENCE_SOURCE=~/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py \
+KNEE_RAPTOR_SOURCE=~/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/raptor-audit/knee-mri-twelve-findings-from-a-single-model.py \
+~/Dev/rsna-knee-abnormality-detection/.venv/bin/python -m unittest discover -s tests -v
 ```
 
 Local verification:236/236fixture-enabled tests PASS, including six new standalone tests; the existing17-case mirror input stress suite also passes. Archived executable reconstruction, synthetic visible/full builds, fresh-interpreter bundle import, in-memory source compilation, whitespace checks and dependency-free smoke PASS (CPU selection, no model forward). Full test log: `outputs/analysis/mirror-submission-20261009/tests.log`. No commit, remote launch, model download, upload or submission was performed by this implementation task. Generated tests use temporary directories; durable aggregate logs live in primary ignored `outputs/analysis/mirror-submission-20261009/`.

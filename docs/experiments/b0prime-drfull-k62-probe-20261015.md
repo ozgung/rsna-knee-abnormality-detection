@@ -39,7 +39,7 @@ Targeted checks ran **28 tests: 24 passed, four optional reader tests skipped** 
 Claude claimed/launched this **one** rehearsal at 16:18 after reconciling quota/jobs. The recorded command below is already executed; do not repeat it:
 
 ```bash
-kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/b0prime-drfull-k62-qual-20261015-r2
+kaggle kernels push -p ~/Dev/rsna-knee-abnormality-detection/outputs/kaggle/b0prime-drfull-k62-qual-20261015-r2
 ```
 
 No `--timeout`. Post actual version, accepted source/settings, logs, status and stop/recovery details. It ends naturally; owner coordinates any necessary stop. No Codex launch or duplicate collector. Collect terminal evidence into the fresh `...-r2-result/` directory:

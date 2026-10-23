@@ -4,7 +4,7 @@ Revised 2026-10-18 evening after merging the live campaign branch: the first ver
 written from the stale October 9 `main` and assumed our best entry was 0.950. Our best is
 now **R6F-pure v2, submission 57340072, public 0.958** (our own controller around the
 public recipe), with A′-w at 0.957 and A′ at 0.956; see the
-[handoff log](../claude-astra-handoff.md) and the
+[handoff log](../archive/handoff/claude-astra-handoff.md) and the
 [October 17 strategy revision](../research/strategy-revision-20261017.md). The listing,
 provenance and measurement sections below are unchanged evidence; the consequences and
 queue sections are rewritten for the actual position.

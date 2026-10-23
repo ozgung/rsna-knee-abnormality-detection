@@ -90,7 +90,7 @@ class SamplingTests(unittest.TestCase):
 class CaptureTests(unittest.TestCase):
     def test_synthetic_dicom_parity_masks_mirror_repeat(self):
         import os
-        source=Path(os.environ.get('KNEE_TEST_PUBLIC_SOURCE','/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py'))
+        source=Path(os.environ.get('KNEE_TEST_PUBLIC_SOURCE','~/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py'))
         if not source.exists(): self.skipTest('audited private source fixture unavailable')
         import pydicom
         from knee.reference import audit_source,load_definitions
@@ -124,7 +124,7 @@ class CaptureTests(unittest.TestCase):
         import torch
         from knee.reference import load_definitions,audit_source
         from knee.native_crop_qualification import mirrored_triplets
-        source=Path('/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py')
+        source=Path('~/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py')
         if not source.exists(): self.skipTest('audited source fixture unavailable')
         public,_=load_definitions(*audit_source(source.read_text()))
         volume=np.zeros((96,384,384),np.uint8)
@@ -143,7 +143,7 @@ class CaptureTests(unittest.TestCase):
     def test_actual_capture_rethrows_fatal_read_and_metadata(self):
         from knee.reference import audit_source,load_definitions
         from knee.native_crop_qualification import capture_study
-        source=Path('/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py')
+        source=Path('~/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py')
         if not source.exists(): self.skipTest('audited source fixture unavailable')
         public,decoder=load_definitions(*audit_source(source.read_text()))
         _,_,resize=public._make_reader()
@@ -166,7 +166,7 @@ class CaptureTests(unittest.TestCase):
         import cv2
         from knee.reference import load_definitions,audit_source,canonical_bytes,sha256
         from knee.native_crop_qualification import run
-        source=Path('/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py')
+        source=Path('~/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py')
         if not source.exists(): self.skipTest('audited source fixture unavailable')
         public_source,decoder_source,manifest=audit_source(source.read_text())
         v=np.ones((96,384,384),np.uint8);m=np.ones(96,np.uint8);c=np.ones((94,3,320,320),np.uint8)

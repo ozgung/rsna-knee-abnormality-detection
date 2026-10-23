@@ -30,7 +30,7 @@ projection=WS2.projection
 WAIVER='projection-8.3h-20261015'
 FAILED_RECEIPT_SHA='8b645d41ded79d946b57e1580586c00ca75849db20dda288d1adad5cc7319dd7'
 AUTHORIZATION={'reported_by':'Claude',
-    'source':'docs/claude-astra-handoff.md, 2026-10-15 11:28 UTC',
+    'source':'docs/archive/handoff/claude-astra-handoff.md, 2026-10-15 11:28 UTC',
     'reported_user_choice':'Submit A-prime anyway',
     'independently_verified_direct_user_message':False,
     'scope':'one competitive probe; only the 8.3h projection gate; actual nine-hour limit unchanged'}

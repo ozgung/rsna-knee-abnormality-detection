@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from knee import public_training_smoke as smoke
 from knee.public_adaptation_fit import metric_report, paired_bootstrap
 
-E = '/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/own224-window-samerun-20261012-result-v1/own224_window_diagnostic/endpoint-private.npz'
+E = '~/Dev/rsna-knee-abnormality-detection/outputs/kaggle/own224-window-samerun-20261012-result-v1/own224_window_diagnostic/endpoint-private.npz'
 ENDPOINT_SHA = '1c7a0d0928e625551a47ab10082fcb9a5837cd1c3eefd4adc2fac0d921aa27c9'
 WEAK = ['Lateral OA', 'PF OA', 'Lateral Meniscus', 'MCL']
 npz, out = Path(sys.argv[1]), Path(sys.argv[2])

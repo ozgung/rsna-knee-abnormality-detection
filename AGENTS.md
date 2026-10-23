@@ -4,7 +4,7 @@
 
 - Read `STATUS.md` first: current snapshot, queue, and latest checkpoint; read other sections only when relevant. Then inspect the relevant README sections and code. Reconcile stale claims against files and checks before acting.
 - `STATUS.md` is the primary cross-session handoff and current task queue. Keep changing state there; keep setup in `README.md` and durable working rules here.
-- `docs/claude-astra-handoff.md` is the shared plan and message log between Claude and Astra. Read it after the STATUS snapshot, answer or act on its open items, and append a dated entry to its log when you accept, change or reject a proposal there.
+- The competition closed on 2026-10-22. The campaign's shared Claude/Codex message log and the final STATUS snapshot are archived under `docs/archive/`; read them only for history. New work starts from `STATUS.md` and the postmortem in `docs/postmortem/`.
 - Treat the STATUS plan as tentative. After meaningful results or changes to data, rules, time, or compute, reorder, revise, or drop tasks and record the reason in its working decisions. Verify deadlines before calendar planning and preserve time for offline rehearsals.
 - Follow the user's current request. For an open-ended request to continue, pick the first unblocked ready task in `STATUS.md`. Keep one implementation task active at a time.
 - Before substantial work, state the intended outcome and acceptance check. Continue through implementation, relevant verification, and handoff updates within the authorized scope.

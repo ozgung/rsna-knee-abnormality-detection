@@ -13,7 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path("/Users/ozgun/Dev/rsna-knee-abnormality-detection")
+ROOT = Path("~/Dev/rsna-knee-abnormality-detection")
 sys.path.insert(0, str(ROOT))
 from knee.paired_validation import _auc_draws, resample_counts  # noqa: E402
 

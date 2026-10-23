@@ -3,7 +3,7 @@
 Purpose: before any table feeds training, check each public CC0 report-derived label table for gold leakage, then score it against the 58 fully labelled studies (CPU only, aggregate numbers only). Outputs (ignored): `outputs/analysis/label-benchmark-20261009/{summary.json,per_table.csv,agreement.csv}`.
 
 ```bash
-# downloads: kaggle datasets download <ref> -f <file> -p data/weak-labels/<owner>_<slug> -q   (CLI: /Users/ozgun/miniconda3/bin/kaggle)
+# downloads: kaggle datasets download <ref> -f <file> -p data/weak-labels/<owner>_<slug> -q   (CLI: ~/miniconda3/bin/kaggle)
 .venv/bin/python -I scripts/benchmark_label_tables.py   # defaults: --data-dir data/raw --tables-dir data/weak-labels --out-dir outputs/analysis/label-benchmark-20261009
 ```
 Parquet files are read through a CSV conversion made with miniconda's pyarrow 26.0.0 (the `.venv` has no pyarrow; `pip install pyarrow` was run in miniconda only). Bootstrap: 2,000 study-level draws, seed 20261008; one draw (index 1365, MCL has a single class) is skipped for every table.

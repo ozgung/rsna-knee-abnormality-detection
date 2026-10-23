@@ -19,7 +19,7 @@ The result is one aggregate JSON file, capped at64KiB. It records source/archite
 From the reviewed repository:
 
 ```bash
-PROJECT=/Users/ozgun/Dev/rsna-knee-abnormality-detection
+PROJECT=~/Dev/rsna-knee-abnormality-detection
 "$PROJECT/.venv/bin/python" scripts/build_mavit_checkpoint_audit.py \
   "$PROJECT/outputs/kaggle/mavit-checkpoint-audit-20261009" knee-mavit-checkpoint-audit-20261009 \
   --source-dir "$PROJECT/outputs/analysis/post-fusion-research-20261009/mavit/dataset-code"
@@ -32,8 +32,8 @@ Parent should review `kernel-metadata.json`, `audit-contract.json` and `build-re
 Nine focused tests pass: ZIP metadata safety; weights-only loading without retry; exact key/shape/dtype/finite checks; malicious-pickle rejection without executing its side effect; no pretrained load/download/forward; no gold-file reads; bounded private-metadata failure receipt; unchanged public architecture AST; CPU-only offline build and isolated import. A local public-constructor test uses explicitly test-only timm/einops import shims because those packages are absent locally; it verifies the original MALA-T stage depths/dimensions and study-head structure, not real dependency compatibility.
 
 ```bash
-KNEE_REFERENCE_PARENT=/Users/ozgun/Dev/rsna-knee-abnormality-detection \
-/Users/ozgun/Dev/rsna-knee-abnormality-detection/.venv/bin/python \
+KNEE_REFERENCE_PARENT=~/Dev/rsna-knee-abnormality-detection \
+~/Dev/rsna-knee-abnormality-detection/.venv/bin/python \
   -m unittest discover -s tests -p test_mavit_checkpoint.py -v
 ```
 

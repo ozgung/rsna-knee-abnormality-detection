@@ -16,9 +16,9 @@ import sys
 import time
 
 ROOT=Path(__file__).resolve().parents[1]
-KAGGLE='/Users/ozgun/miniconda3/bin/kaggle'
+KAGGLE='~/miniconda3/bin/kaggle'
 PYTHON=ROOT/'.venv/bin/python'
-KAGGLE_PYTHON='/Users/ozgun/miniconda3/bin/python'
+KAGGLE_PYTHON='~/miniconda3/bin/python'
 CACHE='ozgung/knee-train04-cache-full-20261008'
 PROBE='ozgung/knee-train04-coverage-probe-warm-20261008'
 REFERENCE='ozgung/knee-train04-reference-20261009'

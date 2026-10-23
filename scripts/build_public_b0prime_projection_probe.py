@@ -21,7 +21,7 @@ from knee.public_s6_qualification import digest,file_sha,require,save
 
 WAIVER='b0prime-projection-20261015'
 FAILED_RECEIPT_SHA='ef9838a483d02c9e24e7a70553871e4a1d30541949a8f3d4525f0903344abbfe'
-AUTHORIZATION={'reported_by':'Claude','source':'docs/claude-astra-handoff.md, 2026-10-15 18:18 UTC',
+AUTHORIZATION={'reported_by':'Claude','source':'docs/archive/handoff/claude-astra-handoff.md, 2026-10-15 18:18 UTC',
  'reported_user_choice':'Submit anyway','reported_choice_utc':'2026-10-15 about 17:20 UTC',
  'independently_verified_direct_user_message':False,
  'scope':'one B0prime knowledge probe; waive only projected nine-hour and 8.3h gates; actual nine-hour limit unchanged; not a final candidate'}

@@ -200,7 +200,7 @@ class BuildTests(unittest.TestCase):
     def test_rehearsal_build(self):
         from scripts.build_public_r7_b3 import build,verify_build,DATASETS,REHEARSAL_SLUG
         a=json.loads((OUT/'analysis/s6-capped-recovery-20261012/parent-build-arguments.json').read_bytes())
-        a={k:str(v).replace('/Users/ozgun/Dev/rsna-knee-abnormality-detection',str(EVIDENCE)) for k,v in a.items() if k not in ('control_build','control_result','destination','slug')}
+        a={k:str(v).replace('~/Dev/rsna-knee-abnormality-detection',str(EVIDENCE)) for k,v in a.items() if k not in ('control_build','control_result','destination','slug')}
         root=scratch(self)
         a.update(destination=str(root/'b3'),slug=REHEARSAL_SLUG,heliosli_notebook=str(BUILD_INPUTS[4]),r7_asset_dir=str(OUT/'analysis/r7-recovery-20261013/r7-v1-assets'),
                  heliosli_output=str(OUT/'analysis/r7-recovery-20261013/heliosli-0957-output'),r7_reference=str(BUILD_INPUTS[5]),dread_source=str(DREAD_SOURCE),

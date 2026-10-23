@@ -76,7 +76,7 @@ Artifacts (ignored): `outputs/s6v2/vmout/` (preflight, readouts, predictions, ru
 
 The strict verdict above stands as written: **BLOCKED**. Rule 1's fold-0 OOF band failed under the pre-coded reference, so rule 2 did not promote V2.
 
-At about 08:15 UTC on Oct 16, having seen these results, the user chose to override the block and launch the V2 all-data fit. The decision is recorded as post-hoc in `docs/claude-astra-handoff.md` (014de1d). It is not a pre-registered promotion.
+At about 08:15 UTC on Oct 16, having seen these results, the user chose to override the block and launch the V2 all-data fit. The decision is recorded as post-hoc in `docs/archive/handoff/claude-astra-handoff.md` (014de1d). It is not a pre-registered promotion.
 
 - **Fit:** nartaa's all-data config (16 epochs, every pool study, no OOF prediction), seed 42, V2 targets (`targets_V2_all.csv`).
   - Its bytes are identical to `targets_V2_f0.csv` (sha256 `e2283884…`), because the prior fill touches no cells.

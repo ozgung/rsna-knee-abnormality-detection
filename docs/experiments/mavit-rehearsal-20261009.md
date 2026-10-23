@@ -48,8 +48,8 @@ This command only builds an immutable private/offline GPU notebook and contracts
 Focused fixture command:
 
 ```bash
-KNEE_REFERENCE_PARENT=/Users/ozgun/Dev/rsna-knee-abnormality-detection \
-  /Users/ozgun/Dev/rsna-knee-abnormality-detection/.venv/bin/python \
+KNEE_REFERENCE_PARENT=~/Dev/rsna-knee-abnormality-detection \
+  ~/Dev/rsna-knee-abnormality-detection/.venv/bin/python \
   -m unittest discover -s tests -p test_mavit_rehearsal.py -v
 ```
 

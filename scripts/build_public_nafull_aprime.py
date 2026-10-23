@@ -7,7 +7,7 @@ from knee import public_nafull_aprime_runtime as RT
 from knee.public_s6_qualification import canonical,digest,file_sha,require,save
 
 PROJECT=Path(__file__).resolve().parents[1]
-MAIN=Path('/Users/ozgun/Dev/rsna-knee-abnormality-detection')
+MAIN=Path('~/Dev/rsna-knee-abnormality-detection')
 ARCH=MAIN/'outputs/kaggle/ws2-r224-v2-qual-20261015'
 AR=MAIN/'outputs/kaggle/ws2-r224-v2-qual-20261015-result/ws2-a-prime'
 B0=MAIN/'outputs/kaggle/knee-s6-dread-b0-rehearsal-20261013-result-v1/s6-recovery-entry'

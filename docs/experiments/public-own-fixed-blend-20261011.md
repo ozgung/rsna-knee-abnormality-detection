@@ -32,4 +32,4 @@ This is exposed development evidence. Public all-data warmstart and R2 globalOOF
 
 Close this fixed probe without rescue or weight search.
 
-Aggregate receipt with SHA256 inputs, checks, per-target supports and bootstrap: [receipt](../../outputs/analysis/public-own-fixed-blend-20261011/receipt.json). Authorization: [shared handoff](../claude-astra-handoff.md), 06:35UTC.
+Aggregate receipt with SHA256 inputs, checks, per-target supports and bootstrap: [receipt](../../outputs/analysis/public-own-fixed-blend-20261011/receipt.json). Authorization: [shared handoff](../archive/handoff/claude-astra-handoff.md), 06:35UTC.

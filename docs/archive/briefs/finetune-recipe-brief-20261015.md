@@ -1,6 +1,6 @@
 # Brief: fine-tuning recipe (cloud session, Oct 15, 2026)
 
-Written by Claude for a cloud Claude session that the user starts from the web. The local session coordinates. Read this brief, `STATUS.md`, and the end of `docs/claude-astra-handoff.md` first.
+Written by Claude for a cloud Claude session that the user starts from the web. The local session coordinates. Read this brief, `STATUS.md`, and the end of `docs/archive/handoff/claude-astra-handoff.md` first.
 
 ## Setup
 - **Repo:** `ozgung/rsna-knee-abnormality-detection`, branch `codex/token-efficient-instructions`.
@@ -35,7 +35,7 @@ Design a fine-tuning recipe that is genuinely promising, and that we can test at
   - **A′** = A with R224 taking 0.35 of the Raptor half (R384 keeps 0.65). Submitted as 57229227.
 - **Runtime:** there is no headroom. A′ projects about 8.6 h conservative. R7 takes about 65% of the time, R384 16%, R224 10%. The R7 prefetch saved only about 11%. See `docs/research/runtime-headroom-plan-20261015.md`.
 - **Lineage:**
-  - nartaa's R384 (0.949 solo) was fine-tuned from dreaddevelopment's Raptor, which is CC0 and was trained on this competition. It used all data, blended JEV labels, 2,399 OAI knees as masked supervision, 96-slice depth, 384 px and SWA; gold-58 was used for selection. The R224 sibling scores 0.945. See `docs/claude-astra-handoff.md`, roughly lines 85–110.
+  - nartaa's R384 (0.949 solo) was fine-tuned from dreaddevelopment's Raptor, which is CC0 and was trained on this competition. It used all data, blended JEV labels, 2,399 OAI knees as masked supervision, 96-slice depth, 384 px and SWA; gold-58 was used for selection. The R224 sibling scores 0.945. See `docs/archive/handoff/claude-astra-handoff.md`, roughly lines 85–110.
   - heliosli's R7 and S6 are ConvNeXt-small with per-finding spatial attention, window MIL, SKM-TEA knee-centred local views and fastMRI aux.
   - nartaa's S6fall is the S6 architecture trained on all data with JEV-blend soft labels: 0.950 solo.
 - **Our own training** (`docs/experiments/raptor64-*.md`, `docs/experiments/own-base-gap-audit-20261012.md`):
@@ -71,4 +71,4 @@ Design a fine-tuning recipe that is genuinely promising, and that we can test at
 4. Your view on the dr-full B0′ probe.
 5. The first experiment to launch now: exact data, compute, duration and acceptance criteria.
 
-When you finish, also append a short dated entry, signed "Claude (cloud) → Codex", to the end of `docs/claude-astra-handoff.md`, on the same new branch, saying where the doc is.
+When you finish, also append a short dated entry, signed "Claude (cloud) → Codex", to the end of `docs/archive/handoff/claude-astra-handoff.md`, on the same new branch, saying where the doc is.

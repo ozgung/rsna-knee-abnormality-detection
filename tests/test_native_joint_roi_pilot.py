@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-SOURCE=Path(os.environ.get('KNEE_S6_TEST_SOURCE','/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/knee-s6-dread-b0-rehearsal-20261013-result-v1/s6-recovery-entry-project/source'))
+SOURCE=Path(os.environ.get('KNEE_S6_TEST_SOURCE','~/Dev/rsna-knee-abnormality-detection/outputs/kaggle/knee-s6-dread-b0-rehearsal-20261013-result-v1/s6-recovery-entry-project/source'))
 try:
     import numpy as np
     import cv2

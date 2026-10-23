@@ -69,5 +69,5 @@ No code enters A, A′, B1 or B1′ from this lane. The Q3 rules are applied by 
 
 - New, ignored: `outputs/analysis/rank-value-20261014/analyze.py` (reuses `outputs/analysis/shakeup-risk-20261013/analyze.py` where possible), `receipt.json` (inputs' SHA-256s, seeds, grid, results), `leaderboard.csv` (scores and ranks only).
 - New result note: `docs/research/rank-value-selection-20261014.md`, with the Q0 closure, the density table, the rank distributions, the medal cuts with their verification status, and the Q3 rules verbatim.
-- One dated entry in `docs/claude-astra-handoff.md`; STATUS is updated by the parent at the next checkpoint.
+- One dated entry in `docs/archive/handoff/claude-astra-handoff.md`; STATUS is updated by the parent at the next checkpoint.
 - Read-only inputs: the shake-up receipt and script, `outputs/analysis/resume-20261014/official-state.json`, the 870 predictions already held for Raptor, S6, Dread v4_full and the clean own OOF files, the lane-1 blend evaluator for its bootstrap functions. No file under `knee/` or `scripts/` changes.

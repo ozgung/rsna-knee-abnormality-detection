@@ -238,7 +238,7 @@ def main() -> None:
     ap.add_argument("--data-dir", type=Path, default=ROOT / "data/raw")
     ap.add_argument("--tables-dir", type=Path, default=ROOT / "data/weak-labels")
     ap.add_argument("--out-dir", type=Path, default=ROOT / "outputs/analysis/label-benchmark-20261009")
-    ap.add_argument("--parquet-python", default="/Users/ozgun/miniconda3/bin/python",
+    ap.add_argument("--parquet-python", default="~/miniconda3/bin/python",
                     help="Python with pyarrow, used only if pandas cannot read parquet")
     args = ap.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)

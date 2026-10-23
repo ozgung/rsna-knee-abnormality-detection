@@ -27,10 +27,10 @@ Fixture-enabled checks (OpenCV is test-only under `/tmp/coverage-inference-test-
 
 ```bash
 PYTHONPATH=/tmp/coverage-inference-test-deps \
-KNEE_REFERENCE_PARENT=/Users/ozgun/Dev/rsna-knee-abnormality-detection \
-KNEE_REFERENCE_SOURCE=/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py \
-KNEE_RAPTOR_SOURCE=/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/raptor-audit/knee-mri-twelve-findings-from-a-single-model.py \
-/Users/ozgun/Dev/rsna-knee-abnormality-detection/.venv/bin/python -m unittest discover -s tests -v
+KNEE_REFERENCE_PARENT=~/Dev/rsna-knee-abnormality-detection \
+KNEE_REFERENCE_SOURCE=~/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py \
+KNEE_RAPTOR_SOURCE=~/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/raptor-audit/knee-mri-twelve-findings-from-a-single-model.py \
+~/Dev/rsna-knee-abnormality-detection/.venv/bin/python -m unittest discover -s tests -v
 ```
 
 Local verification:230/230fixture-enabled tests PASS, default smoke PASS (no backend forward), source compilation/diff checks PASS;7focused mirror tests PASS, including the actual pinned decoder on synthetic DICOM files and header-descriptor cleanup after resource failure. Full test log is preserved in the primary workspace at `outputs/analysis/mirror-rehearsal-20261009/tests.log`. Actual checkpoint compatibility, compression diversity, CUDA parity/runtime, visible predictions and any score remain pending the parent-run qualification. No commit, remote launch, upload or submission was performed by this implementation task.

@@ -14,8 +14,8 @@ The64-update limit defines the diagnostic experiment. There is no assistant wall
 Build only from the integrated primary repository:
 
 ```bash
-repo=/Users/ozgun/Dev/rsna-knee-abnormality-detection
-primary=/Users/ozgun/Dev/rsna-knee-abnormality-detection
+repo=~/Dev/rsna-knee-abnormality-detection
+primary=~/Dev/rsna-knee-abnormality-detection
 cd "$repo"
 "$primary/.venv/bin/python" scripts/build_coverage_diagnostic.py \
   "$primary/outputs/kaggle/train04-reference-20261009/notebook.ipynb" \
@@ -45,7 +45,7 @@ At 08:20 UTC, `ozgung/knee-train04-global-objective-assets-20261009` version 1 c
 
 The cache inventory remains available. A fresh download of `coverage_cache/cache-report.json` matches the original pinned SHA256 and PASS status. At approximately 08:26 UTC, the parent launched one recovery job, `ozgung/knee-train04-global-recovery-20261009` version 1. Its notebook is byte-identical to the failed attempt; only notebook identity and title changed. Scientific revision remains `3c205e1`, with the same model initialization/RNG, labels, 2,000/200 split, objective, schedule, environment and 12-hour platform limit. This is a fresh attempt from the original initialization, not a checkpoint resume. The original failed notebook remains preserved.
 
-Build: `outputs/kaggle/train04-global-recovery-20261009/`. Launch: `/Users/ozgun/miniconda3/bin/kaggle kernels push -p outputs/kaggle/train04-global-recovery-20261009 --timeout 43200`. Evidence: `outputs/analysis/train04-global-objective-20261009/mount-failure-0823.json`, `cache-source-check/`, and `recovery-build.json`. No source or scientific changes; verified exact notebook hash, metadata-only differences and input-receipt hash. Runtime tests were not repeated for identical code.
+Build: `outputs/kaggle/train04-global-recovery-20261009/`. Launch: `~/miniconda3/bin/kaggle kernels push -p outputs/kaggle/train04-global-recovery-20261009 --timeout 43200`. Evidence: `outputs/analysis/train04-global-objective-20261009/mount-failure-0823.json`, `cache-source-check/`, and `recovery-build.json`. No source or scientific changes; verified exact notebook hash, metadata-only differences and input-receipt hash. Runtime tests were not repeated for identical code.
 
 Inspect recovery logs and small reports before downloading any selected checkpoint. If the same input-mount failure recurs, investigate a different cache transport rather than looping retries. Do not revive the old local controller. MaViT's distinct train2000 diagnostic remains active; its UI showed 24 minutes running, but no logs or optimizer/inference progress were established.
 

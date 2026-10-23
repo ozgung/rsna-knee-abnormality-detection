@@ -63,7 +63,7 @@ Estimate (not measured for this code): the earlier header inventory (`outputs/ka
 Build: `python scripts/build_orientation_audit.py` (done; refuses to overwrite an existing directory; v2 contract hashes in `outputs/kaggle/orientation-audit-v2-20261012/build-receipt.json`). Executed once17:46UTC after parent commitdd4c767; do not repeat:
 
 ```
-/Users/ozgun/miniconda3/bin/kaggle kernels push -p outputs/kaggle/orientation-audit-v2-20261012
+~/miniconda3/bin/kaggle kernels push -p outputs/kaggle/orientation-audit-v2-20261012
 ```
 
 ## Acceptance criteria (declared before launch)

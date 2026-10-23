@@ -30,7 +30,7 @@ POLICY={'version':'ws3-prefetch-projection-v1','gate_seconds':8.3*3600,
     'serial_control':'diagnostic excluded from hidden projection; included in actual elapsed under 9h',
     'other_overhead':'all original measured per-arm qualification overhead retained once',
     'mirror_speed_limit':.85,'worker_rss_limit_bytes':9.5e9,'phase_rss_limit_bytes':22e9,
-    'prospective_decision':'docs/claude-astra-handoff.md 2026-10-15 12:31 UTC'}
+    'prospective_decision':'docs/archive/handoff/claude-astra-handoff.md 2026-10-15 12:31 UTC'}
 
 
 def templates():

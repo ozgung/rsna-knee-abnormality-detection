@@ -20,7 +20,7 @@ Acceptance: **21 targeted tests PASS/zero skips**, including seven new waiver te
 After actual job/quota/submission reconciliation, Claude claims this one entry:
 
 ```bash
-kaggle kernels push -p /Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle/b0prime-drfull-k62-probe-waiver-20261015
+kaggle kernels push -p ~/Dev/rsna-knee-abnormality-detection/outputs/kaggle/b0prime-drfull-k62-probe-waiver-20261015
 ```
 
 No `--timeout`. Post accepted version/source/settings and preserve visible receipts/four NPZ/CSV/logs under `outputs/kaggle/b0prime-drfull-k62-probe-waiver-20261015-visible/s6-recovery-entry/` with the existing filtered collector. Before any separately owned submission, compare visible raw old/S6 probabilities and fingerprints to the r2 same-study outputs at their existing tolerances, and independently recompute the unchanged 70:30 blend over the actual visible population. A pending or failed visible run cannot be submitted. No duplicate collector or automatic final selection.

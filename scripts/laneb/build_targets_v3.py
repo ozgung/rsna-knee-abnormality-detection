@@ -6,7 +6,7 @@ fold columns to targets_V2_all.csv.  Prints counts only.
 import csv, hashlib, importlib.util, json, sys
 from pathlib import Path
 
-ROOT = Path("/Users/ozgun/Dev/rsna-knee-abnormality-detection")
+ROOT = Path("~/Dev/rsna-knee-abnormality-detection")
 spec = importlib.util.spec_from_file_location("bt", ROOT / "scripts/s6v2/build_targets.py")
 BT = importlib.util.module_from_spec(spec); spec.loader.exec_module(BT)
 

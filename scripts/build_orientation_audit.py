@@ -149,4 +149,4 @@ if __name__ == '__main__':
     result = build(**vars(args))
     print(json.dumps(result, indent=2))
     print('BUILD ONLY. Push NOT executed. When authorized, run from the project root:')
-    print(f'  /Users/ozgun/miniconda3/bin/kaggle kernels push -p {args.destination}')
+    print(f'  ~/miniconda3/bin/kaggle kernels push -p {args.destination}')

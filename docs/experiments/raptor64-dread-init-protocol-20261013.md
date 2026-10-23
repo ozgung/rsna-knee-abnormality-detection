@@ -111,13 +111,13 @@ All paths are relative to the repository root after the reviewed commit; `S=rapt
 
 ```bash
 # 0. Local: qualify cache metadata (no images) and write the private stage config.
-/Users/ozgun/miniconda3/bin/python scripts/collect_raptor64_cache_metadata.py \
-  --evidence-root /Users/ozgun/Dev/rsna-knee-abnormality-detection \
+~/miniconda3/bin/python scripts/collect_raptor64_cache_metadata.py \
+  --evidence-root ~/Dev/rsna-knee-abnormality-detection \
   --receipt outputs/analysis/raptor64-20261013/qualified-metadata-v1.json \
   --stage-config outputs/analysis/raptor64-20261013/raptor64-stage-config-private.json
 # 1. Local: build the reviewed bundle (four packages, tools, accepted notebooks, pinned persister).
 .venv/bin/python scripts/build_raptor64_colab_bundle.py outputs/analysis/raptor64-20261013/colab-bundle-v1 \
-  --evidence-root /Users/ozgun/Dev/rsna-knee-abnormality-detection
+  --evidence-root ~/Dev/rsna-knee-abnormality-detection
 #    Put bundle_sha256 into outputs/analysis/raptor64-20261013/vm/vm-extract.py and the
 #    stage-config SHA into vm/vm-stage.py (REPLACE_WITH_... placeholders).
 # 2. Allocate one GPU session (A100, or H100 if preferred and available).

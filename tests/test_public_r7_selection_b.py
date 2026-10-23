@@ -174,7 +174,7 @@ BUILD_INPUTS=[OUT/'kaggle/public-s6-evaluation-20261011-reviewed',OUT/'analysis/
 class BuildTests(unittest.TestCase):
     def args(self,variant,destination):
         a=json.loads((OUT/'analysis/s6-capped-recovery-20261012/parent-build-arguments.json').read_bytes())
-        a={k:str(v).replace('/Users/ozgun/Dev/rsna-knee-abnormality-detection',str(EVIDENCE)) for k,v in a.items() if k not in ('control_build','control_result','destination','slug')}
+        a={k:str(v).replace('~/Dev/rsna-knee-abnormality-detection',str(EVIDENCE)) for k,v in a.items() if k not in ('control_build','control_result','destination','slug')}
         a.update(variant=variant,destination=str(destination),slug='knee-r7-only-b1-rehearsal-20261013' if variant=='b1' else 'knee-r7-dread-b2-rehearsal-20261013',
                  heliosli_notebook=str(BUILD_INPUTS[3]),r7_asset_dir=str(OUT/'analysis/r7-recovery-20261013/r7-v1-assets'),heliosli_output=str(OUT/'analysis/r7-recovery-20261013/heliosli-0957-output'),
                  r7_reference=str(BUILD_INPUTS[4]),dread_source=str(BUILD_INPUTS[5]),raptor62_result=str(BUILD_INPUTS[6]),dread_cpu_receipt=str(BUILD_INPUTS[7]))

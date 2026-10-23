@@ -521,7 +521,7 @@ BUILD_INPUTS=[OUT/'kaggle/public-s6-evaluation-20261011-reviewed',OUT/'analysis/
 class R7BuildTests(unittest.TestCase):
     def args(self,destination):
         args=json.loads((OUT/'analysis/s6-capped-recovery-20261012/parent-build-arguments.json').read_bytes())
-        args={k:str(Path(v)).replace('/Users/ozgun/Dev/rsna-knee-abnormality-detection',str(EVIDENCE)) for k,v in args.items()}
+        args={k:str(Path(v)).replace('~/Dev/rsna-knee-abnormality-detection',str(EVIDENCE)) for k,v in args.items()}
         args.update(destination=str(destination),slug='knee-public-r7-recovery-rehearsal-20261013',heliosli_notebook=str(HELIOSLI_NOTEBOOK),
                     r7_asset_dir=str(R7_EVIDENCE/'r7-v1-assets'),heliosli_output=str(R7_EVIDENCE/'heliosli-0957-output'))
         return args

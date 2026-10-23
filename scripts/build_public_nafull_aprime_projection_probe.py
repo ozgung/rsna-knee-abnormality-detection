@@ -53,7 +53,7 @@ CHECKER_SOURCES=('knee/public_ws2_entry.py','knee/public_nafull_aprime_runtime.p
     'knee/public_r7_recovery.py','knee/public_ws2_checkpoint.py',
     'knee/public_nafull_raptor_input.py','knee/public_nafull_reference.py')
 AUTHORIZATION={'reported_by':'Claude',
-    'source':'docs/claude-astra-handoff.md and docs/experiments/na-full-aprime-rehearsal-20261016.md, 2026-10-16 22:10 UTC; Codex condition audit 22:45 UTC',
+    'source':'docs/archive/handoff/claude-astra-handoff.md and docs/experiments/na-full-aprime-rehearsal-20261016.md, 2026-10-16 22:10 UTC; Codex condition audit 22:45 UTC',
     'reported_user_rule':'Waive if only the estimate fails','reported_choice_utc':'2026-10-16 about 21:55 UTC',
     'independently_verified_direct_user_message':False,
     'scope':'one A-triple-prime probe bound to r3 failed receipt; waive only the ordinary 8.3h conservative projection; '

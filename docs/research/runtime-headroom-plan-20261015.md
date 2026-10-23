@@ -1,6 +1,6 @@
 # Runtime headroom and the A″ plan, 2026-10-15
 
-Written 2026-10-15 12:10 UTC by Fable (Claude), analysis only: no GPU, no Colab, no Kaggle push or submission. Labels: **[measured]** = a number in a receipt, ledger or repo file; **[literature]** = another participant's text or source; **[estimate]** = my judgement or a model built on measured inputs. Scratch scripts: `/Users/ozgun/.claude/jobs/74614526/tmp/headroom/{breakdown,scenarios}.py` (read-only over the ledgers; no study IDs printed).
+Written 2026-10-15 12:10 UTC by Fable (Claude), analysis only: no GPU, no Colab, no Kaggle push or submission. Labels: **[measured]** = a number in a receipt, ledger or repo file; **[literature]** = another participant's text or source; **[estimate]** = my judgement or a model built on measured inputs. Scratch scripts: `~/.claude/jobs/74614526/tmp/headroom/{breakdown,scenarios}.py` (read-only over the ledgers; no study IDs printed).
 
 ## Verdict
 
@@ -125,5 +125,5 @@ Savings are conservative-projection hours on the v2 ledgers for A′ (8.59 h bas
 - v7 rehearsal: `outputs/kaggle/public-r7-recovery-rehearsal-20261013-result-v7/s6-recovery-entry/receipt.json`; `docs/experiments/r7-recovery-entry-20261013.md`.
 - Projection code: `knee/public_s6_recovery_entry.py` lines 551–571; `knee/public_ws2_entry.py` lines 189–209; R7 worker loop `knee/public_r7_recovery_entry.py` lines 349–433.
 - Lane 3b: `docs/experiments/lane3b-r7-prefetch-headroom-protocol-20261014.md`; branch `claude/r7-prefetch-lane3b-20261014` at a415ce5 (`docs/experiments/lane3b-r7-prefetch-headroom-result-20261014.md` there); `outputs/analysis/lane3b-r7-prefetch-20261014/{projection.json,p2-soak-receipt.json,astra-design-review.md}`.
-- Hidden runs: `kaggle competitions submissions -c rsna-knee-abnormality-detection --csv` (saved to the scratch directory); `docs/claude-astra-handoff.md` entries 2026-10-12 12:07/12:11, 2026-10-14 01:51/05:12/08:19/10:13; `outputs/analysis/resume-20261014/official-state.json`.
+- Hidden runs: `kaggle competitions submissions -c rsna-knee-abnormality-detection --csv` (saved to the scratch directory); `docs/archive/handoff/claude-astra-handoff.md` entries 2026-10-12 12:07/12:11, 2026-10-14 01:51/05:12/08:19/10:13; `outputs/analysis/resume-20261014/official-state.json`.
 - Candidates: `docs/research/public-0957-scan-20261015.md` §1.2, §1.4, §2, §3; `docs/research/rank-value-selection-20261014.md`; `outputs/research/public-0957-20261015/datasets/nartaa__rsna-knee-s6fall-weights/checkpoint-manifest.json`; `docs/research/plan-update-20261014.md` step 7.

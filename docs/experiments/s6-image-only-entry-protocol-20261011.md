@@ -15,7 +15,7 @@ After a passing real rehearsal, review the immutable pure-entry source/attachmen
 
 ## Ownership and capacity
 
-SolMedium `/root/s6_dual_entry_implementation_sol` owns only three new runtime/builder/test files in isolated worktree `/Users/ozgun/.codex/worktrees/s6-image-only-entry/rsna-knee-abnormality-detection`, created at `d79bf31`. Parent owns review, integration, commits, build, capacity checks, one rehearsal launch and subsequent entry decisions. Existing scientific modules and comparisons remain immutable. No duplicate GPU launch.
+SolMedium `/root/s6_dual_entry_implementation_sol` owns only three new runtime/builder/test files in isolated worktree `~/.codex/worktrees/s6-image-only-entry/rsna-knee-abnormality-detection`, created at `d79bf31`. Parent owns review, integration, commits, build, capacity checks, one rehearsal launch and subsequent entry decisions. Existing scientific modules and comparisons remain immutable. No duplicate GPU launch.
 
 Actual evaluator elapsed6.04h on one board; 1300-study S6 alone scales near8.95h, ideal two-board scaling4.48h. Shared CPU/storage and original320 workload remain uncertain. Account quota before the separate full384 rehearsal was3.6514 of45h remaining. This reading does not establish hidden-evaluation allowance or per-board billing; verify actual platform evidence, do not infer either free evaluation or a block. No purchases or new terms.
 

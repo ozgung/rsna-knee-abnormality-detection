@@ -24,7 +24,7 @@ Checks: seven focused tests PASS in fastgen; default dependency-free smoke PASS;
 Verify the immutable preparation without rebuilding or launching:
 
 ```bash
-/Users/ozgun/miniconda3/envs/fastgen/bin/python scripts/build_public_nafull_aprime.py \
+~/miniconda3/envs/fastgen/bin/python scripts/build_public_nafull_aprime.py \
   --cpu-receipt outputs/analysis/na-full-export-acceptance-20261016/cpu-k62.json \
   --verify-build outputs/kaggle/nafull-aprime-rehearsal-20261016
 ```
@@ -46,7 +46,7 @@ R2 adds the full frozen B0 reference module (`be9ba44b085a863a8048771effa8d3e699
 Verify before owner launch:
 
 ```bash
-/Users/ozgun/miniconda3/envs/fastgen/bin/python scripts/build_public_nafull_aprime.py \
+~/miniconda3/envs/fastgen/bin/python scripts/build_public_nafull_aprime.py \
   --cpu-receipt outputs/analysis/na-full-export-acceptance-20261016/cpu-k62.json \
   --verify-build outputs/kaggle/nafull-aprime-rehearsal-r2-20261016
 ```
@@ -77,7 +77,7 @@ Claude owns the next fresh rehearsal after actual job/quota reconciliation and t
 
 Claude reports a direct user decision: “Waive if only the estimate fails.” This applies only to a separately named A‴ probe admission bound to its own fresh r3 failed receipt, if every other check passes. The ordinary 8.3 h projection remains an honestly recorded FAIL; no A′/B0′ waiver transfers and actual elapsed <9 h, source/state/reader/sentinel/resource/schema and measured-input gates remain mandatory. No waiver artifact or campaign entry has been created. A′ remains final-1 unless A‴ displays at least A′, per Claude's reported user rule; this is a competitive selection rule, not a generalization claim.
 
-At 21:55 UTC, Claude reports r3 push refused by Kaggle's two-session GPU cap and a local one-shot queue behind the two running solo rehearsals. Its queue identity/recovery details are requested in the shared handoff. Parent started no queue, launch or collector. Prepared r3 identities and original r2 failures above remain unchanged. See the [shared launch/decision log](../claude-astra-handoff.md) for owner provenance.
+At 21:55 UTC, Claude reports r3 push refused by Kaggle's two-session GPU cap and a local one-shot queue behind the two running solo rehearsals. Its queue identity/recovery details are requested in the shared handoff. Parent started no queue, launch or collector. Prepared r3 identities and original r2 failures above remain unchanged. See the [shared launch/decision log](../archive/handoff/claude-astra-handoff.md) for owner provenance.
 
 
 ## R3 real result: projection-only condition met — Oct 17, 01:45 TRT / Oct 16, 22:45 UTC

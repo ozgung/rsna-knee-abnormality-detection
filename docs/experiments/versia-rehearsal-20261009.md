@@ -33,11 +33,11 @@ Fixture checks:
 
 ```bash
 PYTHONPATH=/tmp/coverage-inference-test-deps \
-KNEE_REFERENCE_PARENT=/Users/ozgun/Dev/rsna-knee-abnormality-detection \
-KNEE_VERSIA_SPEC=/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/analysis/mirror-fusion-spec-20261009 \
-KNEE_REFERENCE_SOURCE=/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py \
-KNEE_RAPTOR_SOURCE=/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/raptor-audit/knee-mri-twelve-findings-from-a-single-model.py \
-/Users/ozgun/Dev/rsna-knee-abnormality-detection/.venv/bin/python -m unittest discover -s tests -v
+KNEE_REFERENCE_PARENT=~/Dev/rsna-knee-abnormality-detection \
+KNEE_VERSIA_SPEC=~/Dev/rsna-knee-abnormality-detection/outputs/analysis/mirror-fusion-spec-20261009 \
+KNEE_REFERENCE_SOURCE=~/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py \
+KNEE_RAPTOR_SOURCE=~/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/raptor-audit/knee-mri-twelve-findings-from-a-single-model.py \
+~/Dev/rsna-knee-abnormality-detection/.venv/bin/python -m unittest discover -s tests -v
 ```
 
 Focused tests also freeze the source rank semantics without creating a production fusion: mirror double-argsort breaks ties before float32 conversion, subsequent percentile ranks average ties, and target coefficients match the frozen specification. Future fusion still needs ID alignment, full recipe implementation and a common rehearsal. Local verification: 252/252 fixture-enabled tests PASS, including nine focused Versia tests and the actual four-worker CPU handoff with 67 tiny synthetic items. Source compilation, whitespace/diff checks, isolated bundle import and dependency-free CPU smoke PASS (no model forward). A smoke notebook built successfully at 149,158 bytes, private/offline with only the intended attachment. The first full invocation was blocked by the macOS sandbox denying `torch_shm_manager`; the complete suite passed with authorized local shared-memory access. Both logs are preserved under `outputs/analysis/versia-rehearsal-20261009/`; the passing log is `tests-unsandboxed-ipc.log`. The smoke build there is explicitly an uncommitted-implementation artifact, not the authoritative parent launch package. Generated logs/build artifacts stay in primary ignored outputs; no commit, launch, upload, download or STATUS edit is performed by this implementation task.

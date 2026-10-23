@@ -29,7 +29,7 @@ Environment: existing fastgen Python3.12.3, torch2.10.0, timm1.0.24, CPU fp32/tw
 Exact successful command:
 
 ```bash
-/Users/ozgun/miniconda3/envs/fastgen/bin/python scripts/qualify_s6solo_cpu.py \
+~/miniconda3/envs/fastgen/bin/python scripts/qualify_s6solo_cpu.py \
   --train outputs/s6v2/dl/extras/heliosli/compact_train.py \
   --infer outputs/s6v2/dl/extras/heliosli/compact_infer.py \
   --control outputs/analysis/s6v2-final-acceptance-20261016/control/E_prior_s42_fall.pt \

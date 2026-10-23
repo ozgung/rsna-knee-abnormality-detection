@@ -7,7 +7,7 @@ sha256/size against MANIFEST.json, checks dataset privacy, and writes a receipt.
 import hashlib, json, subprocess, sys, tempfile, zipfile
 from pathlib import Path
 
-KAGGLE = '/Users/ozgun/miniconda3/bin/kaggle'
+KAGGLE = '~/miniconda3/bin/kaggle'
 dataset, dest, receipt_path = sys.argv[1], Path(sys.argv[2]), Path(sys.argv[3])
 assert not dest.exists() and not receipt_path.exists(), 'fresh paths required'
 dest.mkdir(parents=True)

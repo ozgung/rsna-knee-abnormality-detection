@@ -19,7 +19,7 @@ No labels, reports or prediction fixtures are embedded. The only attachments are
 Run from the reviewed/integrated repository with its existing interpreter. Use fresh destinations; keep archived originals intact. The following common arguments are identical for visible and full builds:
 
 ```bash
-PROJECT=/Users/ozgun/Dev/rsna-knee-abnormality-detection
+PROJECT=~/Dev/rsna-knee-abnormality-detection
 KAGGLE_EVIDENCE="$PROJECT/outputs/kaggle"
 FUSION_ARGS=(
   --mirror-build "$KAGGLE_EVIDENCE/mirror-rehearsal-20261009"
@@ -53,11 +53,11 @@ The10 new tests cover public-source rank/tie equality, ID coverage/alignment/ord
 
 ```bash
 PYTHONPATH=/tmp/coverage-inference-test-deps \
-KNEE_REFERENCE_PARENT=/Users/ozgun/Dev/rsna-knee-abnormality-detection \
-KNEE_VERSIA_SPEC=/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/analysis/mirror-fusion-spec-20261009 \
-KNEE_REFERENCE_SOURCE=/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py \
-KNEE_RAPTOR_SOURCE=/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/raptor-audit/knee-mri-twelve-findings-from-a-single-model.py \
-/Users/ozgun/Dev/rsna-knee-abnormality-detection/.venv/bin/python -m unittest discover -s tests -v
+KNEE_REFERENCE_PARENT=~/Dev/rsna-knee-abnormality-detection \
+KNEE_VERSIA_SPEC=~/Dev/rsna-knee-abnormality-detection/outputs/analysis/mirror-fusion-spec-20261009 \
+KNEE_REFERENCE_SOURCE=~/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py \
+KNEE_RAPTOR_SOURCE=~/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/raptor-audit/knee-mri-twelve-findings-from-a-single-model.py \
+~/Dev/rsna-knee-abnormality-detection/.venv/bin/python -m unittest discover -s tests -v
 ```
 
 Local four-worker tests need the normal process/IPC permission allowed by the reviewed shell execution; restricted sandbox IPC can fail independently of code. Final fixture-enabled suite: **262/262 PASS**; dependency-free smoke PASS (`torch_forward:false`); source compile and diff checks PASS. The full log is `outputs/analysis/versia-fusion-20261009/tests-full.log`. Parent and independent read-only source reviews found no blocker; real common CUDA probabilities/runtime remain untested. A temporary build-only smoke artifact resides in primary ignored `outputs/analysis/versia-fusion-20261009/build-smoke-v1/`; it predates final review and must not be launched. No private/generated artifacts are stored outside primary ignored outputs after temporary test directories are removed.

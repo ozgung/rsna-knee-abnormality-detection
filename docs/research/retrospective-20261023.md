@@ -29,7 +29,7 @@ Readings:
 
 ## 3. What was knowable before the deadline
 
-- About 1,400 teams were tied at 0.958 on public, nearly all forks of the same blends, and the forum expected a shake-up for that reason ([handoff](../claude-astra-handoff.md), early research log).
+- About 1,400 teams were tied at 0.958 on public, nearly all forks of the same blends, and the forum expected a shake-up for that reason ([handoff](../archive/handoff/claude-astra-handoff.md), early research log).
 - P2 was effectively that fork. As a final it could only land wherever the fork block landed.
 - Raptor's per-finding weights looked tuned on the public board, and gold-58 ranked Raptor last.
 - The user's standing preference was to spend effort on our own methods rather than on public-notebook tweaks.

@@ -5,6 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "rsna-knee-starter"
 version = "0.1.0"
+license = "Apache-2.0"
 description = "Offline-first scaffold for study-level knee MRI experiments"
 requires-python = ">=3.11"
 dependencies = []

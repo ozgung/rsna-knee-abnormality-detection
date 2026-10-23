@@ -8,7 +8,7 @@ Only StudyInstanceUID and the 12 label columns of ``train.csv`` are read; the ``
 never loaded. Gold-58 studies (all 12 targets filled) are never written to the output tables; gold
 labels are used only by the descriptive teacher-side check, which is not used for selection.
 
-Mixing (predeclared in docs/claude-astra-handoff.md section 3, Track B):
+Mixing (predeclared in docs/archive/handoff/claude-astra-handoff.md section 3, Track B):
     addressed cell (m=1): y1 = (1-alpha_addressed)*y_base + alpha_addressed*p_oof
     silent cell    (m=0): y1 = (1-alpha_silent)*y_base    + alpha_silent*p_oof
     then clip to [clip_lo, clip_hi]; fractions are kept (never rounded).
@@ -272,7 +272,7 @@ def write_parquet(csv_paths: list[Path]) -> str:
     code = ("import sys,pyarrow as pa,pyarrow.csv as pc,pyarrow.parquet as pq;"
             "t=pc.read_csv(sys.argv[1],convert_options=pc.ConvertOptions(column_types={'StudyInstanceUID':pa.string()}));"
             "pq.write_table(t,sys.argv[2])")
-    for cand in (ROOT / ".venv/bin/python", Path("/Users/ozgun/miniconda3/bin/python")):
+    for cand in (ROOT / ".venv/bin/python", Path("~/miniconda3/bin/python")):
         if not cand.exists():
             continue
         try:
@@ -372,7 +372,7 @@ def main(argv=None) -> None:
         "script": "scripts/build_bootstrap_labels.py", "date_run_unix": int(t0), "runtime_s": round(time.time() - t0, 2),
         "alpha_addressed": a.alpha_addressed, "alpha_silent": a.alpha_silent, "clip": list(clip),
         "synovitis_prior": {"effusion<0.3": SYN_PRIOR_LOW, "0.3<=effusion<=0.7": SYN_PRIOR_MID, "effusion>0.7": SYN_PRIOR_HIGH,
-                            "provenance": "predeclared in docs/claude-astra-handoff.md section 3 Track B (B2)"},
+                            "provenance": "predeclared in docs/archive/handoff/claude-astra-handoff.md section 3 Track B (B2)"},
         "folds_used": folds, "allow_partial": a.allow_partial, "require_folds": a.require_folds,
         "row_counts": {**info, "oof_val_rows": int(len(oof_val)), "gold_studies": len(gold_ids),
                        "output_rows": int(len(y1)), "complete": bool(len(y1) == info["base_nongold_rows"])},

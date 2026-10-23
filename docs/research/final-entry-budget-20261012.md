@@ -36,7 +36,7 @@ To fit the exceeding rows, drop S6 (saves 4.73 h). K94 x 5 folds + mirror then t
 
 ## 3. GPU quota
 
-Live `kaggle quota` at 15:46 UTC [M]: 44.41/45 h used, **0.59 h remaining** (not 1.6 h), refreshAt **2026-10-17T00:00:00** (Saturday, matches `docs/claude-astra-handoff.md:115`; time zone presumed UTC). Used time rose 43.35 h (14:00) to 44.41 h (now) with job 138336842 running, so if it is billed by wall time it exhausts the quota near 16:20 UTC. Hidden-test reruns appear not to draw on the quota [D]: 43.14 h before the entry launch, about 43.19 h after, despite a >=6 h dual-T4 hidden rerun. One rehearsal plus visible entry costs about 0.44 + 0.05 = 0.5 h, so 0-1 fit now (3 if 1.6 h were real). After Oct 17 there are 45 h through Oct 22, and wall-clock is the constraint.
+Live `kaggle quota` at 15:46 UTC [M]: 44.41/45 h used, **0.59 h remaining** (not 1.6 h), refreshAt **2026-10-17T00:00:00** (Saturday, matches `docs/archive/handoff/claude-astra-handoff.md:115`; time zone presumed UTC). Used time rose 43.35 h (14:00) to 44.41 h (now) with job 138336842 running, so if it is billed by wall time it exhausts the quota near 16:20 UTC. Hidden-test reruns appear not to draw on the quota [D]: 43.14 h before the entry launch, about 43.19 h after, despite a >=6 h dual-T4 hidden rerun. One rehearsal plus visible entry costs about 0.44 + 0.05 = 0.5 h, so 0-1 fit now (3 if 1.6 h were real). After Oct 17 there are 45 h through Oct 22, and wall-clock is the constraint.
 
 ## 4. Calendar sketch (UTC) [E]
 

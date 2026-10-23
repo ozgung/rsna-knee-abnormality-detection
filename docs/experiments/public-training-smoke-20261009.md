@@ -104,7 +104,7 @@ pre-date any later source review and must not launch.
 
 ```bash
 PYTHONPATH=/tmp/coverage-inference-test-deps:/tmp/public-training-smoke-deps \
-KNEE_REFERENCE_PARENT=/Users/ozgun/Dev/rsna-knee-abnormality-detection \
+KNEE_REFERENCE_PARENT=~/Dev/rsna-knee-abnormality-detection \
 .venv/bin/python -m unittest discover -s tests -p 'test_public_training_smoke.py' -v
 ```
 
@@ -112,7 +112,7 @@ After parent verifies current quota, unique slug, source/attachment hashes and
 private/internet/GPU metadata, the exact launch command is:
 
 ```bash
-/Users/ozgun/miniconda3/bin/kaggle kernels push \
+~/miniconda3/bin/kaggle kernels push \
   -p outputs/kaggle/public-training-smoke-20261009
 ```
 

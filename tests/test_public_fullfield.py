@@ -10,7 +10,7 @@ try:
     import torch
 except ImportError:np=None
 
-SOURCE=Path('/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py')
+SOURCE=Path('~/Dev/rsna-knee-abnormality-detection/outputs/research/2026-10-08/mirror-audit/rsna-knee-0949-anatomical-mirror.py')
 
 @unittest.skipIf(np is None or not SOURCE.exists(),'ML packages and audited source needed')
 class WindowTests(unittest.TestCase):

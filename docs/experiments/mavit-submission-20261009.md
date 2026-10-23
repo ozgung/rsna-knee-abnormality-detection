@@ -56,8 +56,8 @@ Both notebooks attach only competition data, the public MaViT dataset, and the e
 Focused tests cover immutable archive reconstruction/tamper, observed SciPy, isolated no-ML import, receipt mixing,1e-6 rejection, official ordering/coverage, source-function reuse, test-only file access, arbitrary test counts, fresh output ownership and failure rollback. Mocked orchestration tests verify call/ID order only, not CUDA numerics. Existing reader/model tests remain unchanged.
 
 ```bash
-KNEE_REFERENCE_PARENT=/Users/ozgun/Dev/rsna-knee-abnormality-detection \
-  /Users/ozgun/Dev/rsna-knee-abnormality-detection/.venv/bin/python \
+KNEE_REFERENCE_PARENT=~/Dev/rsna-knee-abnormality-detection \
+  ~/Dev/rsna-knee-abnormality-detection/.venv/bin/python \
   -m unittest discover -s tests -p test_mavit_submission.py -v
 ```
 
