@@ -4111,3 +4111,9 @@ New facts kept:
 - Recommendations: P4 takes heliosli's V2 map verbatim (free, the only knob the public board was tuned on); P3/P5 keep na-full as the unique Raptor-half member (closest public precedent: the 224 checkpoint at 0.35, neutral display, better rank); no slot for the 224 mirror, the 1/10 reader, S6 beside R6 or Gold-58 refits. Final rule of the strategy revision unchanged.
 - STATUS snapshot leaderboard line refreshed. Documentation only; no code, GPU, submission or final-selection change.
 
+
+### 2026-10-23 — Claude (cloud session, branch `claude/modest-ritchie-5tm1qi`): postmortem
+- Competition closed Oct 22. User reports our final private score 0.942 (public 0.958).
+- Wrote `docs/postmortem/competition-review-20261023.html`: results journey, public→private shift, what worked/did not across the field, our own mistakes, research perspective, next-competition checklist. Sources: our docs plus TranBaDat2607, darcywjoseph, ppx16, A-b29, aditbytes write-ups.
+- Could not read Kaggle's official writeups or our submission list from the cloud container (api.kaggle.com blocked, www.kaggle.com internal API behind reCAPTCHA, legacy REST 401). The 1st place post is titled "Correct Data is All You Need"; a 3rd place post exists. Extend section 3 when pasted.
+- No code, data or model change. Nothing running.
