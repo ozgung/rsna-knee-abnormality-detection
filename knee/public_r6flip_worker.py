@@ -18,6 +18,18 @@ Observers (rehearsal and entry alike, so rehearsal timing includes them):
   parameter checksums; worker_init_fn binds the anatomy V-Net and side net inside each loader child
   (state before/after every item) and, in rehearsal sentinel pass 1 only, injects one no-usable-window
   failure through the source's own window_rows seam.
+
+P6 dual compact (sealed cfg['blend'] compact_arms): the same worker runs R6 and then heliosli's R7 v1 bundle without
+--flip-tta. Its board config then carries 'flip': False and, for R7, 'profile': 'r7' / 'compact_arm': 'r7' with the R7
+manifest, CPU pins and mount in the 'r6' / 'r6_mount' slots; only plain passes are observed and the deployed probabilities
+are recomputed from them. A config without these keys is the unchanged R6 flip-TTA worker.
+
+P6s shared decode (cfg 'r7_shared', production pass only): the R6 plain worker also loads the four R7 v1 fold models
+(pinned by file SHA256 and actual-checkpoint CPU state digests, compiled like compact_infer --compile) and scores them on
+the very windows compact_infer just rendered for R6 (one decode per study), right after R6's last fold. R7 deployed
+probabilities are recomputed with R7's own state spec and stackers (knee.public_r7_stackers) and written as an R7 ledger,
+receipt and a flushed CSV under <stage>/board<b>-r7-production/r7. Near the deadline R7 stops first (R6 keeps going), so
+cut studies keep R6 plain as their compact slot.
 """
 import functools
 import hashlib
@@ -70,6 +82,25 @@ def file_sha(path):
     return h.hexdigest()
 
 
+def flip_enabled(cfg):
+    """--flip-tta unless the board config seals 'flip': False (P6 plain compact arms)."""
+    flip = cfg.get('flip', R6F.FLIP_TTA)
+    require(isinstance(flip, bool), 'R6_FLIP_FLAG')
+    return flip
+
+
+def profile_name(cfg):
+    name = cfg.get('profile', 'r6')
+    require(name in ('r6', 'r7') and (name == 'r6' or flip_enabled(cfg) is False), 'COMPACT_PROFILE')   # R7 only as a plain arm
+    return name
+
+
+def compact_arm(cfg):
+    arm = cfg.get('compact_arm', 'r6')
+    require(arm == profile_name(cfg), 'COMPACT_ARM_IS_PROFILE')
+    return arm
+
+
 def worker_args(cfg, assignment, output):
     """probe_dual.py's worker command (minus interpreter/script) plus the notebook's WORKER_ARGS, in their order."""
     m = cfg['r6']['manifest']
@@ -93,7 +124,7 @@ def worker_args(cfg, assignment, output):
         args += ['--compile']
     if m.get('fluid_stacker'):
         args += ['--fluid-stacker', str(mount / m['fluid_stacker'])]
-    if m.get('flip_tta') or R6F.FLIP_TTA:
+    if flip_enabled(cfg):
         args += ['--flip-tta']
     if m.get('state_stacker'):
         args += ['--state-stacker', str(mount / m['state_stacker'])]
@@ -171,6 +202,8 @@ class Observer:
         self.child_dir = self.out / 'children'
         self.child_dir.mkdir(parents=True, exist_ok=True)
         self.inject = cfg.get('inject_uid')
+        self.flip = flip_enabled(cfg)
+        self.shared = None             # SharedR7 (P6s production pass only)
 
     # -- installation
     def install(self):
@@ -341,6 +374,7 @@ class Observer:
         if img is cur['plain']:
             kind = 'plain'
         else:
+            require(self.flip, 'R6_PLAIN_ONLY_UNEXPECTED_SCORING_INPUT')
             if cur['mirror'] is None:
                 expected, expected_meta = R6F.mirror_inputs(cur['plain'], cur['plain_meta'])
                 cur['mirror_input_equal'] = bool(torch.equal(img, expected) and torch.equal(meta, expected_meta))
@@ -371,6 +405,21 @@ class Observer:
             del fresh, zf, slf, blf
             torch.cuda.empty_cache()
             require(slot['sentinel']['finite'] and dp <= RELOAD_DPROB_TOL, 'R6_FRESH_RELOAD_SAME_INPUT')
+        if self.shared is not None and kind == 'plain' and k == len(self.pins) - 1:
+            self.shared.on_study(self, cur, img, meta, mask, chunk)
+
+    def finish_or_abort(self):
+        """At main() return: a study compact_infer fully scored before leaving its loop (deadline break) is closed like a
+        normal boundary; anything else is aborted as before."""
+        cur = self.current
+        if cur is None:
+            return
+        passes = ('plain', 'mirror') if self.flip else ('plain',)
+        done = {(c['model'], c['pass']) for c in cur['calls']}
+        if cur['error'] is None and self.models and all((k, p) in done for k in range(len(self.models)) for p in passes):
+            self.end()
+        else:
+            self.abort_current('main_returned_without_boundary')
 
     def end(self):
         cur = self.current
@@ -390,13 +439,23 @@ class Observer:
         self.mark = now
 
     @staticmethod
-    def observation(study, models):
-        """The deployed (last) plain and mirrored call of every fold model."""
+    def observation(study, models, flip=True):
+        """The deployed (last) plain and mirrored call of every fold model (plain only without flip TTA)."""
         last = {}
         for c in study['calls']:
             last[(c['model'], c['pass'])] = c
         n = len(models)
-        require(all((k, p) in last for k in range(n) for p in ('plain', 'mirror')), 'R6_FOLD_PASS_COVERAGE')
+        passes = ('plain', 'mirror') if flip else ('plain',)
+        require(all((k, p) in last for k in range(n) for p in passes)
+                and all(c['pass'] in passes for c in study['calls']), 'R6_FOLD_PASS_COVERAGE')
+        if not flip:
+            entry = models[0]['entry']
+            require(all(m['entry']['state_k'] == entry['state_k'] and m['entry']['bin_names'] == entry['bin_names'] for m in models),
+                    'R6_FOLD_HEADS')
+            return {'plain': [last[(k, 'plain')]['z'] for k in range(n)], 'mirror': None,
+                    'plain_aux': [(last[(k, 'plain')]['sl'], last[(k, 'plain')]['bl']) for k in range(n)], 'mirror_aux': None,
+                    'state_k': entry['state_k'], 'bin_names': entry['bin_names'],
+                    'fp32_rescues': sum(1 for c in study['calls'] if c['mode'] == 'fp32'), 'calls': len(study['calls'])}
         entry = models[0]['entry']
         require(all(m['entry']['state_k'] == entry['state_k'] and m['entry']['bin_names'] == entry['bin_names'] for m in models),
                 'R6_FOLD_HEADS')
@@ -429,6 +488,7 @@ def summarize(cfg, obs, ci_receipt, predictions, labels, spec, fluid_doc, state_
     """Per-study records and the complete assigned-population ledger arrays (worker-local checks only)."""
     import numpy as np
     ids = cfg['ids']
+    flip = flip_enabled(cfg)
     fallback = ci_receipt.get('fallback') or {}
     require(set(predictions) <= set(ids) and set(fallback) <= set(ids) and not set(predictions) & set(fallback)
             and set(predictions) | set(fallback) == set(ids), 'R6_SCORED_OR_FALLBACK_PARTITION')
@@ -442,11 +502,11 @@ def summarize(cfg, obs, ci_receipt, predictions, labels, spec, fluid_doc, state_
     for ordinal, sid in enumerate(ids):
         s = by_id.get(sid)
         if sid in predictions:
-            require(s is not None and not s.get('aborted') and s['error'] is None and s['windows'] > 0 and s['plain'] and s['mirror'],
+            require(s is not None and not s.get('aborted') and s['error'] is None and s['windows'] > 0 and s['plain'] and s['mirror'] == flip,
                     'R6_SCORED_STUDY_OBSERVED')
-            o = Observer.observation(s, obs.models)
+            o = Observer.observation(s, obs.models, flip)
             fall = [n for n, hit in (("Baker's", sid in state_fallback), ('Effusion', sid in fluid_fallback)) if hit]
-            p_recon, detail = R6F.reconstruct(o, s['fluid'], fluid_doc, state_doc, spec, labels, stack_fallback=fall)
+            p_recon, detail = R6F.reconstruct(o, s['fluid'], fluid_doc, state_doc, spec, labels, stack_fallback=fall, flip=flip)
             p = np.asarray(predictions[sid], dtype=np.float64)
             err = float(np.max(np.abs(p - p_recon)))
             require(np.isfinite(p).all() and ((p >= 0) & (p <= 1)).all() and err <= RECONSTRUCTION_ATOL, 'R6_DEPLOYED_RECONSTRUCTION')
@@ -489,9 +549,19 @@ def load_stackers(mount, manifest, labels):
     return spec, fluid_doc, state_doc, pair
 
 
+def profile_module(name):
+    if name == 'r7':
+        from knee import public_r7_profile as P
+    else:
+        from knee import public_r6_profile as P
+    return P
+
+
 def check_compact_receipt(ci, manifest):
     """The captured worker's own receipt must name exactly the pinned bundle, sources and switches."""
-    from knee.public_r6_profile import SOURCE_SHA256, ASSET_SHA256
+    from knee import public_r7_profile
+    from knee.public_r6_profile import SOURCE_SHA256
+    ASSET_SHA256 = profile_module('r7' if manifest.get('bundle_id') == public_r7_profile.BUNDLE_ID else 'r6').ASSET_SHA256
     require(ci.get('status') == 'PASS' and ci.get('timed_out') is False and ci.get('amp') == 'fp16'
             and ci.get('models') == manifest['models'] and ci.get('extent_models') == 4 and ci.get('syn_decomp_models') == 4
             and ci.get('spatial_models') == 4 and ci.get('trainer_md5') == manifest['trainer_md5']
@@ -503,12 +573,14 @@ def check_compact_receipt(ci, manifest):
             'R6_SOURCE_RECEIPT')
 
 
-def execute(cfg, out, r, torch, CT, import_ci, manifest, spec, fluid_doc, state_doc, pair, check_ci=check_compact_receipt):
+def execute(cfg, out, r, torch, CT, import_ci, manifest, spec, fluid_doc, state_doc, pair, check_ci=check_compact_receipt,
+            shared=None):
     """Observe one compact_infer main() over cfg['ids'] and turn it into a bound, complete ledger and receipt."""
     import resource
     from knee.public_s6_recovery_runtime import save_ledger
     labels = R6F.LABELS
     obs = Observer(cfg, out, torch, CT)
+    obs.shared = shared
     obs.install()
     try:
         CI = import_ci()
@@ -527,15 +599,22 @@ def execute(cfg, out, r, torch, CT, import_ci, manifest, spec, fluid_doc, state_
     finally:
         obs.uninstall()
     r['main_seconds'] = time.perf_counter() - main_start
-    obs.abort_current('main_returned_without_boundary')
+    obs.finish_or_abort()
+    if shared is not None:                 # R7 ledger and receipt first: an R6 summary failure must not lose them
+        r['r7_shared'] = shared.finalize(obs, r)
     r['aborted_observations'] = sum(1 for s in obs.studies if s.get('aborted'))
     ci = json.loads((out / 'compact' / 'receipt.json').read_bytes())
     r['compact_receipt_sha256'] = file_sha(out / 'compact' / 'receipt.json')
     require(len(obs.models) == len(manifest['models']) == 4 and [m['entry']['file'] for m in obs.models] == manifest['models'],
             'R6_FOUR_FOLDS_BOUND')
-    perm, bin_perm = R6F.mirror_perm(labels, spec, obs.models[0]['entry']['bin_names'])
-    flip = ci.get('flip_tta') or {}
-    require(flip.get('perm') == perm and flip.get('bin_perm') == bin_perm and flip.get('mcl') == 'plain pass only', 'R6_FLIP_PERMUTATION')
+    if flip_enabled(cfg):
+        perm, bin_perm = R6F.mirror_perm(labels, spec, obs.models[0]['entry']['bin_names'])
+        flip = ci.get('flip_tta') or {}
+        require(flip.get('perm') == perm and flip.get('bin_perm') == bin_perm and flip.get('mcl') == 'plain pass only', 'R6_FLIP_PERMUTATION')
+        flip_receipt = {'perm': perm, 'bin_perm': bin_perm, 'receipt': flip}
+    else:
+        require('flip_tta' not in ci, 'PLAIN_PASS_NO_FLIP_RECEIPT')
+        flip_receipt = {'enabled': False}
     check_ci(ci, manifest)
     predictions = read_predictions(out / 'compact' / 'predictions.csv', labels)
     probs, statuses, logits, records = summarize(cfg, obs, ci, predictions, labels, spec, fluid_doc, state_doc)
@@ -562,7 +641,7 @@ def execute(cfg, out, r, torch, CT, import_ci, manifest, spec, fluid_doc, state_
              folds=[dict(m['entry'], sentinel=m['sentinel'], checksum=m['checksum']) for m in obs.models],
              state_before=R6F.digest([m['entry']['state'] for m in obs.models]),
              state_after=R6F.digest([a['state'] for a in after]),
-             flip={'perm': perm, 'bin_perm': bin_perm, 'receipt': flip}, compile=compile_receipt,
+             flip=flip_receipt, compile=compile_receipt,
              loaders=obs.loaders, children=children, compile_check_forward_calls=obs.calls_other,
              compact_stats=ci.get('stats'), compact_seconds=ci.get('seconds'),
              fallback_reasons={k: str(v)[:200] for k, v in (ci.get('fallback') or {}).items()},
@@ -576,18 +655,290 @@ def execute(cfg, out, r, torch, CT, import_ci, manifest, spec, fluid_doc, state_
     return r
 
 
+R7_SHARED_COMPILE_TOL = 1e-3     # compact_infer --compile-tol default / R7 recipe tol_prob
+R7_CUT_SAFETY = 1.3              # R7 stops when the remaining studies at the R6-only pace x 1.3 would pass the deadline
+R7_CUT_MIN_STUDIES = 3
+
+
+class SharedR7:
+    """P6s: R7 v1 fold models on R6's rendered windows inside the R6 plain worker (see the module docstring)."""
+
+    def __init__(self, cfg, torch, CT, device=None):
+        self.cfg, self.torch, self.CT = cfg['r7_shared'], torch, CT
+        self.r6_manifest = (cfg.get('r6') or {}).get('manifest')
+        self.ids, self.board, self.pass_name = list(cfg['ids']), cfg.get('board'), cfg.get('pass')
+        self.code = cfg.get('code')
+        self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
+        self.deadline = float(self.cfg.get('deadline_epoch') or 0)
+        self.out = Path(self.cfg['out']) / 'r7'
+        self.models, self.entries, self.eager, self.checksums = [], [], {}, []
+        self.compile = {'requested': bool(self.cfg['manifest'].get('compile')), 'active': False, 'fallback': None, 'decision': None,
+                        'study_dprob': None, 'warmup_shapes': [], 'warmup_max_dprob': None, 'check_seconds': None}
+        self.active, self.cut = True, None
+        self.rows = {}
+        self.csv = None
+
+    def load(self):
+        """Pins first (file SHA256, manifest, strict constructor/state/buffers vs the CPU pins), then device, compile, warm-up."""
+        import inspect
+        torch, CT = self.torch, self.CT
+        from knee import public_r7_profile as R7P
+        from knee import public_r7_stackers as stackers
+        t0 = time.perf_counter()
+        mount = Path(self.cfg['mount'])
+        profile = R7P.validate_r7_assets(mount, source_dir=self.code) if self.code else None
+        manifest = json.loads((mount / 'manifest.json').read_bytes())
+        require(manifest == self.cfg['manifest'] and file_sha(mount / 'manifest.json') == R7P.MANIFEST_SHA256, 'R7_SHARED_EXACT_MANIFEST')
+        self.manifest = manifest
+        if self.r6_manifest is not None:     # R7 must see exactly R6's rendered windows: same render/crop recipe
+            require(all(manifest.get(k) == self.r6_manifest.get(k) for k in ('size', 'crop', 'slices', 'views', 'phys_mm', 'eval_stride',
+                                                                             'backbone', 'anchor_weights_sha256', 'side_model')),
+                    'R7_SHARED_SAME_RENDER_RECIPE')
+        self.spec = json.loads((mount / manifest['state_spec']).read_bytes())
+        self.fluid_doc = stackers.load_fluid((mount / manifest['fluid_stacker']).read_bytes(), R6F.LABELS)
+        layout = stackers.state_layout(self.spec, R6F.LABELS)
+        self.state_doc = stackers.load_state((mount / manifest['state_stacker']).read_bytes(), R6F.LABELS, layout,
+                                             hashlib.md5((mount / manifest['state_spec']).read_bytes()).hexdigest())
+        pair = stackers.check_pair(self.fluid_doc, self.state_doc)
+        require(tuple(pair['fluid']) == stackers.FLUID_ADOPTED and tuple(pair['state']) == stackers.STATE_ADOPTED
+                and not self.state_doc['needs_volume'], 'R7_SHARED_ADOPTED_STACKERS')
+        pins = self.cfg['cpu_pins']['folds']
+        require([p['file'] for p in pins] == manifest['models'] and len(pins) == 4, 'R7_SHARED_FOUR_FOLDS')
+        for name, pin in zip(manifest['models'], pins):
+            path = mount / name
+            sha = file_sha(path)
+            sd = torch.load(path, map_location='cpu', weights_only=True)
+            kw = {}
+            if any(k == 'sp_q' or k.endswith('.sp_q') for k in sd):
+                kw['spatial'] = True
+            if any(k.split('.')[-1] in ('ext_u', 'ext_view', 'ext_gamma') for k in sd):
+                kw['extent'] = True
+            if any(k == 'syn_beta' or k.endswith('.syn_beta') for k in sd):
+                kw['syn_decomp'] = True
+            ctor = dict(freeze_blocks=manifest['freeze_blocks'], crop=manifest['crop'], state_spec=self.spec, in_chans=manifest['slices'], **kw)
+            m = CT.Net(manifest['backbone'], None, **ctor)          # compact_infer load_group's exact call
+            res = m.load_state_dict(sd, strict=True)
+            del sd
+            bound = inspect.signature(CT.Net.__init__).bind(m, manifest['backbone'], None, **ctor)
+            bound.apply_defaults()
+            args = {k: v for k, v in bound.arguments.items() if k != 'self'}
+            args['state_spec'] = R6F.digest(args['state_spec'])
+            entry = {'file': name, 'file_sha256': sha, 'strict': not res.missing_keys and not res.unexpected_keys,
+                     'constructor_args': args, 'state': R6F.module_digest(m), 'buffers': R6F.buffers_digest(m),
+                     'constructor': R6F.constructor_digest(m), 'bin_names': [list(x) for x in m.bin_names],
+                     'state_k': [int(x) for x in m.state_k]}
+            require(entry['strict'] and sha == pin['file_sha256'] and all(entry[k] == pin[k] for k in ('state', 'buffers', 'constructor',
+                                                                                                       'constructor_args')),
+                    'QUALIFIED_R7_SHARED_FOLD_STATE')
+            self.entries.append(entry)
+            self.models.append(m.eval().requires_grad_(False).to(self.device).to(memory_format=torch.channels_last))
+        require(all(e['state_k'] == self.entries[0]['state_k'] and e['bin_names'] == self.entries[0]['bin_names'] for e in self.entries),
+                'R7_SHARED_FOLD_HEADS')
+        if self.compile['requested']:
+            import torch._dynamo as _dynamo
+            for name_, lim_ in (('cache_size_limit', 64), ('recompile_limit', 64), ('accumulated_cache_size_limit', 2048),
+                                ('accumulated_recompile_limit', 2048)):        # compact_infer's own settings (R6 + R7 = 8 encoders)
+                if hasattr(_dynamo.config, name_):
+                    setattr(_dynamo.config, name_, max(lim_, int(getattr(_dynamo.config, name_))))
+            for m in self.models:
+                self.eager[id(m)] = m.enc
+                m.enc = torch.compile(self.eager[id(m)], dynamic=False, mode='default')
+            self.compile['active'] = True
+            self.warmup()
+        self.checksums = [R6F.checksum(m) for m in self.models]
+        self.out.mkdir(parents=True, exist_ok=True)
+        (self.out / 'compact').mkdir(exist_ok=True)
+        self.csv = open(self.out / 'compact' / 'predictions.csv', 'w', newline='', encoding='utf-8')
+        self.csv.write(','.join(['StudyInstanceUID'] + R6F.LABELS) + '\n')
+        self.csv.flush()
+        return {'profile': profile, 'folds': len(self.models), 'compile': dict(self.compile), 'seconds': time.perf_counter() - t0,
+                'deadline_epoch': self.deadline}
+
+    def _forward(self, m, img, meta, mask, chunk, mode, eager=False):
+        torch = self.torch
+        enc = m.enc
+        if eager and id(m) in self.eager:
+            m.enc = self.eager[id(m)]
+        try:
+            if mode == 'fp32' or img.device.type != 'cuda':      # also leaves compact_infer's enclosing fp16 autocast
+                with torch.autocast(img.device.type, enabled=False):
+                    z, sl, bl = m(img, meta, mask, chunk=chunk, return_aux=True)
+            else:
+                with torch.autocast('cuda', dtype=torch.float16):
+                    z, sl, bl = m(img, meta, mask, chunk=chunk, return_aux=True)
+        finally:
+            m.enc = enc
+        return z.float(), sl.float(), bl.float()
+
+    def warmup(self):
+        """Every encoder batch shape (32..192 windows) compiled before the first study; compiled vs eager only as a sanity bound."""
+        torch = self.torch
+        gen = torch.Generator().manual_seed(20261020)
+        crop, slices = int(self.manifest['crop']), int(self.manifest['slices'])
+        worst = 0.
+        with torch.inference_mode():
+            for s in range(32, 193, 32):
+                img = torch.randint(0, 256, (1, s, slices, crop, crop), generator=gen, dtype=torch.uint8).to(self.device)
+                meta = torch.zeros((1, s, 9), dtype=torch.float32, device=self.device)
+                mask = torch.ones((1, s), dtype=torch.bool, device=self.device)
+                for m in self.models:
+                    zc = self._forward(m, img, meta, mask, 192, 'fp16')[0]
+                    ze = self._forward(m, img, meta, mask, 192, 'fp16', eager=True)[0]
+                    require(bool(torch.isfinite(zc).all()) == bool(torch.isfinite(ze).all()), 'R7_SHARED_WARMUP_FINITENESS')
+                    worst = max(worst, float((torch.sigmoid(zc.double()) - torch.sigmoid(ze.double())).abs().max()))
+                self.compile['warmup_shapes'].append(s)
+        self.compile['warmup_max_dprob'] = worst
+        if worst > .05:                                   # compact_infer COMPILE_SANITY_DP: a broken compiled kernel
+            self.set_eager('warm-up compiled vs eager |dp| %.3g > 0.05' % worst)
+
+    def set_eager(self, reason):
+        for m in self.models:
+            if id(m) in self.eager:
+                m.enc = self.eager[id(m)]
+        self.eager.clear()
+        self.compile.update(active=False, fallback=str(reason)[:400])
+
+    def check(self, img, meta, mask, chunk):
+        """compact_infer's study-level gate on the first real study: compiled vs eager fold-mean probability within 1e-3."""
+        torch = self.torch
+        t0 = time.perf_counter()
+        zc = torch.stack([self._forward(m, img, meta, mask, chunk, 'fp16')[0][0] for m in self.models])
+        ze = torch.stack([self._forward(m, img, meta, mask, chunk, 'fp16', eager=True)[0][0] for m in self.models])
+        d = float((torch.sigmoid(zc.mean(0).double()) - torch.sigmoid(ze.mean(0).double())).abs().max())
+        self.compile['study_dprob'] = d
+        self.compile['decision'] = 'compiled' if d <= R7_SHARED_COMPILE_TOL else 'eager'
+        if d > R7_SHARED_COMPILE_TOL:
+            self.set_eager('study check |dp| %.3g > %.0e' % (d, R7_SHARED_COMPILE_TOL))
+        self.compile['check_seconds'] = time.perf_counter() - t0
+
+    def r6_only_pace(self, obs):
+        rows = [(s, self.rows.get(s['id'], {})) for s in obs.studies if not s.get('aborted')]
+        paces = [s['handle_seconds'] + (0. if s['first_of_loader'] else s['wait_seconds']) - x.get('r7_seconds', 0.) for s, x in rows]
+        return sum(paces) / len(paces) if len(paces) >= R7_CUT_MIN_STUDIES else None
+
+    def should_cut(self, obs, now=None):
+        """R7 last: stop R7 when R6 alone could no longer finish the remaining studies before the deadline (x 1.3)."""
+        if not self.active or not self.deadline:
+            return False
+        pace = self.r6_only_pace(obs)
+        if pace is None:
+            return False
+        remaining = len(self.ids) - len(obs.studies)
+        now = time.time() if now is None else now
+        if now + remaining * max(pace, 0.) * R7_CUT_SAFETY > self.deadline:
+            self.active = False
+            self.cut = {'after_studies': len(obs.studies), 'remaining': remaining, 'r6_only_pace_seconds': pace,
+                        'epoch': now, 'deadline_epoch': self.deadline}
+            return True
+        return False
+
+    def on_study(self, obs, cur, img, meta, mask, chunk):
+        """Called once per study right after R6's last plain fold forward, on the same rendered windows."""
+        torch = self.torch
+        if 'r7' in cur:
+            return
+        sid = cur['id']
+        self.should_cut(obs)
+        if not self.active:
+            cur['r7'] = None
+            self.rows[sid] = {'status': 'deadline'}
+            return
+        t0 = time.perf_counter()
+        obs.fresh_depth += 1                  # R7 forwards are not R6 scoring calls for the observer
+        try:
+            with torch.inference_mode():
+                if self.compile['active'] and self.compile['decision'] is None:
+                    self.check(img, meta, mask, chunk)
+                zs, aux, rescues = [], [], 0
+                for m in self.models:
+                    z, sl, bl = self._forward(m, img, meta, mask, chunk, 'fp16')
+                    if not bool(torch.isfinite(z).all()):          # compact_infer's fp32 rescue, eager encoder
+                        z, sl, bl = self._forward(m, img, meta, mask, chunk, 'fp32', eager=True)
+                        rescues += 1
+                    zs.append(z.detach().cpu()[0])
+                    aux.append((sl.detach().cpu(), bl.detach().cpu()))
+            checksum_equal = all(R6F.checksum(m) == c for m, c in zip(self.models, self.checksums))
+        finally:
+            obs.fresh_depth -= 1
+        require(checksum_equal, 'R7_SHARED_PARAMETER_BUFFER_MUTATION')
+        e = self.entries[0]
+        p, detail = R6F.reconstruct({'plain': zs, 'mirror': None, 'plain_aux': aux, 'mirror_aux': None, 'state_k': e['state_k'],
+                                     'bin_names': e['bin_names']}, cur['fluid'], self.fluid_doc, self.state_doc, self.spec, R6F.LABELS,
+                                    flip=False)
+        finite = bool(all(math.isfinite(float(x)) and 0. <= float(x) <= 1. for x in p))
+        seconds = time.perf_counter() - t0
+        row = {'status': 'genuine' if finite else 'nonfinite', 'probabilities': [float(x) for x in p], 'logits': detail['logits'],
+               'model_probabilities': detail['model_probabilities'], 'stackers': detail['stackers'], 'fp32_rescues': rescues,
+               'checksum_equal': checksum_equal, 'r7_seconds': seconds, 'windows': int(img.shape[1])}
+        self.rows[sid] = row
+        cur['r7'] = True
+        if finite:
+            self.csv.write(','.join([sid] + ['%.9g' % x for x in row['probabilities']]) + '\n')
+            self.csv.flush()
+
+    def finalize(self, obs, r6_receipt):
+        """R7 ledger (assigned order) and receipt; studies without R7 output are deadline/data-local rows."""
+        import numpy as np
+        import resource
+        from knee.public_s6_recovery_runtime import save_ledger
+        if self.csv is not None:
+            self.csv.close()
+        studies = {s['id']: s for s in obs.studies}
+        probs, statuses, logits, records = [], [], [], []
+        for ordinal, sid in enumerate(self.ids):
+            x, s = self.rows.get(sid), studies.get(sid)
+            if x is not None and x['status'] == 'genuine' and s is not None:
+                probs.append(np.asarray(x['probabilities'], dtype=np.float64))
+                statuses.append('genuine')
+                logits.append(np.asarray(x['logits'], dtype=np.float32))
+                records.append({'id': sid, 'ordinal': ordinal, 'status': 'genuine', 'windows': x['windows'], 'input': s.get('input'),
+                                'r7_seconds': x['r7_seconds'], 'production_seconds': x['r7_seconds'], 'fp32_rescues': x['fp32_rescues'],
+                                'checksum_equal': x['checksum_equal'], 'fluid_status_ok': fluid_status_ok(s['fluid']),
+                                'stackers': x['stackers'], 'model_probabilities': x['model_probabilities'],
+                                'probabilities': x['probabilities'], 'logits': x['logits'], 'calls': 4, 'shared_decode': True,
+                                'r6_aborted': bool(s.get('aborted'))})
+            else:
+                probs.append(np.full(12, np.nan))
+                statuses.append('data_local_failure')
+                logits.append(np.full((4, 12), np.nan, dtype=np.float32))
+                records.append({'id': sid, 'ordinal': ordinal, 'status': 'data_local_failure', 'phase': 'r7_shared',
+                                'failure_code': 'r7 cut before the deadline' if (x or {}).get('status') == 'deadline' else
+                                'nonfinite r7 output' if x is not None else 'r6 study not scored',
+                                'deadline': x is None or x.get('status') == 'deadline', 'production_seconds': 0.})
+        ledger = self.out / 'predictions.npz'
+        save_ledger(ledger, self.ids, probs, statuses, logits=logits)
+        after = [{'state': R6F.module_digest(m), 'buffers': R6F.buffers_digest(m)} for m in self.models]
+        require(all(a['state'] == e['state'] and a['buffers'] == e['buffers'] for a, e in zip(after, self.entries)), 'R7_SHARED_STATE_AFTER')
+        cuda = self.torch.cuda.is_available()
+        rec = {'status': 'PASS', 'version': VERSION, 'arm': 'r7', 'slot': 'r7-shared', 'pass': self.pass_name, 'board': self.board,
+               'assigned': self.ids, 'completed': len(records), 'records': records, 'genuine': statuses.count('genuine'),
+               'failed': statuses.count('data_local_failure'), 'zero_failed': all(s == 'genuine' for s in statuses), 'zero_imputed': True,
+               'fp32_recoveries': sum(x.get('fp32_rescues', 0) for x in records), 'folds': self.entries,
+               'state_before': R6F.digest([e['state'] for e in self.entries]), 'state_after': R6F.digest([a['state'] for a in after]),
+               'flip': {'enabled': False}, 'compile': dict(self.compile), 'cut': self.cut, 'environment': r6_receipt.get('environment'),
+               'shared_with': 'r6 production worker (same process, same rendered windows)', 'ledger_sha256': file_sha(ledger),
+               'peak_rss_bytes': resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024,
+               'peak_cuda_bytes': self.torch.cuda.max_memory_allocated() if cuda else 0}
+        save(self.out / 'receipt.json', rec)
+        return {'status': 'PASS', 'genuine': rec['genuine'], 'failed': rec['failed'], 'cut': self.cut, 'compile': rec['compile'],
+                'receipt': str(self.out / 'receipt.json')}
+
+
 def r6_worker(config_path):
     """Kaggle board worker: environment, staged inputs, source closure, assets and pins first; then execute()."""
     cfg = json.loads(Path(config_path).read_bytes())
-    out = Path(cfg['out']) / 'r6'
+    arm, name, flip = compact_arm(cfg), profile_name(cfg), flip_enabled(cfg)
+    out = Path(cfg['out']) / arm
     out.mkdir()
     start = time.perf_counter()
-    r = {'status': 'RUNNING', 'version': VERSION, 'arm': 'r6', 'slot': 'r6flip', 'pass': cfg['pass'], 'board': cfg['board'],
-         'assigned': cfg['ids'], 'completed': 0, 'records': []}
+    r = {'status': 'RUNNING', 'version': VERSION, 'arm': arm, 'slot': 'r6flip' if flip else name + '-plain', 'pass': cfg['pass'],
+         'board': cfg['board'], 'assigned': cfg['ids'], 'completed': 0, 'records': []}
     save(out / 'receipt.json', r)
     try:
         import torch
-        from knee.public_r6_profile import validate_r6_assets, SOURCE_SHA256, MANIFEST_SHA256
+        from knee.public_r6_profile import SOURCE_SHA256
+        P = profile_module(name)
+        MANIFEST_SHA256 = P.MANIFEST_SHA256
         from knee.public_s6_qualification import verify_sources
         from knee.public_s6_recovery_entry import board_environment, verify_staged
         r['environment'] = board_environment(torch, cfg)
@@ -595,7 +946,7 @@ def r6_worker(config_path):
         require(all(os.environ.get(k) == v for k, v in PROBE_DUAL_ENV.items()), 'R6_PROBE_DUAL_ENV')
         verify_staged(cfg['data'], cfg['data_ids'], cfg['data_binding'])
         verify_sources(cfg['code'], cfg['source_pins'])
-        r['profile'] = validate_r6_assets(cfg['r6_mount'], source_dir=cfg['code'])
+        r['profile'] = (P.validate_r7_assets if name == 'r7' else P.validate_r6_assets)(cfg['r6_mount'], source_dir=cfg['code'])
         mount = Path(cfg['r6_mount'])
         manifest = json.loads((mount / 'manifest.json').read_bytes())
         require(manifest == cfg['r6']['manifest'] and hashlib.sha256((mount / 'manifest.json').read_bytes()).hexdigest() == MANIFEST_SHA256,
@@ -610,13 +961,19 @@ def r6_worker(config_path):
         import compact_train as CT
         require(Path(CT.__file__).resolve() == (code / 'compact_train.py').resolve() and CT.LABELS == R6F.LABELS, 'R6_EXACT_TRAINER_IMPORT')
         spec, fluid_doc, state_doc, pair = load_stackers(mount, manifest, R6F.LABELS)
+        shared = None
+        if cfg.get('r7_shared'):
+            require(name == 'r6' and arm == 'r6' and not flip and cfg['pass'] == 'production', 'R7_SHARED_ON_R6_PLAIN_PRODUCTION_ONLY')
+            shared = SharedR7(cfg, torch, CT)
+            r['r7_shared_setup'] = shared.load()
+            save(out / 'receipt.json', r)
 
         def import_ci():
             import compact_infer as CI
             require(Path(CI.__file__).resolve() == (code / 'compact_infer.py').resolve()
                     and file_sha(CI.__file__) == SOURCE_SHA256['compact_infer.py'], 'R6_EXACT_WORKER_IMPORT')
             return CI
-        execute(cfg, out, r, torch, CT, import_ci, manifest, spec, fluid_doc, state_doc, pair)
+        execute(cfg, out, r, torch, CT, import_ci, manifest, spec, fluid_doc, state_doc, pair, shared=shared)
     except BaseException as e:
         save(out / 'failure-private.json', {'type': type(e).__name__, 'detail': str(e)[:4000]})
         r.update(status='INTERRUPTED' if isinstance(e, (InterruptedError, KeyboardInterrupt, TimeoutError)) else 'FAIL',

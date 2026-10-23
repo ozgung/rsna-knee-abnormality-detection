@@ -75,6 +75,7 @@ def recover(old320, r6, crop224, old_missing, r6_missing, crop224_missing, *, fa
     import numpy as np
     from knee import public_ws2_recovery as REC
     require(resolve_blend(blend)[0] == RAPTOR_ARMS, 'RECOVER_FROZEN_RAPTOR_ARMS_ONLY')   # other arm sets: recover_arms
+    require(resolve_compact(blend)[0] == DEFAULT_COMPACT, 'RECOVER_FROZEN_COMPACT_ONLY')     # P6 dual compact: recover_arms
     rec = REC.recover(old320, r6, crop224, old_missing, r6_missing, crop224_missing, fatal_errors=fatal_errors)
     w = np.asarray(raptor_weight_vector(blend=blend), dtype=np.float64)
     raptor = rec['raptor_slot']
@@ -179,23 +180,35 @@ def mcl_state_columns(layout):
             for i in (range(c['start'], c['stop']) if 'categories' in c else [c['column']])]
 
 
-def reconstruct(observation, fluid_record, fluid_doc, state_doc, spec, labels=LABELS, stack_fallback=()):
+def plain_state(state_k, plain_aux):
+    """Fold-mean state read-out of the plain pass only (compact_infer v4c without --flip-tta)."""
+    import torch
+    return torch.stack([state_readout(state_k, sl, bl)[0] for sl, bl in plain_aux]).double().mean(0)
+
+
+def reconstruct(observation, fluid_record, fluid_doc, state_doc, spec, labels=LABELS, stack_fallback=(), flip=True):
     """Deployed study probabilities from the observed raw passes (independent of compact_infer's own arithmetic).
 
     observation: {'plain': [z [12]] * 4, 'mirror': [...], 'plain_aux': [(sl, bl)] * 4, 'mirror_aux': [...],
-    'state_k': [...], 'bin_names': [...]} as float32 CPU tensors.
+    'state_k': [...], 'bin_names': [...]} as float32 CPU tensors. flip=False (P6 compact arms): plain pass only,
+    per-fold logits as observed and the fold-mean plain state read-out; no mirror entries are used.
     """
     import numpy as np
     import torch
     from knee import public_r7_stackers as stackers
-    perm, bin_perm = mirror_perm(labels, spec, observation['bin_names'])
-    zs = deployed_logits(observation['plain'], observation['mirror'], perm, labels.index('MCL'))
+    layout = stackers.state_layout(spec, labels)
+    if flip:
+        perm, bin_perm = mirror_perm(labels, spec, observation['bin_names'])
+        zs = deployed_logits(observation['plain'], observation['mirror'], perm, labels.index('MCL'))
+        stv = deployed_state(observation['state_k'], observation['plain_aux'], observation['mirror_aux'], perm, bin_perm,
+                             mcl_state_columns(layout)).numpy()
+    else:
+        perm = bin_perm = None
+        zs = torch.stack(list(observation['plain']))
+        stv = plain_state(observation['state_k'], observation['plain_aux']).numpy()
     zmean = zs.mean(0)
     p_model = torch.sigmoid(zmean).double().numpy()
     zf = zs.mean(0).double().numpy()
-    layout = stackers.state_layout(spec, labels)
-    stv = deployed_state(observation['state_k'], observation['plain_aux'], observation['mirror_aux'], perm, bin_perm,
-                         mcl_state_columns(layout)).numpy()
     p, receipt = stackers.apply(p_model, zf, stv, fluid_record, fluid_doc, state_doc, labels)
     for name in stack_fallback:
         j = labels.index(name)
@@ -266,7 +279,10 @@ DEADLINE_SECONDS = 8.3 * 3600          # from kernel start T0
 RAPTOR_ARMS = (('old320', R384_WEIGHT), ('crop224', R224_WEIGHT))   # frozen default; variants seal their own in cfg['blend']
 STATUSES = ('genuine', 'data_local_failure', 'unavailable')
 BLEND_ARM_NAMES = ('old320', 'crop224', 'nafull')    # stage order: R384 two-view, R224 one-view, na-full K62 one-view
-ALL_ARMS = ('old320', 'r6', 'crop224', 'nafull')
+ALL_ARMS = ('old320', 'r6', 'crop224', 'nafull', 'r7')
+COMPACT_ARM_NAMES = ('r6', 'r7')               # stage order: R6, then R7 last (the arm the T0 + 8.3 h guard cuts in P6)
+DEFAULT_COMPACT = (('r6', 1.0),)               # P2 and P3-P5: rank(R6 flip) is the whole compact slot
+DEFAULT_COMPACT_FLIP = True
 RAPTOR_WEIGHTS_V2 = {'Lateral OA': .15, 'PF OA': .65, 'Synovitis': .85, "Baker's": .30}   # heliosli V2 table, others 0.5
 # Entry variants. None of these is the default: no variant means no cfg['blend'] key and the frozen v1 arithmetic.
 VARIANTS = {
@@ -276,15 +292,36 @@ VARIANTS = {
            'default_weight': DEFAULT_RAPTOR_WEIGHT},
     'p5': {'raptor_arms': [['old320', .65], ['nafull', .35]], 'weights': dict(RAPTOR_WEIGHTS),
            'default_weight': DEFAULT_RAPTOR_WEIGHT},
+    # P6 dual-compact (final-push plan 2026-10-19, Lane A): P2's Raptor half and per-finding weights; the compact slot is
+    # 1/2 rank(R6 plain) + 1/2 rank(R7 plain), no flip TTA, weights fixed before any P6 output exists. R7 runs last.
+    'p6': {'raptor_arms': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]], 'weights': dict(RAPTOR_WEIGHTS),
+           'default_weight': DEFAULT_RAPTOR_WEIGHT, 'compact_arms': [['r6', .5], ['r7', .5]], 'compact_flip': False},
+    # P6-prime: P6 without the R224 stage (only if the P6 rehearsal point exceeds 26,000 s).
+    'p6p': {'raptor_arms': [['old320', 1.0]], 'weights': dict(RAPTOR_WEIGHTS),
+            'default_weight': DEFAULT_RAPTOR_WEIGHT, 'compact_arms': [['r6', .5], ['r7', .5]], 'compact_flip': False},
+    # P6s (2026-10-20, after Lane B's out-of-fold win): P6 with one decode per study -- R7 scored in the R6 plain worker on
+    # R6's rendered windows (compact_shared). Same arithmetic as P6; p6sp is P6s without R224.
+    'p6s': {'raptor_arms': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]], 'weights': dict(RAPTOR_WEIGHTS),
+            'default_weight': DEFAULT_RAPTOR_WEIGHT, 'compact_arms': [['r6', .5], ['r7', .5]], 'compact_flip': False,
+            'compact_shared': True},
+    'p6sp': {'raptor_arms': [['old320', 1.0]], 'weights': dict(RAPTOR_WEIGHTS),
+             'default_weight': DEFAULT_RAPTOR_WEIGHT, 'compact_arms': [['r6', .5], ['r7', .5]], 'compact_flip': False,
+             'compact_shared': True},
+    # P7-prime (Lane C): P2's frozen Raptor half and v1 weights; the compact slot is our S6 seed ensemble (knee.public_s6c)
+    'p7': {'raptor_arms': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]], 'weights': dict(RAPTOR_WEIGHTS),
+           'default_weight': DEFAULT_RAPTOR_WEIGHT},
 }
-PRECISION = {'old320': 'float64', 'r6': '%.9g', 'crop224': 'float32 CSV', 'nafull': 'float64'}
+COMPACT_VARIANTS = {'p7': 's6c'}     # variants whose compact ('r6') slot is not the heliosli R6 bundle
+PRECISION = {'old320': 'float64', 'r6': '%.9g', 'crop224': 'float32 CSV', 'nafull': 'float64', 'r7': '%.9g'}
+BLEND_KEYS = {'raptor_arms', 'weights', 'default_weight'}
+COMPACT_KEYS = {'compact_arms', 'compact_flip'}
 
 
 def resolve_blend(blend=None):
     """(raptor arms, per-finding weights, default weight) from the sealed cfg['blend']; None is the frozen default."""
     if blend is None:
         return RAPTOR_ARMS, dict(RAPTOR_WEIGHTS), DEFAULT_RAPTOR_WEIGHT
-    require(set(blend) == {'raptor_arms', 'weights', 'default_weight'}, 'BLEND_SCHEMA')
+    require(set(blend) in (BLEND_KEYS, BLEND_KEYS | COMPACT_KEYS, BLEND_KEYS | COMPACT_KEYS | {'compact_shared'}), 'BLEND_SCHEMA')
     arms = tuple((str(a), float(w)) for a, w in blend['raptor_arms'])
     names = [a for a, _ in arms]
     require(names and 'old320' in names and names == [x for x in BLEND_ARM_NAMES if x in names], 'BLEND_ARM_ORDER')
@@ -300,19 +337,49 @@ def blend_arm_names(blend=None):
     return [a for a, _ in resolve_blend(blend)[0]]
 
 
+def resolve_compact(blend=None):
+    """(compact arms with weights, flip TTA) from the sealed cfg['blend']; absent keys are P2's rank(R6 flip)."""
+    resolve_blend(blend)
+    if blend is None or 'compact_arms' not in blend:
+        return DEFAULT_COMPACT, DEFAULT_COMPACT_FLIP
+    arms = tuple((str(a), float(w)) for a, w in blend['compact_arms'])
+    names = [a for a, _ in arms]
+    require(names and names[0] == 'r6' and names == [x for x in COMPACT_ARM_NAMES if x in names], 'COMPACT_ARM_ORDER')
+    require(all(0.0 < w <= 1.0 for _, w in arms) and abs(sum(w for _, w in arms) - 1.0) <= 1e-12, 'COMPACT_ARM_WEIGHTS_SUM_TO_ONE')
+    require(isinstance(blend['compact_flip'], bool), 'COMPACT_FLIP_FLAG')
+    return arms, blend['compact_flip']
+
+
+def compact_shared(blend=None):
+    """P6s: R7 scored inside the R6 plain worker on the same rendered windows (one decode); requires the r6+r7 plain pair."""
+    if blend is None or not blend.get('compact_shared'):
+        return False
+    require(blend['compact_shared'] is True and compact_arm_names(blend) == ['r6', 'r7'] and resolve_compact(blend)[1] is False,
+            'COMPACT_SHARED_NEEDS_R6_R7_PLAIN')
+    return True
+
+
+def compact_arm_names(blend=None):
+    """Compact arm names enabled by the sealed blend, in stage order (['r6'] unless a variant seals more)."""
+    return [a for a, _ in resolve_compact(blend)[0]]
+
+
 def recover_arms(arrays, missing, blend=None, *, fatal_errors=()):
     """Complete-population recovery for sealed variants (A-prime's fill/rank rules on any subset of the Raptor arms).
 
     Per arm: genuine rows only, global genuine mean for classified data-local rows (R6 values and mean at '%.9g'), union cap
     floor(3% N), complete-population average percentile ranks (R224 through the public float32 CSV round trip), raptor slot =
-    sum of arm weights * ranks in stage order, then w_f * slot + (1 - w_f) * rank(R6) per finding.
+    sum of arm weights * ranks in stage order, then w_f * slot + (1 - w_f) * compact slot per finding, where the compact slot
+    is rank(R6) by default or, for a sealed compact_arms list (P6), the weighted sum of the compact arms' ranks (each '%.9g').
     """
     import numpy as np
     import pandas as pd
     from knee.public_ws2_recovery import quantize9, source224_csv_values
     require(not fatal_errors, 'FATAL_ERRORS_REQUIRE_ABORT')
     arms = resolve_blend(blend)[0]
-    names = [a for a, _ in arms] + ['r6']
+    compact = resolve_compact(blend)[0]
+    compact_names = [a for a, _ in compact]
+    names = [a for a, _ in arms] + compact_names
     src = {a: np.asarray(arrays[a]) for a in names}
     msk = {a: np.asarray(missing[a]) for a in names}
     n = len(src['r6'])
@@ -326,10 +393,10 @@ def recover_arms(arrays, missing, blend=None, *, fatal_errors=()):
         genuine = np.asarray(src[a][~msk[a]], dtype=np.float64)
         require(len(genuine) > 0, 'GENUINE_SUCCESS_REQUIRED_' + a)
         require(np.isfinite(genuine).all() and ((genuine >= 0) & (genuine <= 1)).all(), 'GENUINE_PROBABILITIES_' + a)
-        if a == 'r6':
+        if a in compact_names:
             genuine = quantize9(genuine)
         mean = genuine.mean(axis=0, dtype=np.float64)
-        if a == 'r6':
+        if a in compact_names:
             mean = quantize9(mean[None])[0]
         filled = np.empty((n, 12), dtype=np.float64)
         filled[~msk[a]], filled[msk[a]] = genuine, mean
@@ -340,20 +407,30 @@ def recover_arms(arrays, missing, blend=None, *, fatal_errors=()):
     for a, weight in arms:
         term = weight * ranks[a]
         slot = term if slot is None else slot + term
+    if compact == DEFAULT_COMPACT:
+        cslot = ranks['r6']
+    else:
+        cslot = None
+        for a, weight in compact:
+            term = weight * ranks[a]
+            cslot = term if cslot is None else cslot + term
     w = np.asarray(raptor_weight_vector(blend=blend), dtype=np.float64)
     out = np.empty_like(slot)
     for j in range(len(LABELS)):
-        out[:, j] = w[j] * slot[:, j] + (1.0 - w[j]) * ranks['r6'][:, j]
+        out[:, j] = w[j] * slot[:, j] + (1.0 - w[j]) * cslot[:, j]
     require(np.isfinite(out).all() and ((out >= 0) & (out <= 1)).all(), 'BLEND_UNIT_INTERVAL')
+    extra = {} if compact == DEFAULT_COMPACT else {'compact_slot': cslot, 'compact_weights': dict(compact)}
     return {'recipe': VERSION, 'frozen_fill_rank_recipe': 'A-prime fill/rank rules on the sealed arm set', 'population': n, 'cap': cap,
             'union_recovered': union, 'means': means, 'statuses': statuses, 'ranks': ranks, 'raptor_slot': slot, 'blend': out,
-            'raptor_weights': dict(zip(LABELS, w.tolist())), 'precision': {a: PRECISION[a] for a in names}}
+            'raptor_weights': dict(zip(LABELS, w.tolist())), 'precision': {a: PRECISION[a] for a in names}, **extra}
 
 
 def recover_guarded(arrays, statuses, raptor_arms=None, blend=None):
     """A-prime recovery when every arm is complete (genuine or data-local within the cap); otherwise the public
     fallback: each arm ranked over its own available rows, a Raptor arm missing takes the other Raptor arms' rank
     (weights renormalized), the compact arm missing takes the Raptor half and vice versa, nothing at all gives 0.5.
+    With sealed compact_arms (P6) a compact arm missing takes the other compact arms' rank the same way (a study the guard
+    cut from R7 gets rank(R6) as its compact slot).
 
     arrays: {arm: [n, 12] probabilities}; statuses: {arm: [n] of STATUSES}. Never raises on missing work.
     The Raptor arms and per-finding weights come from the sealed cfg['blend'] (None: the frozen default); an explicit
@@ -362,7 +439,9 @@ def recover_guarded(arrays, statuses, raptor_arms=None, blend=None):
     import numpy as np
     import pandas as pd
     arms = tuple(tuple(x) for x in raptor_arms) if raptor_arms is not None else resolve_blend(blend)[0]
-    names = [a for a, _ in arms] + ['r6']
+    compact = resolve_compact(blend)[0]
+    compact_names = [a for a, _ in compact]
+    names = [a for a, _ in arms] + compact_names
     n = len(statuses['r6'])
     st = {a: np.asarray(statuses[a]) for a in names}
     require(all(len(st[a]) == n and set(st[a].tolist()) <= set(STATUSES) for a in names) and n > 0, 'GUARDED_STATUS_SCHEMA')
@@ -370,7 +449,7 @@ def recover_guarded(arrays, statuses, raptor_arms=None, blend=None):
     data_local = {a: st[a] == 'data_local_failure' for a in names}
     cap = math.floor(3 * n / 100)
     union = np.logical_or.reduce([data_local[a] for a in names])
-    frozen = arms == RAPTOR_ARMS
+    frozen = arms == RAPTOR_ARMS and compact == DEFAULT_COMPACT
     complete = not any(u.any() for u in unavailable.values()) and int(union.sum()) <= cap
     if complete and (frozen or raptor_arms is None):
         if frozen:
@@ -390,7 +469,7 @@ def recover_guarded(arrays, statuses, raptor_arms=None, blend=None):
         r = np.full((n, 12), np.nan)
         if ok[a].any():
             v = np.asarray(arrays[a], dtype=np.float64)[ok[a]]
-            v = quantize9(v) if a == 'r6' else source224_csv_values(v) if a == 'crop224' else v
+            v = quantize9(v) if a in compact_names else source224_csv_values(v) if a == 'crop224' else v
             r[ok[a]] = pd.DataFrame(v).rank(method='average', pct=True).to_numpy()
         ranks[a] = r
     num = np.zeros((n, 12))
@@ -401,8 +480,24 @@ def recover_guarded(arrays, statuses, raptor_arms=None, blend=None):
         den += np.where(m, weight, 0.)
     have_raptor = den[:, 0] > 0
     rr = np.where(have_raptor[:, None], num / np.where(den > 0, den, 1.), np.nan)
-    ro = ranks['r6']
-    have_r6 = ok['r6']
+    if compact == DEFAULT_COMPACT:
+        ro = ranks['r6']
+        have_r6 = ok['r6']
+        extra = {}
+    else:
+        cnum = np.zeros((n, 12))
+        cden = np.zeros((n, 1))
+        for a, weight in compact:
+            m = ok[a][:, None]
+            cnum += np.where(m, weight * np.nan_to_num(ranks[a]), 0.)
+            cden += np.where(m, weight, 0.)
+        have_r6 = cden[:, 0] > 0                  # "r6" here means any compact arm (fallback count keys kept)
+        ro = np.where(have_r6[:, None], cnum / np.where(cden > 0, cden, 1.), np.nan)
+        partial = have_r6 & ~np.logical_and.reduce([ok[a] for a in compact_names])
+        extra = {'compact_slot': ro, 'compact_weights': dict(compact),
+                 'compact_fallback': {'partial_compact': int(partial.sum()),
+                                      **{'%s_only' % a: int((ok[a] & ~np.logical_or.reduce([ok[b] for b in compact_names if b != a]))
+                                                            .sum()) for a in compact_names}}}
     out = np.where(have_raptor[:, None] & have_r6[:, None], w * rr + (1. - w) * ro,
                    np.where(have_raptor[:, None], rr, np.where(have_r6[:, None], ro, .5)))
     require(np.isfinite(out).all() and ((out >= 0) & (out <= 1)).all(), 'BLEND_UNIT_INTERVAL')
@@ -416,12 +511,15 @@ def recover_guarded(arrays, statuses, raptor_arms=None, blend=None):
             'data_local_by_arm': {a: int(data_local[a].sum()) for a in names},
             'means': {}, 'statuses': {a: st[a].tolist() for a in names}, 'ranks': ranks, 'raptor_slot': rr, 'blend': out,
             'raptor_weights': dict(zip(LABELS, w.tolist())), 'precision': {a: PRECISION[a] for a in names},
-            'frozen_fill_rank_recipe': 'public per-model available-row ranks'}
+            'frozen_fill_rank_recipe': 'public per-model available-row ranks', **extra}
 
 
 def guarded_receipt(rec):
     import numpy as np
     keep = {k: rec.get(k) for k in ('recipe', 'mode', 'population', 'cap', 'union_recovered', 'fallback_studies', 'fallback',
                                     'unavailable_by_arm', 'data_local_by_arm', 'raptor_weights')}
+    for k in ('compact_weights', 'compact_fallback'):         # P6 only; absent keys keep the P2-P5 receipts unchanged
+        if k in rec:
+            keep[k] = rec[k]
     keep['blend_sha256'] = hashlib.sha256(np.ascontiguousarray(rec['blend']).tobytes()).hexdigest()
     return keep

@@ -46,7 +46,10 @@ V2_COLUMNS = ['Lateral OA', 'PF OA', 'Synovitis', "Baker's"]
 
 class VariantTableTests(unittest.TestCase):
     def test_variants_match_the_spec(self):
-        self.assertEqual(sorted(R6F.VARIANTS), ['p3', 'p4', 'p5'])
+        self.assertEqual(sorted(R6F.VARIANTS), ['p3', 'p4', 'p5', 'p6', 'p6p', 'p6s', 'p6sp', 'p7'])      # p6*: tests/test_public_r6flip_p6.py
+        self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p7'])[0], R6F.RAPTOR_ARMS)        # P2's Raptor half, compact = S6 seeds
+        self.assertEqual(R6F.raptor_weight_vector(blend=R6F.VARIANTS['p7']), R6F.raptor_weight_vector())
+        self.assertEqual(R6F.COMPACT_VARIANTS, {'p7': 's6c'})
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p3'])[0], (('old320', .52), ('crop224', .28), ('nafull', .2)))
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p4'])[0], R6F.resolve_blend(R6F.VARIANTS['p3'])[0])
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p5'])[0], (('old320', .65), ('nafull', .35)))
@@ -81,7 +84,7 @@ class VariantTableTests(unittest.TestCase):
 
 @unittest.skipIf(np is None or pd is None, 'numpy/pandas not installed')
 class BlendArithmeticTests(unittest.TestCase):
-    def data(self, n=40, seed=0, arms=('old320', 'r6', 'crop224', 'nafull')):
+    def data(self, n=40, seed=0, arms=('old320', 'r6', 'crop224', 'nafull', 'r7')):
         rng = np.random.default_rng(seed)
         return {a: rng.random((n, 12)) for a in arms}
 
@@ -91,7 +94,7 @@ class BlendArithmeticTests(unittest.TestCase):
         pct = lambda v: pd.DataFrame(np.asarray(v, dtype=np.float64)).rank(method='average', pct=True).to_numpy()
         arms, weights, default = R6F.resolve_blend(blend)
         slot = sum(w * pct(source224_csv_values(arrays[a]) if a == 'crop224' else arrays[a]) for a, w in arms)
-        r6 = pct(quantize9(arrays['r6']))
+        r6 = sum(w * pct(quantize9(arrays[a])) for a, w in R6F.resolve_compact(blend)[0])
         out = np.empty_like(slot)
         for j, name in enumerate(R6F.LABELS):
             w = weights.get(name, default)
@@ -127,10 +130,12 @@ class BlendArithmeticTests(unittest.TestCase):
     def test_each_variants_arms_and_weights_reach_the_blend(self):
         for variant, blend in R6F.VARIANTS.items():
             arrays = self.data()
-            names = R6F.blend_arm_names(blend) + ['r6']
+            names = R6F.blend_arm_names(blend) + R6F.compact_arm_names(blend)
             statuses = {a: ['genuine'] * 40 for a in names}
             rec = R6F.recover_guarded({a: arrays[a] for a in names}, statuses, blend=blend)
-            self.assertEqual((rec['mode'], rec['fallback_studies']), ('variant_complete_population', 0), variant)
+            arms, compact = R6F.resolve_blend(blend)[0], R6F.resolve_compact(blend)[0]      # frozen = P2's arms and compact slot
+            mode = 'aprime_complete_population' if (arms, compact) == (R6F.RAPTOR_ARMS, R6F.DEFAULT_COMPACT) else 'variant_complete_population'
+            self.assertEqual((rec['mode'], rec['fallback_studies']), (mode, 0), variant)
             self.assertTrue(np.allclose(rec['blend'], self.expected(arrays, blend), rtol=0, atol=1e-12), variant)
             self.assertEqual(rec['raptor_weights'], dict(zip(R6F.LABELS, R6F.raptor_weight_vector(blend=blend))))
             self.assertEqual(sorted(rec['ranks']), sorted(names))
@@ -405,7 +410,7 @@ class VariantPacketTests(unittest.TestCase):
         from scripts import build_r6flip_entry as B
         cls.B = B
         cls.default = B.packet('rehearsal')
-        cls.packs = {v: B.packet('rehearsal', variant=v) for v in R6F.VARIANTS}
+        cls.packs = {v: B.packet('rehearsal', variant=v) for v in R6F.VARIANTS if v not in R6F.COMPACT_VARIANTS}   # p7: test_public_s6c
 
     def test_default_build_has_no_variant_artifacts(self):
         cfg = self.default['cfg']
@@ -425,24 +430,30 @@ class VariantPacketTests(unittest.TestCase):
     def test_default_payload_differs_from_a_variant_only_by_variant_content(self):
         """Everything shipped for the default except the variant additions is shared by the variants."""
         for variant, pack in self.packs.items():
+            nafull, r7 = 'nafull' in R6F.blend_arm_names(R6F.VARIANTS[variant]), self.B.has_r7(variant)
             self.assertEqual(pack['codecs'], self.default['codecs'])
             for name, text in self.default['sources'].items():
                 self.assertEqual(pack['sources'][name], text, name)
             extra = set(pack['sources']) - set(self.default['sources'])
-            self.assertEqual(extra, set(self.B.NAFULL_SOURCES))
+            self.assertEqual(extra, set(self.B.NAFULL_SOURCES if nafull else ()) | set(self.B.R7_SOURCES if r7 else ()))
             for key, value in self.default['cfg'].items():
                 if key != 'r6flip_binding':
                     self.assertEqual(pack['cfg'][key], value, key)
-            self.assertEqual(set(pack['cfg']) - set(self.default['cfg']), {'blend', 'nafull'})
+            self.assertEqual(set(pack['cfg']) - set(self.default['cfg']),
+                             {'blend', *(['nafull'] if nafull else []), *(['r7_reference'] if r7 else []),
+                              *(['p6_reference'] if R6F.compact_shared(R6F.VARIANTS[variant]) else [])})
 
     def test_variant_slugs_metadata_and_blend_are_sealed(self):
         for variant, pack in self.packs.items():
             self.assertEqual(pack['cfg']['blend'], R6F.VARIANTS[variant])
             self.assertEqual(pack['cfg']['r6flip_binding']['raptor_weight_vector'], R6F.raptor_weight_vector(blend=R6F.VARIANTS[variant]))
             self.assertEqual(pack['cfg']['r6flip_binding']['entry_variant']['name'], variant)
+            date = {'p6': '20261019', 'p6p': '20261019', 'p6s': '20261020', 'p6sp': '20261020'}.get(variant, '20261018')
             slug = self.B.slug_for(variant, 'rehearsal')
-            self.assertEqual(slug, 'r6flip-%s-rehearsal-20261018' % variant)
-            self.assertEqual(self.B.slug_for(variant, 'entry'), 'r6flip-%s-entry-20261018' % variant)
+            self.assertEqual(slug, 'r6flip-%s-rehearsal-%s' % (variant, date))
+            self.assertEqual(self.B.slug_for(variant, 'entry'), 'r6flip-%s-entry-%s' % (variant, date))
+            if 'nafull' not in R6F.blend_arm_names(R6F.VARIANTS[variant]):
+                continue                                   # p6/p6p: dual compact, no na-full (tests/test_public_r6flip_p6.py)
             meta = self.B.metadata(slug, variant)
             self.assertEqual((meta['id'], meta['title']), ('ozgung/' + slug, slug))
             self.assertNotIn('timeout', meta)

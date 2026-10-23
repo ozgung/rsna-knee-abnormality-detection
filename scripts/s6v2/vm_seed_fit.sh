@@ -1,0 +1,34 @@
+#!/bin/bash
+# Lane C (Oct 19): one all-data S6 fit (V2-all recipe: 16 epochs, every pool study) for <tag> <seed> <targets csv>, then a
+# private Kaggle export of the model with SHA256SUMS + run_config + membership + partial preds.  The preflight on the
+# targets must already have passed (vm_seed_boot.sh runs it once).  Seed overrides vm_train.sh's --seed-base 42 (argparse:
+# last value wins).  Kill rule: epoch-0 loss > 0.55 (V2-all 0.5106) stops the fit.  Resumable (rerun = --resume).
+set -euo pipefail
+TAG=$1; SEED=$2; TG=$3
+OUT=/content/runs/${TAG}_s${SEED}; mkdir -p $OUT
+LOG=/content/runs/${TAG}_s${SEED}.log
+S6V2_ALL_DATA=1 S6V2_LOADER_WORKERS=${S6V2_LOADER_WORKERS:-5} bash /content/vm_train.sh V2 "$TG" $OUT --only-folds 0 --seed-base $SEED \
+  >> $LOG 2>&1 &
+TP=$!
+# epoch-0 kill rule watcher
+while kill -0 $TP 2>/dev/null; do
+  l=$(grep -oE "seed $SEED fold 0 epoch 0 loss [0-9.]+" $LOG | tail -1 | awk '{print $NF}' || true)
+  if [ -n "$l" ]; then
+    if python3 -c "import sys; sys.exit(0 if float('$l') > 0.55 else 1)"; then echo "KILL epoch0 loss $l > 0.55"; kill $TP; exit 3; fi
+    echo "epoch0 loss $l ok"; break
+  fi
+  sleep 60
+done
+wait $TP
+M=$OUT/models/E_prior_s${SEED}_f0.pt
+[ -s $M ] || { echo "FIT_FAIL no model"; exit 1; }
+D=/content/export_${TAG}_s${SEED}; mkdir -p $D
+cp $M $D/E_prior_s${SEED}_${TAG}all.pt
+cp $OUT/run_config.json $OUT/membership_E_prior_s${SEED}_f0.json $OUT/partial_preds_E_prior_s${SEED}.json $D/
+(cd $D && sha256sum E_prior_s${SEED}_${TAG}all.pt run_config.json membership_E_prior_s${SEED}_f0.json partial_preds_E_prior_s${SEED}.json > SHA256SUMS)
+# private Kaggle Model ozgung/knee-s6-lanec-seeds-20261019, variation <tag>-s<seed> (private dataset quota is exhausted)
+for i in 1 2 3; do
+  v=$(bash /content/vm_kmodel.sh knee-s6-lanec-seeds-20261019 ${TAG}-s${SEED} $D E_prior_s${SEED}_${TAG}all.pt "export") && { echo "EXPORT_DONE ozgung/knee-s6-lanec-seeds-20261019/pyTorch/${TAG}-s${SEED}/$v"; exit 0; }
+  sleep 120
+done
+echo "EXPORT_FAIL"; exit 4

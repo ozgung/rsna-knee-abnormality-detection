@@ -4105,15 +4105,152 @@ New facts kept:
   - p5 rehearsal → entry p5 (bg b5pvtefyj).
 - Old sealed P2 packets no longer replay under the new builder (bound to source revisions). That is fine: P2 is already scored (0.958).
 
-### 2026-10-18 ~17:30 UTC — Claude (cloud session, branch `claude/brave-mayer-jlszoe`): scan revised on the live branch
-- Merged `codex/token-efficient-instructions` (30874f5) into the cloud branch; the stale STATUS edits from the first scan are dropped (theirs kept).
-- `docs/experiments/20261018-public-notebook-scan.md` rewritten from "we are at 0.950" to the actual position: R6F-pure v2 0.958, A′-w 0.957. New section compares our R6F-pure v2 with the public 0.958 notebooks knob by knob (Raptor ports, v1 vs V2 weights, 224 mirror, extra members, failure policy) with the public evidence for each.
-- Recommendations: P4 takes heliosli's V2 map verbatim (free, the only knob the public board was tuned on); P3/P5 keep na-full as the unique Raptor-half member (closest public precedent: the 224 checkpoint at 0.35, neutral display, better rank); no slot for the 224 mirror, the 1/10 reader, S6 beside R6 or Gold-58 refits. Final rule of the strategy revision unchanged.
-- STATUS snapshot leaderboard line refreshed. Documentation only; no code, GPU, submission or final-selection change.
+### 2026-10-18 20:45 UTC: Claude (solo), P3 and P5 submitted
+- Both rehearsals PASS except the projection. P3: point 30,770 s, conservative 40,892 s. P5: point 28,913 s, conservative 38,807 s. The gate is 29,880 s. Projection-only waivers are at `outputs/kaggle/r6flip-waiver-{p3,p5}-20261018.json`.
+- P3's point estimate is above the T0 + 8.3 h guard, so na-full may cover only part of the studies in P3 and P4. P5 is just under the guard.
+- Entry visible runs: receipt PASS, `fallback_studies` 0, pulled code identical to the sealed notebook.
+- Submissions: **P3 57366765** (19:36 UTC), **P5 57368388** (20:41 UTC).
+- P4 is next in the p3 chain (bg bd0hvzl15): build, visible run, then auto-submit.
+- 20:59 UTC: **P4 submitted as 57368819.** Its visible run passed (receipt PASS, `fallback_studies` 0, code identical). Both chains have finished. All three variants are waiting on hidden scoring; there are no local jobs left.
 
+### 2026-10-19 16:15 UTC: Claude (solo), P3/P4/P5 scored 0.957
+- P3 57366765, P4 57368819 and P5 57368388 all scored **0.957 public**: none beat P2 57340072 (0.958). The na-full arm, the V2 per-finding weights and dropping crop224 gave no displayed gain. The 0.001 gap is inside the public SD of about 0.003, so this is not evidence of harm. Whether the guard cut na-full in hidden runs is unknown.
+- Full leaderboard (`outputs/analysis/lb-20261019/`): 6,218 teams. 0.958 is shared by 1,259 teams (ranks 186–1,444); 64 teams are at 0.959. The bronze line (about rank 622) falls inside the 0.958 block, so the private result depends on unrounded scores.
+- Finals stand: P2 57340072 (0.958) and A′-w 57324282 (0.957). No selection action yet; Oct 21 remains the plan.
 
+### 2026-10-19 16:40 UTC: Claude (solo), public scan for 0.959
+No public notebook or discussion claims 0.959; the 64 teams there have no published recipe. Versia-7's latest version reproduces goodpjw2008 v27, which was already known. The only public knobs left that P2 lacks are the R224 mirror and the end-stage MIL leg at small per-target weights. [Scan](research/public-scan-20261019.md).
+
+### 2026-10-19 17:45 UTC: Claude (solo), final push launched
+- The Fable max plan was accepted ([plan](research/final-push-plan-20261019.md)). The user approved using all compute concurrently and Lane D (fastMRI student). Lanes A–D are running as subagents in `.claude/worktrees/lane{a,b,c,d}-20261019`.
+- STATUS.md was rewritten as a compact snapshot. The old one is archived at `docs/status-archive/status-before-20261019-final-push.md`.
+
+### 2026-10-19 21:15 UTC: Claude (solo), Lane A stopped at the kill rule
+- P6 rehearsal `ozgung/r6flip-p6-rehearsal-20261019` v1: FAIL_PROJECTION_ONLY. The point estimate is 32,085 s (conservative 43,710 s). The P6′ replay without R224 gives 29,832 s. Both exceed the plan's 26,000 s limit, so no entry was built and no slot was used.
+- R6 plain costs about 70 % of R6 flip, not 50 %, because decoding dominates. The dual compact vs R6 flip has Spearman 0.990, and the P6 blend vs the P2 blend 0.994 (39 rehearsal studies), which is too close to P2 to be worth much as final 2.
+- Code merged (0c49b21): `p6`/`p6p` variants, `knee/public_r7_profile.py`, 22 new tests. 49 r6flip tests and smoke pass after the merge.
+- Final 2 now falls to P7′ (Lane C) or A′-w under the selection rule.
+
+### 2026-10-19 22:30 UTC: Claude (solo), Lane B done; P6 reopened as shared-decode P6s
+- Lane B (merged e483f37): fold mapping confirmed in 8 of 8 folds. On 4,349 held-out studies, dual − R6 flip = **+0.0029 [+0.0019, +0.0039]**, with the dual winning in all folds, so the final-1 out-of-fold rule is met. The caveat is that these are single-model columns; on gold-58 with four models averaged, the difference is −0.0022 (wide CI). Labels v3 is READY, and Lane C picks it up. Colab burn is 5.3 units per A100-h; the balance was about 499 at 22:09.
+- P6 failed only on runtime, and decoding dominates that cost. Lane A is reopened to build **P6s**, which decodes each study once and feeds both R6 plain and R7 plain. Pre-registered gate: point ≤ 26,000 s (else P6s′ without R224 if ≤ 29,000 s). No submission after Oct 21 18:00.
+
+### 2026-10-20 00:25 UTC: Claude (solo), P6s′ submitted (57414571)
+- With shared decode, R6 plain and R7 plain run on windows rendered once: 592 s production against 374 + 375 s run separately.
+  - P6s point is 27,183 s, inside the 26,000–29,000 s band, so P6s′ (no R224) was built: point 25,507 s, conservative 34,840 s.
+  - Parity for the shared pass: R6 6.2e-4 and R7 3.1e-4 (tolerance 1e-3).
+- Entry `ozgung/r6flip-p6sp-entry-20261020` v1: visible PASS, `fallback_studies` 0, code identical. **Submitted as 57414571** at 00:17 UTC under the projection-only waiver.
+- Risk: at P2's hidden-to-projected ratio of about 1.17, the hidden run lands near the guard, so the last studies may take R6-plain compact ranks. Dropping R224 costs an estimated 0.0003–0.0005.
+- Merged as 14f85a6; R6F tests and smoke pass.
+- Selection: P6s′ challenges P2 for final 1 only if it displays ≥ 0.958 (it holds the out-of-fold win); otherwise it is the final-2 candidate if it displays ≥ 0.957.
+
+### 2026-10-20 08:45 UTC: Claude (solo), P6s′ 0.957; fastMRI student solo 0.954; P7′ amended
+- **P6s′ 57414571 = 0.957 public.** It holds the out-of-fold win but displays below 0.958, so P2 stays final 1. P6s′ is now the final-2 candidate.
+- **Lane D done** (merged 8f21dca). A third concurrent Colab session worked, and every gate passed. The student is S6 on labels v3 plus 745 fastMRI exams, labelled with P2-teacher ranks mapped onto the labels-v3 distribution (a deviation from the plan, decided before any result). Gold-58 0.9350 (exposed; V2-all scored 0.9341 on the same path). **Solo 57426580 = 0.954**, against 0.950 for the S6 solos; the gap is about one public SD.
+- I scanned the Lane D diff for fastMRI links and file names before merging: none found.
+- **P7′ amendment** (decided blind to any v3 read-out): the compact is now the equal-weight mean rank of {v3-s42, v3-s43, student}. Lane C has been told.
+
+### 2026-10-20 09:05 UTC: Claude (solo), Oct 20 provenance recheck, not adverse
+The rules body is unchanged. New Kaggle staff reply in 747455 (Oct 19 22:46): no legal interpretation of third-party terms, no per-dataset or per-weight pre-approval, teams are responsible. The per-asset threads are still unanswered. The override is not triggered and the selection rule stands. [Note](research/provenance-refresh-20261020.md).
+
+### 2026-10-20 ~10:00 UTC: Claude (solo), user approved the T4-label shim for the Lane D2 teacher
+- P2's sealed teacher workers only run on a GPU named "Tesla T4". On an A100, the shim reports the device as a T4, so fp16 is used and TF32 is off. Its parity on 24 exams: R384 3.2e-4 and R224 4.9e-4 max |Δp|, Spearman ≥ 0.999.
+- The user chose "Allow the T4 shim" (AskUserQuestion). Scope: fastMRI teacher targets in Lane D2 only. It is never in an entry, a packet or committed runtime code. Each arm needs parity within 1e-3 / 0.999 before its full run.
+
+### 2026-10-20 10:20 UTC: Claude (solo), Lane D2 dropped
+The Lane D2 agent's permission policy refused the T4 shim even with the user's approval relayed, because it accepts only direct user messages. The parent did not run the refused action itself. The VM is stopped and nothing was produced. Asked for a recommendation, I chose to drop D2: small final-2 value, a risk of further refusals, and contention for Lane C's Kaggle slots. Student 1 stays in P7′.
+
+### 2026-10-20 15:40 UTC: Claude (solo), all lanes finished; final-2 evidence
+- Lane C done and merged (e46a68d resolves its controller conflict with Lane A's P6s: both variant sets kept, the arm-name list in `arm_table` renamed, the frozen-mode test uses P2's compact; 469 public-entry tests OK, bare suite unchanged at the 22 optional-dependency errors, smoke passes; ed801d0 brings the final note). **C1 solo 57432734 = 0.955; P7′ 57432784 = 0.955.** All VMs are stopped.
+- Final-2 table on the 39 rehearsal studies: ρ(P6s′, P2) = 0.991, ρ(P7′, P2) = 0.967. E[max] gain is zero for every candidate. [Evidence](experiments/final-selection-20261020.md).
+- Recommendation: final 1 = P2; final 2 = P7′ as the all-ours-compact hedge, which deviates from rule 2 (P6s′). The user decides on Oct 21.
+- 15:45 UTC, user: final 2 will be decided on Oct 21 (options P7′ hedge, P6s′ by rule, A′-w); Claude sets both final-selection checkboxes once chosen. No checkbox has been touched yet.
+
+### 2026-10-20 15:25 UTC: Claude (solo), what 0.960 requires; P9 proposed
+- User question: several public 0.958 notebooks exist, 0.959 is silver and 0.965 gold; what does reaching 0.960 take given what we have learned? Assessment: [silver-gap-assessment-20261020.md](research/silver-gap-assessment-20261020.md). Board at 15:06: 6,270 teams; 211 teams at ≥ 0.959, all private recipes; the 0.958 block is 1,387 teams (ranks 212–1,598); silver ≈ 314, bronze ≈ 627.
+- Findings: the public lineage ends at 0.958 (60 score-sorted and 80 recent kernels, 168 topics checked; nothing new since Oct 19). The top teams train own models on image-informed, iterated pseudo-labels without external data (azamat1ch, colum2131; rank 1 is efficiency rank 3). hengck23's thread adds LLM abstention, agreement filtering and definite negatives. Our one image-teacher round (labels v3) gave the project's largest own step, 0.950 → 0.955 solo, and our 3-member compact is now R6-class on gold-58 and less correlated with R6 than R7 is.
+- Proposal (needs the user's go): **P9** = P2 with the compact slot ½ rank(R6) + ½ rank(own S6 members), own stage last under the guard. Runtime forces R6 plain and no R224 unless a shared decode (384 + 320 px renders from one DICOM read) is built. Expected +0.001 to +0.003 true; P(display ≥ 0.959) 0.35–0.45. Optional parallel bet: labels v4 with out-of-fold own teachers, P(scored by Oct 22 10:00) ≈ 0.3. Nothing was launched.
+
+### 2026-10-20 15:55 UTC: Claude (solo), user go on P9 and labels v4; lanes launched
+- User: "yes do 1 and 2"; any paid model may be used for labels. Asked whether video models or image-sequence inputs help labels: answered no for this round (zero-shot VLM reads sit far below our 0.93-class image teachers; video backbones carry no knee prior; the useful image signal is out-of-fold predictions of our own models, which labels v4 uses). Hosted-LLM use on report text is explicitly permitted by the host (thread 733965, captured under `outputs/research/public-scan-20261020/disc-733965.txt`).
+- Lane P9 (worktree `lanep9-20261020`) and Lane L4 (`lanel4-20261020`) launched 15:50 with the briefs summarised in STATUS. Selection amendment proposed in the assessment §3.1: P9 ≥ 0.959 with gates passed → final 1 = P9, final 2 = P2; P9 = 0.958 → final 2 = P9; else the existing rule.
+
+### 2026-10-20 16:20 UTC: Claude (solo), ambitious plan: Lane F added (two pseudo-label rounds)
+- User: implementation estimates were too conservative; asked for a more ambitious plan. Answer: the constraint is wall-clock per fit, not compute; fits parallelise across Colab sessions. Lane F (worktree `lanef-20261020`) now runs one fit per session on as many A100s as Colab allows: round-1 own out-of-fold teachers (four 12-epoch fold fits on labels v3), round-2 members on v4b, round-3 on v5 under a pre-registered OOF stop rule (+0.002, CI > 0). L4 keeps the label tables and two fit sessions; P9 was told to build the shared decode tonight, add flip TTA, and prepare an all-ours compact variant. Handoffs run through READY.json markers in the main checkout's outputs folders; the parent relays.
+
+### 2026-10-20 19:55 UTC: Claude (solo), P9 v1 submitted (57451284)
+- Lane P9 submitted `p9s` at 19:41: R384 half + compact ½ rank(R6 plain) + ½ rank(mean of v3-s43 and the fastMRI student), own members scored from a shared DICOM decode inside the R6 worker (parity 1e-16 against the separate path). Rehearsal point 24,870 s under the 27,000 s gate, all non-projection gates PASS, visible run fallback 0. The separate-stage build missed its gate by 1.7 % and was not submitted. Gold-58 of the P9 compact 0.9413 (one read, exposed). Spearman of the P9 blend against P2 is 0.985 on the 39 studies, more correlated than hoped because R6 plain is 0.996 of R6 flip.
+- Lane P9 also fixed a latent regression from Lane A's merge (an unconditional R7-profile import that broke any R6 build without the R7 sources) in afd75dd with a regression test. Member budget: up to four members at stride 1; each needs an A100 fp16 probe-36 reference, which Lanes L4 and F must produce with every export. Flip TTA on own members is off the table (no mirror augmentation in the S6 trainer).
+- Lane F: folds 0 and 1 running (epoch 0 losses 0.525 / 0.529), folds 2 and 3 next; own OOF columns expected ~22:30. Lane L4: labels v4a failed its gold rule (0.9124 vs v3 0.9254; LLM overrides pulled labels toward the text, away from the image teacher) and was dropped; v4b = v3 construction with the three-model OOF teacher at weight 0.5; seed 44 on v3 training since 18:13.
+
+### 2026-10-20 23:05 UTC: Claude (solo), round-1 OOF evidence; user: decide without asking; next-iteration decisions
+- Lane F interim (folds 0 and 1, 2,161 held-out studies): own S6 fold models 0.920 vs R6 flip 0.906 (+0.014 [+0.011, +0.017], 11 of 12 findings); gold-58 0.9385 vs 0.9368 (parity; R6 still better on PF OA, Synovitis, Lateral OA on gold). Part of the pooled margin is label-family alignment. Verdict: own compact is R6-class; ½/½ stays.
+- User: "don't stop for asking for my decisions. decide and go on yourself." Decisions recorded in STATUS ("Round-1 evidence and decisions"): P9 v2 member budget and w = 0.5; fold bundle exported as members; p10 and p11 built and given Oct 21 slots; slot plan; third A100 stays with L4 for fits; checkpoint-averaging test; no new architectures without more GPUs; amended selection rule.
+- Lane state: F folds 2/3 finishing (~22:30), READY then v4b seeds; L4 v3-s44 exported and accepted (dataset `ozgung/knee-s6-v3all-s44-20261020` v1), read-outs rerunning after two more VM losses, seed 45 resumed from epoch 1; P9 57451284 in its hidden run, variants p10/p11 being built.
+
+### 2026-10-20 23:20 UTC: Claude (solo), round 1 READY (four folds); mixing grid
+- Lane F wrote `oof_r1/READY.json` at 22:56: own 0.9201 vs R6 flip 0.9066 (+0.0135 [+0.0113, +0.0159]) on 4,345 pool studies; gold-58 four-fold mean 0.9394 vs 0.9368. Parent grid (own vs R6 flip rank mix): report truth favours w = 0.7–0.8 by +0.002 over ½ (biased toward own); gold-58 flat 0.5–0.8. Decision unchanged: P9 v2 at ½/½ (pre-registered), p10/p11 own-only compacts are supported. L4 told to build v4b now.
+
+### 2026-10-20 23:30 UTC: Claude (solo), labels v4b READY, round-2 fits started
+- L4 built v4b in under an hour from Lane F's columns: gold-58 0.9341 (v3 0.9254); proceed rule met. Lane F starts v4b seeds 42 and 43 (16 epochs) now; L4 takes seed 44 after its v3 seed 45. Fold-bundle exports and the averaging test run alongside.
+
+### 2026-10-20 23:50 UTC: Claude (solo), compositions sealed; P9 v2 chain started
+- Lane P9 reported its variants ready (p9s2 grid with w ∈ {0.5, 0.6, 0.7}, optional R224 and member stride 2; p10/p10p and p11 with mean-logit own compacts, up to 8 members; 146 tests OK). Parent sealed: P9 v2 = four members {v3-s43, student, v3-s44, v3-s42} at w 0.5, stride 1, no R224 (isolates the member effect against v1); P10 and P11 = {v3-s43, student, v4b-s42, v4b-s43, f0–f3}, sealed at 06:00 with fallbacks; evening variant pre-decided on P9 v1's display.
+
+### 2026-10-21 01:15 UTC: Claude (solo), P9 v1 = 0.955; own-member plateau
+- 57451284 displays 0.955 (hidden run about 5.3 h). Paired with P6s′ 0.957 (R7 plain in the same slot) it is −0.002; with P7′ = C1 = 0.955 the pattern is that any compact containing our S6 members displays 0.955 on the public set. The out-of-fold lead over R6 (+0.014, report truth) did not transfer; gold-58 parity was the honest estimate. P2 remains final 1.
+- Lane P9's member-cost figure was corrected (about 3,200 s of projected point per extra member at stride 1); the sealed four-member P9 v2 missed the point gate, so the pre-registered rule dropped the last member: P9 v2 = three members (student, v3-s43, v3-s44), rehearsal running, submission about 02:15. P10/P11 (8 members, separate worker) still fit and seal at 06:00. Added: a v4b-member solo probe (slot 4) to measure round 2 against C1 directly.
+
+### 2026-10-21 03:35 UTC: Claude (solo), v4b-s43 solo probe submitted (57463519)
+- Lane F exported the first round-2 member (v4b-s43, 16 epochs, all data; dataset `ozgung/knee-s6-v4ball-s43-20261020` v1) at 02:59; Lane P9 ran it through the C1 solo packet (rehearsal PASS, visible PASS, 0 fallbacks) and submitted 57463519 at 03:24. It measures labels v4b against C1's 0.955 directly; score expected ~06:30. P9 v2 (four members, stride 2) rehearsal finished 03:14, entry pending gates; P10/P11 seal at 06:00. Slots used Oct 21: 1 of 5.
+
+### 2026-10-21 04:05 UTC: Claude (solo), P9 v2 submitted (57464435)
+- Lane P9 submitted `p9s2s2` at 03:55: four own members (v3-s42, student, v3-s43, v3-s44) at eval stride 2 in the shared decode, w 0.5 with R6 plain, no R224. Rehearsal point 26,500 s (gate met), all non-projection gates PASS, visible fallback 0; stride-2 member probabilities differ from stride 1 by up to 0.12 (mean 0.044), an accepted operating-point change; small guard-trim risk for the last few percent of studies. Slots used Oct 21: 2 of 5; P10 and P11 seal at 06:00.
+
+### 2026-10-21 05:30 UTC: Claude (solo), v4b-s43 solo = 0.956
+- 57463519 displays 0.956 against C1's 0.955 (same packet, same seed, labels v4b instead of v3) and 0.950 for the labels-v2 solo. The round-2 step is +0.001 displayed, inside the public noise but in the expected direction; the own single-model line now reads 0.950 → 0.955 → 0.956 across label rounds. P10/P11 rehearsals v2 running; P9 v2 (57464435) pending.
+
+### 2026-10-21 07:20 UTC: Claude (solo), P11 submitted (57471109)
+- P11 = mean logit of eight own members (student, v4b-s42, v4b-s43, v3-s43, round-1 folds f0–f3), nothing else. Rehearsal v3 PASS on every gate including the conservative projection (point 17,925 s), visible fallback 0; hidden wall about 5.5 h. Two earlier rehearsal failures were operational and fixed: the 0.01 reference tolerance (amended to 0.02 with evidence) and a controller race on a deleted temp file (now skipped; it would have forced an early salvage in a hidden run). P10 v2 missed the point on a slow T4 pair, so `p10p` (R384 only + own-8) is being submitted instead as slot 4. Slots used Oct 21: 3 of 5.
+
+### 2026-10-21 07:50 UTC: Claude (solo), P10p submitted (57472040)
+- P10p = R384 half (v1 per-finding weights) + the same eight-member own compact as P11, no R224 (P10 with R224 missed the point gate at 28,165 s on a slow pair), no R6. Rehearsal point 22,168 s, conservative 30,285 s (standing projection-only waiver), all other gates PASS, visible fallback 0. P10p − P11 isolates the Raptor half on an own compact. Scores expected: P9 v2 ~12:30, P11 ~12:45, P10p ~14:45. One Oct 21 slot held for the evening.
+
+### 2026-10-21 07:55 UTC: Claude (solo), round 2 passed; round 3 (labels v5) started
+- oof_r2 READY: own_r2 0.9232 vs own_r1 0.9201 out of fold (+0.0030 [+0.0021, +0.0039]); gold-58 0.9398. Stop rule met, so L4 builds v5 (own r2 teacher) and F trains v5 seeds; last useful export Oct 22 02:00. Lane P9 idle with one Oct 21 slot held; four submissions pending scores (P9 v2, P11, P10p; v4b solo = 0.956).
+
+### 2026-10-21 11:35 UTC: Claude (solo, now Opus 5.5), usage-limit interruption; v5 built; Lane F resumed
+- Lanes F and L4 died at ~07:45 on the Fable usage limit; all Colab runtimes were lost by 10:00. Parent built labels v5 locally (gold-58 0.9351), resumed Lane F for v5 seeds 42/43 plus v4b-s45, and left L4 stopped. P9 v2 = 0.957. Members exported: v3-s43/44/45, student, v4b-s42/43/44, r1-f0..f3, r2-f0..f3. Pending scores: P11 (~12:45), P10p (~14:45). One Oct 21 slot left.
+
+### 2026-10-21 11:20 UTC: Claude (solo), last-submission cut-off moved to Oct 22 14:00 UTC
+- User decision. A 9 h hidden run started at 14:00 ends by 23:00, an hour before the deadline. Lane F's export deadline moves to 06:00 and its VM hard stop to 06:30, with extra v5 seeds filling the slots.
+- 11:25 UTC, user: final-selection lock moved from 22:00 to 23:00 UTC.
+
+### 2026-10-21 12:45 UTC: Claude (solo), P11 = 0.956; runtimes reclaimed during laptop sleep
+- P11 (own-only, eight members, mean logit) = 0.956: the same as the single v4b solo, below P9 v2 (0.957) and P2 (0.958). Ensembling own members does not lift the public display; the own line's gains come from label rounds (0.950 → 0.955 → 0.956).
+- All three Lane F A100s were reclaimed 12:00–12:24 while the laptop was closed, despite Pro+ and fresh tokens. Fits resume from backups (two A100s back, third retried every 5 min). Balance about 315 units.
+
+### 2026-10-21 12:55 UTC: Claude (solo), p12 for Oct 21's last slot
+- Reasoning: Raptor does not complement our members (P7′ 0.955 ≤ P11 0.956), but it does complement R6; R6 + own without Raptor is untested and is the best gold-58 column we have (0.941). Lane P9 resumed to build p12 (no Raptor; ½ R6 flip or plain + ½ own 6–8 members at stride 2, shared decode), target submission ~17:00, and to prepare v5-member versions of p12, p11 and p9s2s2 for Oct 22.
+
+### 2026-10-21 14:55 UTC: Claude (solo), P10p = 0.957
+- R384 half + eight own members = 0.957 vs own alone 0.956: Raptor adds ≤ 0.001 here. Three distinct compositions now display 0.957 (P9 v2, P10p, P6s′); none reaches P2's 0.958. p12 rehearsals in progress.
+
+### 2026-10-21 16:25 UTC: Claude (solo), Lane F final report; round 3 blocked by Colab
+- Rounds 1–2 exported; round 3 (v5 seeds) has no export: eleven Colab runtimes lost after 30–50 min since 11:15, plus three laptop sleeps. Supervisor keeps retrying (A100/G4/H100) until 06:30 with automatic resume and export. Parent started caffeinate for 15 h. p12 rehearsals are COMPLETE; Lane P9 told to finish the chain and submit today.
+
+### 2026-10-21 16:55 UTC: Claude (solo), P12 submitted (57490415)
+- `p12` = no Raptor, ½ rank(R6 plain) + ½ rank(own-8 mean logit) at stride 2 from the shared decode; point 22,895 s, all non-projection gates PASS, visible fallback 0, no guard-trim risk. The flip version (30,941 s) did not fit with ≥ 4 members. v5 variants (p12v5, p12fv5, p11v5, p9s2s2b) are sealed with empty member lists, waiting for v5 exports. Rehearsal outputs are ~10 GB because member checkpoints are copied into every pass; `outputs/lanep9-20261020/fetch_small.py` pulls the rest in under a minute.
+
+### 2026-10-21 21:50 UTC: Claude (solo), P12 = 0.950; v5 members arrived; Oct 22 wave 1 sealed
+- P12 (R6 plain + own-8, no Raptor) = 0.950 against own-8 alone 0.956: Raptor is essential beside R6. Sanity check of P12's column requested before reusing shared code.
+- Lane F's supervisor worked once Colab stabilised: v4b-s45 and v5 seeds 42, 43, 44, 46 exported (gold 0.931–0.939); three more v5 seeds training.
+- Wave 1 for Oct 22: E1 = R384 + R224 + own-6 (v5 ×4, v4b-s45, v4b-s43); E2 = P9 v2 structure with four v5 members. Rehearsals now, submissions right after 00:00 UTC.
+- 22:00 UTC: P12 sanity check (Lane P9): the column replays exactly as ½ rank(R6 plain) + ½ rank(own), no fallback, members finite and distinct; own half at stride 2 vs stride 1 Spearman 0.998. No defect; 0.950 is real. Wave 1 rehearsals being pushed.
+- 2026-10-21 22:05 UTC (Claude → Codex): Oct 22 re-plan (user: "evaluate the findings… use Kaggle or cheaper Colab GPU… last chance"). Slots 1–2 E1 `p10v5` / E2 `p9s2s2b` at 00:00 as sealed; slot 3 C1 `p13` = P2 exactly with compact ½ rank(R6 flip) + ½ rank(own-3: v4b-s43, v5-s44, v5-s43; stride 2 or 3 by the 27,000 s point gate); slot 4 C1 with own weight 0.65; slot 5 reactive by 12:00 (default S4 = E1 with own-8). Ties in display go to entries with own members, which leave the public 0.958 clone tie on the private board. Colab trimmed: no new seeds (STOP_NEW_SEEDS on lanef32/35), lanef37 (v5-s45, epoch 4) stopped, `vm/supervisor2.sh` with trimmed lists; v5-s47/s49 export ~23:00 then the G4s stop; ~160 units expected left. Remaining work on Kaggle. Details in STATUS "Oct 22 plan".
+- 2026-10-22 17:50 UTC (Claude → Codex): Final selection = S4 57504011 + P2 57340072, ticked by the user. Oct 22 scores: S4 0.958, E1 0.949 (probable hidden-run trim), C1 / C1 w0.65 0.957 (member-cut defect: members cut), p13nf 0.957 (fixed cut rule, members ran). Fable xhigh second opinion concurs (~80%). Public rank 501 / 6,394 thanks to S4's exact score (≈ +0.0008 over P2). No compute running. Post-deadline: private LB, archive lanes, integrate branches.
 ### 2026-10-23 — Claude (cloud session, branch `claude/modest-ritchie-5tm1qi`): postmortem
 - Competition closed Oct 22. User reports our final private score 0.942 (public 0.958).
 - Wrote `docs/postmortem/competition-review-20261023.html`: results journey, public→private shift, what worked/did not across the field, our own mistakes, research perspective, next-competition checklist. Sources: our docs plus TranBaDat2607, darcywjoseph, ppx16, A-b29, aditbytes write-ups.
-- Could not read Kaggle's official writeups or our submission list from the cloud container (api.kaggle.com blocked, www.kaggle.com internal API behind reCAPTCHA, legacy REST 401). The 1st place post is titled "Correct Data is All You Need"; a 3rd place post exists. Extend section 3 when pasted.
+- Kaggle pages are readable through headless Chromium (Playwright, `/opt/pw-browsers/chromium`); curl and WebFetch get only the shell. Read 12 write-ups (32nd, 33rd, 38th, 49th, 73rd, 74th, 77th, 102nd, 220th, 228th, 243rd, 507th, 671st) and the final private board (top 0.960, gold ~0.955, silver 0.943 at rank 321). Merged `codex/token-efficient-instructions` (final-week lanes and `docs/research/retrospective-20261023.md`) into this branch.
 - No code, data or model change. Nothing running.
