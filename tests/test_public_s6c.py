@@ -36,7 +36,7 @@ def models(labels='v2', seeds=(42, 43, 44)):
 
 class FrameTests(unittest.TestCase):
     def test_variant_is_p2s_raptor_half_with_a_compact_stage(self):
-        self.assertEqual(R6F.COMPACT_VARIANTS, {'p7': S6C.FOLDER})
+        self.assertEqual(R6F.COMPACT_VARIANTS['p7'], S6C.FOLDER)
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p7'])[0], R6F.RAPTOR_ARMS)
         self.assertEqual(R6F.raptor_weight_vector(blend=R6F.VARIANTS['p7']), R6F.raptor_weight_vector())
         self.assertEqual(ENTRY.S6C_ARM, S6C.FOLDER)
@@ -52,7 +52,7 @@ class FrameTests(unittest.TestCase):
         self.assertEqual(S6C.validate_models([dict(m, path='/kaggle/input/x/' + m['file']) for m in models()])[0], 'E_prior_s42_f0.pt')
         mixed = models() + models('v3', (45,))
         for bad, message in ((mixed, 'S6C_ONE_LABEL_TABLE_NO_MIXING'), (models(seeds=(42, 42)), 'S6C_DISTINCT_SEEDS'),
-                             (models(seeds=(43, 42)), 'S6C_SEEDS_IN_LOADER_ORDER'), (models(seeds=(42,)), 'S6C_TWO_TO_SIX_SEEDS'),
+                             (models(seeds=(43, 42)), 'S6C_SEEDS_IN_LOADER_ORDER'), (models(seeds=(42,)), 'S6C_TWO_TO_EIGHT_MEMBERS'),
                              ([dict(models()[0], extra=1)] + models()[1:], 'S6C_MODEL_SCHEMA'),
                              ([dict(models()[0], dataset='heliosli/x')] + models()[1:], 'S6C_MODEL_DATASET')):
             with self.assertRaises(ValueError) as e:

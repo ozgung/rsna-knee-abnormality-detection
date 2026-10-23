@@ -51,6 +51,16 @@ def worker_config(cfg, board, pass_name, ids, folder):
             'project': str(Path(__file__).resolve().parents[1])}
 
 
+def with_args(cmd, **values):
+    """The captured B command with some flag values replaced (eval_stride=2 -> '--eval-stride 2'); every flag must exist."""
+    cmd = list(cmd)
+    for name, value in values.items():
+        flag = '--' + name.replace('_', '-')
+        require(cmd.count(flag) == 1, 'S6C_COMMAND_FLAG_' + flag)
+        cmd[cmd.index(flag) + 1] = str(value)
+    return cmd
+
+
 def load_controller(path):
     """The archived publisher solo source, executed unchanged as a module (its __main__ guard does not fire)."""
     import hashlib
@@ -240,7 +250,10 @@ def run_worker(config_path):
         assignment = out / 'ids.json'
         assignment.write_text(json.dumps(cfg['ids']))
         cmd = k1.b_cmd(I, 'train', assignment, out / 'compact', out / 'tmp', float(cfg['deadline_epoch'] or 0))
-        r.update(command=[str(x) for x in cmd[1:]], phase='compact_infer')
+        stride = int(s6c.get('eval_stride', 1))
+        if stride != 1:                       # S4: the sealed window stride replaces the B command's eval stride 1
+            cmd = with_args(cmd, eval_stride=stride)
+        r.update(command=[str(x) for x in cmd[1:]], phase='compact_infer', eval_stride=stride)
         save(out / 'receipt.json', r)
         log_path = out / 'compact.log'
         main_start = time.perf_counter()
@@ -262,6 +275,22 @@ def run_worker(config_path):
         predictions = read_predictions(out / 'compact' / 'predictions.csv')
         logits = json.loads((out / 'compact' / 'logits.json').read_bytes())
         probs, statuses, seed_logits, records = summarize(cfg['ids'], ci, predictions, logits, len(staged), model_ready_seconds(log_path))
+        ref_ids = sorted({sid for rows in (s6c.get('reference') or {}).get('probabilities', {}).values() for sid in rows} & set(cfg['ids']))
+        if stride != 1 and cfg['mode'] == 'rehearsal' and cfg['pass'] == 'production' and ref_ids:
+            # rehearsal only: the reference studies again at stride 1 (the A100 read-outs are stride 1); timed as overhead
+            (out / 'ref_ids.json').write_text(json.dumps(ref_ids))
+            cmd1 = with_args(cmd, eval_stride=1, assignment=out / 'ref_ids.json', output=out / 'compact_ref', tmp=out / 'tmp_ref',
+                             dump_logits=out / 'compact_ref' / 'logits.json')
+            t1 = time.perf_counter()
+            with (out / 'compact_ref.log').open('xb') as log:
+                child = subprocess.Popen(cmd1, env=k1.b_env(cfg['board']), stdout=log, stderr=subprocess.STDOUT, cwd=str(out))
+                rc1 = child.wait()
+            require(rc1 == 0, 'S6C_STRIDE1_CHECK_EXIT_%s' % rc1)
+            z1 = json.loads((out / 'compact_ref' / 'logits.json').read_bytes())
+            for row in records:
+                if row['id'] in z1 and row['status'] == 'genuine':
+                    row['seed_probabilities_stride1'] = S6C.sigmoid(z1[row['id']]).tolist()
+            r['stride1_check'] = {'studies': len(ref_ids), 'seconds': time.perf_counter() - t1}
         ledger = out / 'predictions.npz'
         save_ledger(ledger, cfg['ids'], probs, statuses, seed_logits)
         after = restaged(models, staged)

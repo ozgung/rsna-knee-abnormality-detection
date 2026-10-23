@@ -145,8 +145,9 @@ def _child_digests(ds):
     return out
 
 
-def child_init(child_dir, inject_uid, worker_id):
-    """DataLoader worker_init_fn: bind the loader child's anatomy and side models; optional rehearsal injection."""
+def child_init(child_dir, inject_uid, worker_id, shared=None):
+    """DataLoader worker_init_fn: bind the loader child's anatomy and side models; optional rehearsal injection.
+    shared: P9s geometry dict -> every R6 render also yields our members' 320 px windows (knee.public_s6c_shared)."""
     import torch.utils.data as tud
     info = tud.get_worker_info()
     ds = info.dataset
@@ -165,6 +166,9 @@ def child_init(child_dir, inject_uid, worker_id):
         if state['before'] is None and self.native is not None:
             state['before'] = _child_digests(self)
             save(path, state)
+        if shared is not None and self.native is not None:
+            from knee import public_s6c_shared as SH
+            SH.install_child(self, shared)
         uid = self.uids[i]
         if inject_uid is not None and uid == inject_uid and not state['injected'] and self.native is not None:
             seam = self.window_rows
@@ -176,6 +180,9 @@ def child_init(child_dir, inject_uid, worker_id):
             state['injected'].append({'ordinal': int(i), 'error': item.get('error')})
         else:
             item = original(self, i)
+        if shared is not None:
+            from knee import public_s6c_shared as SH
+            item = SH.attach(self, item)
         state['items'] += 1
         if self.native is not None:
             state['after'] = _child_digests(self)
@@ -252,7 +259,8 @@ class Observer:
                     require(k.get('worker_init_fn') is None, 'SOURCE_WORKER_INIT_UNCHANGED')
                     import importlib
                     named = importlib.import_module(WORKER_MODULE)      # picklable by its importable name under spawn
-                    k['worker_init_fn'] = functools.partial(named.child_init, str(obs.child_dir), obs.inject)
+                    k['worker_init_fn'] = functools.partial(named.child_init, str(obs.child_dir), obs.inject,
+                                                            **({'shared': obs.shared.child_cfg} if getattr(obs.shared, 'KEY', None) == 's6c_shared' else {}))
                 obs.loaders.append({'num_workers': k.get('num_workers'), 'prefetch_factor': k.get('prefetch_factor'),
                                     'timeout': k.get('timeout'), 'batch_size': k.get('batch_size', 'default'),
                                     'context': str(k.get('multiprocessing_context')), 'studies': len(dataset)})
@@ -335,6 +343,8 @@ class Observer:
             return
         cur.pop('hash', None)
         cur.pop('plain_meta', None)
+        if cur.get('s6c_input'):
+            cur['s6c_input'] = {k: v for k, v in cur['s6c_input'].items() if k not in ('images', 'meta', 'images_ref', 'meta_ref')}
         cur.update(aborted=reason, handle_seconds=time.perf_counter() - cur.pop('t_begin'),
                    compile_check_calls=self.calls_other - cur.pop('calls_other_before'),
                    plain=cur['plain'] is not None, mirror=cur['mirror'] is not None, checksum_equal=None)
@@ -355,6 +365,13 @@ class Observer:
         if item['error'] is None and len(item['images']):
             images, meta = item['images'], item['meta']
             study['hash'] = self.pool.submit(lambda: {'render_windows': array_sha(images.numpy()), 'metadata': array_sha(meta.numpy())})
+        if getattr(self.shared, 'KEY', None) == 's6c_shared':      # P9s: the members' windows travel in the same item
+            s6 = {'images': item.get('s6c_images'), 'meta': item.get('s6c_meta'), 'error': item.get('s6c_error'), 'note': item.get('s6c_note'),
+                  'images_ref': item.get('s6c_images_ref'), 'meta_ref': item.get('s6c_meta_ref')}
+            if s6['error'] is None and s6['images'] is not None and len(s6['images']):
+                im6, me6 = s6['images'], s6['meta']
+                s6['input'] = {'render_windows': array_sha(im6.numpy()), 'metadata': array_sha(me6.numpy()), 'windows': int(len(im6))}
+            study['s6c_input'] = s6
         self.current = study
 
     def on_scoring(self, model, img, meta, mask, chunk, out):
@@ -430,6 +447,8 @@ class Observer:
         if 'hash' in cur:
             cur['input'] = cur.pop('hash').result()
         cur.pop('plain_meta', None)
+        if cur.get('s6c_input'):
+            cur['s6c_input'] = {k: v for k, v in cur['s6c_input'].items() if k not in ('images', 'meta', 'images_ref', 'meta_ref')}
         cur['plain'] = cur['plain'] is not None
         cur['mirror'] = cur['mirror'] is not None
         cur['checksum_equal'] = all(R6F.checksum(m['module']) == m['checksum'] for m in self.models) if self.models else None
@@ -559,9 +578,13 @@ def profile_module(name):
 
 def check_compact_receipt(ci, manifest):
     """The captured worker's own receipt must name exactly the pinned bundle, sources and switches."""
-    from knee import public_r7_profile
     from knee.public_r6_profile import SOURCE_SHA256
-    ASSET_SHA256 = profile_module('r7' if manifest.get('bundle_id') == public_r7_profile.BUNDLE_ID else 'r6').ASSET_SHA256
+    try:                                   # the R7 profile ships only with the R7 variants (P6*); every other build runs the R6 bundle
+        from knee import public_r7_profile
+        r7_bundle = public_r7_profile.BUNDLE_ID
+    except ImportError:
+        r7_bundle = None
+    ASSET_SHA256 = profile_module('r7' if r7_bundle is not None and manifest.get('bundle_id') == r7_bundle else 'r6').ASSET_SHA256
     require(ci.get('status') == 'PASS' and ci.get('timed_out') is False and ci.get('amp') == 'fp16'
             and ci.get('models') == manifest['models'] and ci.get('extent_models') == 4 and ci.get('syn_decomp_models') == 4
             and ci.get('spatial_models') == 4 and ci.get('trainer_md5') == manifest['trainer_md5']
@@ -600,8 +623,8 @@ def execute(cfg, out, r, torch, CT, import_ci, manifest, spec, fluid_doc, state_
         obs.uninstall()
     r['main_seconds'] = time.perf_counter() - main_start
     obs.finish_or_abort()
-    if shared is not None:                 # R7 ledger and receipt first: an R6 summary failure must not lose them
-        r['r7_shared'] = shared.finalize(obs, r)
+    if shared is not None:                 # R7 / members ledger and receipt first: an R6 summary failure must not lose them
+        r[getattr(shared, 'KEY', 'r7_shared')] = shared.finalize(obs, r)
     r['aborted_observations'] = sum(1 for s in obs.studies if s.get('aborted'))
     ci = json.loads((out / 'compact' / 'receipt.json').read_bytes())
     r['compact_receipt_sha256'] = file_sha(out / 'compact' / 'receipt.json')
@@ -662,6 +685,7 @@ R7_CUT_MIN_STUDIES = 3
 
 class SharedR7:
     """P6s: R7 v1 fold models on R6's rendered windows inside the R6 plain worker (see the module docstring)."""
+    KEY = 'r7_shared'
 
     def __init__(self, cfg, torch, CT, device=None):
         self.cfg, self.torch, self.CT = cfg['r7_shared'], torch, CT
@@ -966,6 +990,12 @@ def r6_worker(config_path):
             require(name == 'r6' and arm == 'r6' and not flip and cfg['pass'] == 'production', 'R7_SHARED_ON_R6_PLAIN_PRODUCTION_ONLY')
             shared = SharedR7(cfg, torch, CT)
             r['r7_shared_setup'] = shared.load()
+            save(out / 'receipt.json', r)
+        elif cfg.get('s6c_shared'):          # P9s: our members from the same decode, every pass (sentinels give the repeat gates)
+            from knee import public_s6c_shared as SH
+            require(name == 'r6' and arm == 'r6', 'S6C_SHARED_ON_R6_ONLY')        # P12: with or without R6 flip TTA
+            shared = SH.SharedS6(cfg, torch)
+            r['s6c_shared_setup'] = shared.load()
             save(out / 'receipt.json', r)
 
         def import_ci():

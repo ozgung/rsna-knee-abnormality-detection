@@ -46,10 +46,12 @@ V2_COLUMNS = ['Lateral OA', 'PF OA', 'Synovitis', "Baker's"]
 
 class VariantTableTests(unittest.TestCase):
     def test_variants_match_the_spec(self):
-        self.assertEqual(sorted(R6F.VARIANTS), ['p3', 'p4', 'p5', 'p6', 'p6p', 'p6s', 'p6sp', 'p7'])      # p6*: tests/test_public_r6flip_p6.py
+        base = {'p3', 'p4', 'p5', 'p6', 'p6p', 'p6s', 'p6sp', 'p7', 'p9', 'p9r', 'p9s', 'p9sr'}
+        self.assertTrue(base <= set(R6F.VARIANTS))                                   # p6*/p9*/p10*/p11*: their own test modules
+        self.assertTrue(all(k.startswith(('p9s2', 'p10', 'p11', 'p12', 'p13')) for k in set(R6F.VARIANTS) - base), sorted(set(R6F.VARIANTS) - base))
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p7'])[0], R6F.RAPTOR_ARMS)        # P2's Raptor half, compact = S6 seeds
         self.assertEqual(R6F.raptor_weight_vector(blend=R6F.VARIANTS['p7']), R6F.raptor_weight_vector())
-        self.assertEqual(R6F.COMPACT_VARIANTS, {'p7': 's6c'})
+        self.assertEqual(R6F.COMPACT_VARIANTS, {k: 's6c' for k in R6F.VARIANTS if k == 'p7' or k.startswith(('p10', 'p11'))})   # p12: R6 runs
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p3'])[0], (('old320', .52), ('crop224', .28), ('nafull', .2)))
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p4'])[0], R6F.resolve_blend(R6F.VARIANTS['p3'])[0])
         self.assertEqual(R6F.resolve_blend(R6F.VARIANTS['p5'])[0], (('old320', .65), ('nafull', .35)))
@@ -84,7 +86,7 @@ class VariantTableTests(unittest.TestCase):
 
 @unittest.skipIf(np is None or pd is None, 'numpy/pandas not installed')
 class BlendArithmeticTests(unittest.TestCase):
-    def data(self, n=40, seed=0, arms=('old320', 'r6', 'crop224', 'nafull', 'r7')):
+    def data(self, n=40, seed=0, arms=('old320', 'r6', 'crop224', 'nafull', 'r7', 's6c')):
         rng = np.random.default_rng(seed)
         return {a: rng.random((n, 12)) for a in arms}
 
@@ -93,8 +95,10 @@ class BlendArithmeticTests(unittest.TestCase):
         from knee.public_ws2_recovery import quantize9, source224_csv_values
         pct = lambda v: pd.DataFrame(np.asarray(v, dtype=np.float64)).rank(method='average', pct=True).to_numpy()
         arms, weights, default = R6F.resolve_blend(blend)
-        slot = sum(w * pct(source224_csv_values(arrays[a]) if a == 'crop224' else arrays[a]) for a, w in arms)
         r6 = sum(w * pct(quantize9(arrays[a])) for a, w in R6F.resolve_compact(blend)[0])
+        if not arms:                       # P11: no Raptor half, the ranked own compact alone
+            return r6
+        slot = sum(w * pct(source224_csv_values(arrays[a]) if a == 'crop224' else arrays[a]) for a, w in arms)
         out = np.empty_like(slot)
         for j, name in enumerate(R6F.LABELS):
             w = weights.get(name, default)
@@ -410,7 +414,9 @@ class VariantPacketTests(unittest.TestCase):
         from scripts import build_r6flip_entry as B
         cls.B = B
         cls.default = B.packet('rehearsal')
-        cls.packs = {v: B.packet('rehearsal', variant=v) for v in R6F.VARIANTS if v not in R6F.COMPACT_VARIANTS}   # p7: test_public_s6c
+        cls.packs = {v: B.packet('rehearsal', variant=v) for v in R6F.VARIANTS if v not in R6F.COMPACT_VARIANTS
+                     and not (R6F.own_shared(R6F.VARIANTS[v]) and B.P9_REHEARSAL_RECEIPT_SHA is None)
+                     and getattr(B, B.S6C_MODELS_BY_VARIANT.get(v, 'S6C_MODELS')) is not None}   # p7: test_public_s6c; unsealed member lists skip
 
     def test_default_build_has_no_variant_artifacts(self):
         cfg = self.default['cfg']
@@ -431,24 +437,30 @@ class VariantPacketTests(unittest.TestCase):
         """Everything shipped for the default except the variant additions is shared by the variants."""
         for variant, pack in self.packs.items():
             nafull, r7 = 'nafull' in R6F.blend_arm_names(R6F.VARIANTS[variant]), self.B.has_r7(variant)
+            s6c = self.B.has_s6c(variant)
             self.assertEqual(pack['codecs'], self.default['codecs'])
             for name, text in self.default['sources'].items():
                 self.assertEqual(pack['sources'][name], text, name)
             extra = set(pack['sources']) - set(self.default['sources'])
-            self.assertEqual(extra, set(self.B.NAFULL_SOURCES if nafull else ()) | set(self.B.R7_SOURCES if r7 else ()))
+            self.assertEqual(extra, set(self.B.NAFULL_SOURCES if nafull else ()) | set(self.B.R7_SOURCES if r7 else ())
+                             | ({*self.B.S6C_SOURCES, self.B.S6C.CAPTURED} if s6c else set()))
             for key, value in self.default['cfg'].items():
                 if key != 'r6flip_binding':
                     self.assertEqual(pack['cfg'][key], value, key)
             self.assertEqual(set(pack['cfg']) - set(self.default['cfg']),
-                             {'blend', *(['nafull'] if nafull else []), *(['r7_reference'] if r7 else []),
-                              *(['p6_reference'] if R6F.compact_shared(R6F.VARIANTS[variant]) else [])})
+                             {'blend', *(['nafull'] if nafull else []), *(['r7_reference'] if r7 else []), *(['s6c'] if s6c else []),
+                              *(['p6_reference'] if R6F.compact_shared(R6F.VARIANTS[variant]) else []),
+                              *(['p9_reference'] if R6F.own_shared(R6F.VARIANTS[variant]) else [])})
 
     def test_variant_slugs_metadata_and_blend_are_sealed(self):
         for variant, pack in self.packs.items():
             self.assertEqual(pack['cfg']['blend'], R6F.VARIANTS[variant])
             self.assertEqual(pack['cfg']['r6flip_binding']['raptor_weight_vector'], R6F.raptor_weight_vector(blend=R6F.VARIANTS[variant]))
             self.assertEqual(pack['cfg']['r6flip_binding']['entry_variant']['name'], variant)
-            date = {'p6': '20261019', 'p6p': '20261019', 'p6s': '20261020', 'p6sp': '20261020'}.get(variant, '20261018')
+            date = {'p6': '20261019', 'p6p': '20261019', 'p6s': '20261020', 'p6sp': '20261020', 'p9': '20261020', 'p9r': '20261020',
+                    'p9s': '20261020', 'p9sr': '20261020', 'p11v5': '20261022', 'p9s2s2b': '20261022', 'p12v5': '20261022',
+                    'p12fv5': '20261022', 'p10v5': '20261022', 'p10pv5': '20261022', 'p10s4': '20261022', 'p10s4s': '20261022',
+                    **{k: '20261022' for k in ('p13a', 'p13b', 'p13c', 'p13aw65', 'p13bw65', 'p13cw65', 'p13n', 'p13nk2', 'p13nw65', 'p13nk2w65', 'p13nf', 'p13nfw65')}}.get(variant, '20261021' if variant.startswith(('p9s2', 'p10', 'p11', 'p12')) else '20261018')
             slug = self.B.slug_for(variant, 'rehearsal')
             self.assertEqual(slug, 'r6flip-%s-rehearsal-%s' % (variant, date))
             self.assertEqual(self.B.slug_for(variant, 'entry'), 'r6flip-%s-entry-%s' % (variant, date))

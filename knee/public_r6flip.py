@@ -58,6 +58,9 @@ def raptor_weight_vector(labels=LABELS, blend=None):
     """Per-finding Raptor-half weight in official target order (R6 gets 1 - w). blend=None is the frozen v1 table;
     otherwise the sealed cfg['blend'] (see resolve_blend)."""
     require(list(labels) == LABELS, 'OFFICIAL_TARGET_ORDER')
+    if blend is not None and (blend.get('own_only') or blend.get('no_raptor')):   # P11 / P12: no Raptor half, weight 0 everywhere
+        resolve_blend(blend)
+        return [0.0] * len(labels)
     _, weights, default = resolve_blend(blend)
     require(set(weights) <= set(LABELS), 'WEIGHT_TARGETS')
     w = [float(weights.get(name, default)) for name in labels]
@@ -279,8 +282,8 @@ DEADLINE_SECONDS = 8.3 * 3600          # from kernel start T0
 RAPTOR_ARMS = (('old320', R384_WEIGHT), ('crop224', R224_WEIGHT))   # frozen default; variants seal their own in cfg['blend']
 STATUSES = ('genuine', 'data_local_failure', 'unavailable')
 BLEND_ARM_NAMES = ('old320', 'crop224', 'nafull')    # stage order: R384 two-view, R224 one-view, na-full K62 one-view
-ALL_ARMS = ('old320', 'r6', 'crop224', 'nafull', 'r7')
-COMPACT_ARM_NAMES = ('r6', 'r7')               # stage order: R6, then R7 last (the arm the T0 + 8.3 h guard cuts in P6)
+ALL_ARMS = ('old320', 'r6', 'crop224', 'nafull', 'r7', 's6c')
+COMPACT_ARM_NAMES = ('r6', 'r7', 's6c')        # stage order: R6, then R7 (P6) or our own s6c members (P9) last, under the guard
 DEFAULT_COMPACT = (('r6', 1.0),)               # P2 and P3-P5: rank(R6 flip) is the whole compact slot
 DEFAULT_COMPACT_FLIP = True
 RAPTOR_WEIGHTS_V2 = {'Lateral OA': .15, 'PF OA': .65, 'Synovitis': .85, "Baker's": .30}   # heliosli V2 table, others 0.5
@@ -310,9 +313,101 @@ VARIANTS = {
     # P7-prime (Lane C): P2's frozen Raptor half and v1 weights; the compact slot is our S6 seed ensemble (knee.public_s6c)
     'p7': {'raptor_arms': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]], 'weights': dict(RAPTOR_WEIGHTS),
            'default_weight': DEFAULT_RAPTOR_WEIGHT},
+    # P9 (gap assessment 2026-10-20 §3.1, Lane P9): P2's Raptor arm R384 only (R224 dropped for runtime, as P6s-prime) and v1
+    # weights; the compact slot is 1/2 rank(R6 plain) + 1/2 rank(own S6 members' mean rank, knee.public_s6c), weights fixed
+    # before any P9 output exists. The own stage runs last under the guard; trimmed studies keep rank(R6 plain). p9r adds R224.
+    'p9': {'raptor_arms': [['old320', 1.0]], 'weights': dict(RAPTOR_WEIGHTS), 'default_weight': DEFAULT_RAPTOR_WEIGHT,
+           'compact_arms': [['r6', .5], ['s6c', .5]], 'compact_flip': False},
+    'p9r': {'raptor_arms': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]], 'weights': dict(RAPTOR_WEIGHTS),
+            'default_weight': DEFAULT_RAPTOR_WEIGHT, 'compact_arms': [['r6', .5], ['s6c', .5]], 'compact_flip': False},
+    # P9s: P9's arithmetic with one decode per study -- the members rendered at 320 px from R6's native cache and scored inside the
+    # R6 plain worker (knee.public_s6c_shared); no separate own stage. p9sr adds R224.
+    'p9s': {'raptor_arms': [['old320', 1.0]], 'weights': dict(RAPTOR_WEIGHTS), 'default_weight': DEFAULT_RAPTOR_WEIGHT,
+            'compact_arms': [['r6', .5], ['s6c', .5]], 'compact_flip': False, 'own_shared': True},
+    'p9sr': {'raptor_arms': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]], 'weights': dict(RAPTOR_WEIGHTS),
+             'default_weight': DEFAULT_RAPTOR_WEIGHT, 'compact_arms': [['r6', .5], ['s6c', .5]], 'compact_flip': False, 'own_shared': True},
 }
-COMPACT_VARIANTS = {'p7': 's6c'}     # variants whose compact ('r6') slot is not the heliosli R6 bundle
-PRECISION = {'old320': 'float64', 'r6': '%.9g', 'crop224': 'float32 CSV', 'nafull': 'float64', 'r7': '%.9g'}
+
+
+def own_dual_blend(w, r224=False, stride=1):
+    """P9s family (parent, 2026-10-20 22:55): compact slot = w rank(own members) + (1 - w) rank(R6 plain), shared decode, the
+    members at eval stride 1 or 2 (stride 2 halves their cost; the stride-1 parity and reference checks stay in the rehearsal)."""
+    b = {'raptor_arms': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]] if r224 else [['old320', 1.0]], 'weights': dict(RAPTOR_WEIGHTS),
+         'default_weight': DEFAULT_RAPTOR_WEIGHT, 'compact_arms': [['r6', round(1.0 - w, 2)], ['s6c', round(w, 2)]], 'compact_flip': False,
+         'own_shared': True}
+    if stride != 1:
+        b['own_stride'] = int(stride)
+    return b
+
+
+def own_compact_blend(raptor='both', aggregation='mean_logit'):
+    """P10 / P11 family (parent, 2026-10-20 22:55): P7's machinery (the own members replace the R6 bundle in the compact slot)
+    with a sealed aggregation and, for P11, no Raptor half at all (the final column is the ranked own compact alone)."""
+    arms = {'both': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]], 'r384': [['old320', 1.0]], 'none': []}[raptor]
+    b = {'raptor_arms': arms, 'weights': dict(RAPTOR_WEIGHTS), 'default_weight': DEFAULT_RAPTOR_WEIGHT, 'own_aggregation': aggregation}
+    if raptor == 'none':
+        b['own_only'] = True
+    return b
+
+
+OWN_WEIGHTS = (50, 60, 70)        # the parent pre-registers w from the four-fold grid; 0.5 to 0.7 expected
+# 'p9s2...' = the second member set (sealed separately from P9s v1's two members): p9s2[r][w60|w70][s2]
+for _w in OWN_WEIGHTS:
+    for _r224 in (False, True):
+        for _stride in (1, 2):
+            VARIANTS['p9s2' + ('r' if _r224 else '') + ('' if _w == 50 else 'w%d' % _w) + ('' if _stride == 1 else 's2')] = \
+                own_dual_blend(_w / 100.0, _r224, _stride)
+# P10: Raptor half as P2 (p10p: R384 only) + own-only compact (mean logit; *mr = mean rank); P11: own-only compact alone.
+VARIANTS.update({'p10': own_compact_blend('both', 'mean_logit'), 'p10mr': own_compact_blend('both', 'mean_rank'),
+                 'p10p': own_compact_blend('r384', 'mean_logit'), 'p10pmr': own_compact_blend('r384', 'mean_rank'),
+                 'p11': own_compact_blend('none', 'mean_logit'), 'p11mr': own_compact_blend('none', 'mean_rank')})
+COMPACT_VARIANTS = {'p7': 's6c', **{k: 's6c' for k in VARIANTS if k.startswith('p10') or k.startswith('p11')}}   # compact slot not the R6 bundle
+
+
+def no_raptor_blend(flip, stride=2, w=0.5):
+    """P12 (parent, 2026-10-21 12:55 UTC): no Raptor stage; compact = (1 - w) rank(R6 [flip|plain]) + w rank(own mean logit), both from
+    the shared decode, members at eval stride 2, cut first at the guard."""
+    b = {'raptor_arms': [], 'weights': dict(RAPTOR_WEIGHTS), 'default_weight': DEFAULT_RAPTOR_WEIGHT,
+         'compact_arms': [['r6', round(1.0 - w, 2)], ['s6c', round(w, 2)]], 'compact_flip': bool(flip), 'own_shared': True,
+         'own_aggregation': 'mean_logit', 'no_raptor': True}
+    if stride != 1:
+        b['own_stride'] = int(stride)
+    return b
+
+
+# p12 = R6 plain + the P10 eight; p12f = R6 flip + the P10 eight; p12fn = R6 flip + a sealed subset (as many as fit the gate);
+# p12v5 / p12fv5 = the Oct 22 member swap (v5 members), sealed when the exports exist
+VARIANTS.update({'p12': no_raptor_blend(False), 'p12f': no_raptor_blend(True), 'p12fn': no_raptor_blend(True),
+                 'p12v5': no_raptor_blend(False), 'p12fv5': no_raptor_blend(True),
+                 'p11v5': own_compact_blend('none', 'mean_logit'), 'p9s2s2b': own_dual_blend(0.5, False, 2)})
+COMPACT_VARIANTS['p11v5'] = 's6c'
+# Oct 22 wave 1 E1 (parent 21:45): P10 with R224 on the E1 list; p10pv5 = the R384-only fallback
+VARIANTS.update({'p10v5': own_compact_blend('both', 'mean_logit'), 'p10pv5': own_compact_blend('r384', 'mean_logit')})
+COMPACT_VARIANTS.update({'p10v5': 's6c', 'p10pv5': 's6c'})
+
+
+def p2_own_blend(w, stride):
+    """P13 (parent, pre-registered 2026-10-21 22:00 UTC): P2 exactly -- R384 0.65 + R224 0.35, v1 per-finding weights, R6 FLIP -- with
+    the compact slot (1 - w) rank(R6 flip) + w rank(own mean logit); members from the shared decode inside the R6 worker."""
+    return {'raptor_arms': [['old320', R384_WEIGHT], ['crop224', R224_WEIGHT]], 'weights': dict(RAPTOR_WEIGHTS),
+            'default_weight': DEFAULT_RAPTOR_WEIGHT, 'compact_arms': [['r6', round(1.0 - w, 2)], ['s6c', round(w, 2)]], 'compact_flip': True,
+            'own_shared': True, 'own_stride': int(stride), 'own_aggregation': 'mean_logit'}
+
+
+# S4 (slot 5): P10 with R224 on the S4 list, members in the separate worker at stride 2 (p10s4) or 3 (p10s4s)
+VARIANTS.update({'p10s4': {**own_compact_blend('both', 'mean_logit'), 'own_stride': 2},
+                 'p10s4s': {**own_compact_blend('both', 'mean_logit'), 'own_stride': 3}})
+COMPACT_VARIANTS.update({'p10s4': 's6c', 'p10s4s': 's6c'})
+# p13a: k=3 at stride 2; p13b: k=3 at stride 3; p13c: k=2 at stride 3; *w65: slot 4 (0.65 own / 0.35 R6 flip), same members/stride
+VARIANTS.update({'p13a': p2_own_blend(.5, 2), 'p13b': p2_own_blend(.5, 3), 'p13c': p2_own_blend(.5, 3),
+                 'p13aw65': p2_own_blend(.65, 2), 'p13bw65': p2_own_blend(.65, 3), 'p13cw65': p2_own_blend(.65, 3)})
+# p13nf / p13nfw65 (2026-10-22 08:40): p13n with the 'combined' members-first cut rule
+VARIANTS.update({'p13nf': {**p2_own_blend(.5, 3), 'raptor_arms': [['old320', 1.0]], 'own_cut': 'combined'},
+                 'p13nfw65': {**p2_own_blend(.65, 3), 'raptor_arms': [['old320', 1.0]], 'own_cut': 'combined'}})
+# p13n (parent redirect 2026-10-22 00:05 UTC): P13 without the R224 arm (R384 with its v1 weights), k=3 at stride 3; p13nk2 = k=2
+VARIANTS.update({k: {**p2_own_blend(w, 3), 'raptor_arms': [['old320', 1.0]]}
+                 for k, w in (('p13n', .5), ('p13nk2', .5), ('p13nw65', .65), ('p13nk2w65', .65))})
+PRECISION = {'old320': 'float64', 'r6': '%.9g', 'crop224': 'float32 CSV', 'nafull': 'float64', 'r7': '%.9g', 's6c': '%.9g'}
 BLEND_KEYS = {'raptor_arms', 'weights', 'default_weight'}
 COMPACT_KEYS = {'compact_arms', 'compact_flip'}
 
@@ -321,11 +416,28 @@ def resolve_blend(blend=None):
     """(raptor arms, per-finding weights, default weight) from the sealed cfg['blend']; None is the frozen default."""
     if blend is None:
         return RAPTOR_ARMS, dict(RAPTOR_WEIGHTS), DEFAULT_RAPTOR_WEIGHT
-    require(set(blend) in (BLEND_KEYS, BLEND_KEYS | COMPACT_KEYS, BLEND_KEYS | COMPACT_KEYS | {'compact_shared'}), 'BLEND_SCHEMA')
+    require(set(blend) in (BLEND_KEYS, BLEND_KEYS | COMPACT_KEYS, BLEND_KEYS | COMPACT_KEYS | {'compact_shared'},
+                           BLEND_KEYS | COMPACT_KEYS | {'own_shared'}, BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride'},
+                           BLEND_KEYS | {'own_aggregation'}, BLEND_KEYS | {'own_aggregation', 'own_only'},
+                           BLEND_KEYS | {'own_aggregation', 'own_stride'},
+                           BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride', 'own_aggregation', 'no_raptor'},
+                           BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride', 'own_aggregation'},
+                           BLEND_KEYS | COMPACT_KEYS | {'own_shared', 'own_stride', 'own_aggregation', 'own_cut'}), 'BLEND_SCHEMA')
+    if 'own_cut' in blend:
+        require(blend.get('own_shared') is True and blend['own_cut'] in ('r6_only', 'combined'), 'OWN_CUT')
     arms = tuple((str(a), float(w)) for a, w in blend['raptor_arms'])
     names = [a for a, _ in arms]
-    require(names and 'old320' in names and names == [x for x in BLEND_ARM_NAMES if x in names], 'BLEND_ARM_ORDER')
-    require(all(0.0 < w <= 1.0 for _, w in arms) and abs(sum(w for _, w in arms) - 1.0) <= 1e-12, 'BLEND_ARM_WEIGHTS_SUM_TO_ONE')
+    if blend.get('own_only'):
+        require(blend['own_only'] is True and not arms and 'own_aggregation' in blend, 'OWN_ONLY_NO_RAPTOR_ARMS')
+    elif blend.get('no_raptor'):                    # P12: no Raptor stage; the compact slot (R6 + own) is the whole column
+        require(blend['no_raptor'] is True and not arms and 'compact_arms' in blend and blend.get('own_shared') is True, 'NO_RAPTOR_NEEDS_SHARED_COMPACT')
+    else:
+        require(names and 'old320' in names and names == [x for x in BLEND_ARM_NAMES if x in names], 'BLEND_ARM_ORDER')
+        require(all(0.0 < w <= 1.0 for _, w in arms) and abs(sum(w for _, w in arms) - 1.0) <= 1e-12, 'BLEND_ARM_WEIGHTS_SUM_TO_ONE')
+    if 'own_aggregation' in blend:
+        require(blend['own_aggregation'] in ('mean_logit', 'mean_rank'), 'OWN_AGGREGATION')
+    if 'own_stride' in blend:
+        require((blend.get('own_shared') is True or 'own_aggregation' in blend) and blend['own_stride'] in (1, 2, 3), 'OWN_STRIDE')
     weights = {str(k): float(v) for k, v in blend['weights'].items()}
     default = float(blend['default_weight'])
     require(set(weights) <= set(LABELS) and all(0.0 <= v <= 1.0 for v in weights.values()) and 0.0 <= default <= 1.0, 'BLEND_WEIGHTS')
@@ -362,6 +474,50 @@ def compact_shared(blend=None):
 def compact_arm_names(blend=None):
     """Compact arm names enabled by the sealed blend, in stage order (['r6'] unless a variant seals more)."""
     return [a for a, _ in resolve_compact(blend)[0]]
+
+
+def own_shared(blend=None):
+    """P9s: the own members scored inside the R6 plain worker from one decode (no separate s6c stage)."""
+    if blend is None or not blend.get('own_shared'):
+        return False
+    require(blend['own_shared'] is True and own_compact_arm(blend), 'OWN_SHARED_NEEDS_OWN_COMPACT_ARM')
+    return True
+
+
+def own_cut(blend=None):
+    """The shared-decode members-first cut rule ('r6_only' = R6-only pace x 1.3, the default; 'combined' = R6 + members x 1.05)."""
+    resolve_blend(blend)
+    return (blend or {}).get('own_cut', 'r6_only')
+
+
+def own_stride(blend=None):
+    """Eval stride of the own members in the shared decode (1 unless the variant seals 2)."""
+    resolve_blend(blend)
+    return int((blend or {}).get('own_stride', 1))
+
+
+def own_aggregation(blend=None):
+    """P10/P11: how the own members are combined in the compact slot ('mean_rank' is P7-prime's)."""
+    resolve_blend(blend)
+    return (blend or {}).get('own_aggregation', 'mean_rank')
+
+
+def own_only(blend=None):
+    """P11: no Raptor half; the final column is the ranked own compact alone."""
+    resolve_blend(blend)
+    return bool((blend or {}).get('own_only'))
+
+
+def own_compact_arm(blend=None):
+    """P9: our S6 members (knee.public_s6c) run as a second compact arm next to the heliosli R6 bundle (plain), last under the
+    guard. Distinct from P7, where the s6c block replaces the R6 bundle in the 'r6' slot."""
+    names = compact_arm_names(blend)
+    if 's6c' not in names:
+        return False
+    # R6 flip TTA is allowed only with the shared decode (P12): the members get their own 320 px windows, R6 its plain + mirror passes
+    require(names == ['r6', 's6c'] and (resolve_compact(blend)[1] is False or blend.get('own_shared') is True) and not compact_shared(blend),
+            'OWN_COMPACT_NEEDS_R6_PLAIN_PAIR')
+    return True
 
 
 def recover_arms(arrays, missing, blend=None, *, fatal_errors=()):
@@ -415,6 +571,8 @@ def recover_arms(arrays, missing, blend=None, *, fatal_errors=()):
             term = weight * ranks[a]
             cslot = term if cslot is None else cslot + term
     w = np.asarray(raptor_weight_vector(blend=blend), dtype=np.float64)
+    if slot is None:                          # P11: no Raptor half (w is all zeros); the compact slot is the whole column
+        slot = np.zeros_like(cslot)
     out = np.empty_like(slot)
     for j in range(len(LABELS)):
         out[:, j] = w[j] * slot[:, j] + (1.0 - w[j]) * cslot[:, j]
