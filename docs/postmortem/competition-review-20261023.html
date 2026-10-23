@@ -24,8 +24,8 @@ p{margin:.5rem 0}
 ul{padding-left:1.2rem;margin:.4rem 0}
 li{margin:.3rem 0}
 li b, p b{font-weight:600}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:1.2rem 0}
-.kpi{min-width:0;background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:10px 14px}
+.kpis{display:flex;flex-wrap:wrap;gap:12px;margin:1.2rem 0}
+.kpi{flex:1 1 150px;min-width:0;background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:10px 14px}
 .kpi .n{font-family:var(--mono);font-size:1.6rem;font-weight:500;font-variant-numeric:tabular-nums}
 .kpi .l{font-size:.8rem;color:var(--muted)}
 figure{margin:1.2rem 0;background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:12px 12px 6px}
@@ -55,190 +55,230 @@ a{color:var(--accent)}
 @media (max-width:480px){ h1{font-size:1.7rem} body{font-size:15px} }
 </style>
 <main>
-<p class="eyebrow">RSNA Knee Abnormality Detection · Kaggle · closed 22 Oct 2026 · written 23 Oct</p>
+<p class="eyebrow">RSNA Knee Abnormality Detection · Kaggle · closed 22 Oct 2026 · written 23 Oct, revised with 12 write-ups</p>
 <h1>We finished at 0.942. Here is what the competition taught us.</h1>
-<p class="lede">Twelve findings per knee MRI study, scored by macro ROC AUC, 4,407 training studies with free-text reports in nine languages and only 58 expert-labelled studies. Our selected entry scored <b>0.958 public</b> and <b>0.942 private</b>. Every entry in the field lost about 0.015 from public to private, so the ranking mostly held and the medal line came down to tie-breaks inside the 0.942 to 0.943 band.</p>
+<p class="lede">Twelve findings per knee MRI study, scored by macro ROC AUC, 4,407 training studies with free-text reports in nine languages and only 58 expert-labelled studies. Our two selected entries both scored <b>0.958 public</b> and <b>0.942 private</b>, rank 715 of 6,425. An entry we did not select, our own eight models with no public Raptor weights, scored <b>0.944 private</b>, which was silver. The competition was decided by label quality and by a hospital shortcut nobody saw at first, not by backbones.</p>
 
 <div class="kpis">
-  <div class="kpi"><div class="n">0.942</div><div class="l">our private score (selected entry)</div></div>
-  <div class="kpi"><div class="n">0.958</div><div class="l">our best public score, shared with ~1,400 copies of one recipe</div></div>
-  <div class="kpi"><div class="n">0.943</div><div class="l">silver line, rank 321 of 6,425 (one write-up's numbers)</div></div>
-  <div class="kpi"><div class="n">−0.015</div><div class="l">public→private drop, same for everyone</div></div>
+  <div class="kpi"><div class="n">0.942</div><div class="l">both selected entries · rank 715 / 6,425</div></div>
+  <div class="kpi"><div class="n">0.944</div><div class="l">our best private entry (P11, unselected) · silver band</div></div>
+  <div class="kpi"><div class="n">0.960</div><div class="l">private winner · gold line ≈ 0.955 (rank 22)</div></div>
+  <div class="kpi"><div class="n">0.943</div><div class="l">silver line (rank 321) · bronze (rank 642) inside the 0.942 tie</div></div>
 </div>
 
 <h2>1. Our campaign in one picture</h2>
 <figure><svg viewBox="0 0 760 330" role="img" aria-label="Public score of each scored submission">
-<line x1="52" x2="744" y1="261.1" y2="261.1" class="grid"/><text x="44" y="265.1" class="tick" text-anchor="end">0.75</text>
-<line x1="52" x2="744" y1="206.8" y2="206.8" class="grid"/><text x="44" y="210.8" class="tick" text-anchor="end">0.80</text>
-<line x1="52" x2="744" y1="152.4" y2="152.4" class="grid"/><text x="44" y="156.4" class="tick" text-anchor="end">0.85</text>
-<line x1="52" x2="744" y1="98.1" y2="98.1" class="grid"/><text x="44" y="102.1" class="tick" text-anchor="end">0.90</text>
-<line x1="52" x2="744" y1="43.7" y2="43.7" class="grid"/><text x="44" y="47.7" class="tick" text-anchor="end">0.95</text>
-<line x1="52" x2="744" y1="52.4" y2="52.4" class="ref"/><text x="744" y="46.4" class="lab" text-anchor="end">private 0.942 (final)</text>
-<line x1="80.8" x2="80.8" y1="272.0" y2="254.6" class="stem own"/>
-<circle cx="80.8" cy="254.6" r="6" class="dot own"><title>Frozen DINOv2 head · Oct 8 · public 0.756</title></circle>
-<text x="80.8" y="243.6" class="val" text-anchor="middle">0.756</text>
-<text x="80.8" y="288" class="tick" text-anchor="middle">Oct 8</text>
-<line x1="138.5" x2="138.5" y1="272.0" y2="66.6" class="stem public"/>
-<circle cx="138.5" cy="66.6" r="6" class="dot public"><title>Public ConvNeXt reader · Oct 8 · public 0.929</title></circle>
-<text x="138.5" y="55.6" class="val" text-anchor="middle">0.929</text>
-<text x="138.5" y="288" class="tick" text-anchor="middle">Oct 8</text>
-<line x1="196.2" x2="196.2" y1="272.0" y2="59.0" class="stem public"/>
-<circle cx="196.2" cy="59.0" r="6" class="dot public"><title>ConvNeXt + Raptor blend · Oct 8 · public 0.936</title></circle>
-<text x="196.2" y="48.0" class="val" text-anchor="middle">0.936</text>
-<text x="196.2" y="288" class="tick" text-anchor="middle">Oct 8</text>
-<line x1="253.8" x2="253.8" y1="272.0" y2="44.8" class="stem public"/>
-<circle cx="253.8" cy="44.8" r="6" class="dot public"><title>Mirror Raptor (nartaa) · Oct 9 · public 0.949</title></circle>
-<text x="253.8" y="33.8" class="val" text-anchor="middle">0.949</text>
-<text x="253.8" y="288" class="tick" text-anchor="middle">Oct 9</text>
-<line x1="311.5" x2="311.5" y1="272.0" y2="122.0" class="stem own"/>
-<circle cx="311.5" cy="122.0" r="6" class="dot own"><title>Own ConvNeXt 5-fold · Oct 9 · public 0.878</title></circle>
-<text x="311.5" y="111.0" class="val" text-anchor="middle">0.878</text>
-<text x="311.5" y="288" class="tick" text-anchor="middle">Oct 9</text>
-<line x1="369.2" x2="369.2" y1="272.0" y2="82.9" class="stem own"/>
-<circle cx="369.2" cy="82.9" r="6" class="dot own"><title>Own CoAtNet-224 5-fold · Oct 10 · public 0.914</title></circle>
-<text x="369.2" y="71.9" class="val" text-anchor="middle">0.914</text>
-<text x="369.2" y="288" class="tick" text-anchor="middle">Oct 10</text>
-<line x1="426.8" x2="426.8" y1="272.0" y2="39.4" class="stem public"/>
-<circle cx="426.8" cy="39.4" r="6" class="dot public"><title>Raptor + S6 blend · Oct 12 · public 0.954</title></circle>
-<text x="426.8" y="28.4" class="val" text-anchor="middle">0.954</text>
-<text x="426.8" y="288" class="tick" text-anchor="middle">Oct 12</text>
-<line x1="484.5" x2="484.5" y1="272.0" y2="54.6" class="stem public"/>
-<circle cx="484.5" cy="54.6" r="6" class="dot public"><title>B0: Dread + S6 (no OAI) · Oct 13 · public 0.940</title></circle>
-<text x="484.5" y="43.6" class="val" text-anchor="middle">0.940</text>
-<text x="484.5" y="288" class="tick" text-anchor="middle">Oct 13</text>
-<line x1="542.2" x2="542.2" y1="272.0" y2="37.2" class="stem public"/>
-<circle cx="542.2" cy="37.2" r="6" class="dot public"><title>A': R7 + Raptor + S6 · Oct 15 · public 0.956</title></circle>
-<text x="542.2" y="26.2" class="val" text-anchor="middle">0.956</text>
-<text x="542.2" y="288" class="tick" text-anchor="middle">Oct 15</text>
-<line x1="599.8" x2="599.8" y1="272.0" y2="43.7" class="stem own"/>
-<circle cx="599.8" cy="43.7" r="6" class="dot own"><title>S6 retrained on our labels v2 · Oct 17 · public 0.950</title></circle>
-<text x="599.8" y="32.7" class="val" text-anchor="middle">0.950</text>
-<text x="599.8" y="288" class="tick" text-anchor="middle">Oct 17</text>
-<line x1="657.5" x2="657.5" y1="272.0" y2="36.1" class="stem public"/>
-<circle cx="657.5" cy="36.1" r="6" class="dot public"><title>A'-w: per-finding weights · Oct 18 · public 0.957</title></circle>
-<text x="657.5" y="25.1" class="val" text-anchor="middle">0.957</text>
-<text x="657.5" y="288" class="tick" text-anchor="middle">Oct 18</text>
-<line x1="715.2" x2="715.2" y1="272.0" y2="35.0" class="stem public"/>
-<circle cx="715.2" cy="35.0" r="6" class="dot public"><title>R6F v2: R6 flip-TTA + Raptor · Oct 18 · public 0.958</title></circle>
-<text x="715.2" y="24.0" class="val" text-anchor="middle">0.958</text>
-<text x="715.2" y="288" class="tick" text-anchor="middle">Oct 18</text>
+<line x1="52" x2="744" y1="261.4" y2="261.4" class="grid"/><text x="44" y="265.4" class="tick" text-anchor="end">0.75</text>
+<line x1="52" x2="744" y1="208.2" y2="208.2" class="grid"/><text x="44" y="212.2" class="tick" text-anchor="end">0.80</text>
+<line x1="52" x2="744" y1="155.0" y2="155.0" class="grid"/><text x="44" y="159.0" class="tick" text-anchor="end">0.85</text>
+<line x1="52" x2="744" y1="101.8" y2="101.8" class="grid"/><text x="44" y="105.8" class="tick" text-anchor="end">0.90</text>
+<line x1="52" x2="744" y1="48.6" y2="48.6" class="grid"/><text x="44" y="52.6" class="tick" text-anchor="end">0.95</text>
+<line x1="52" x2="744" y1="57.1" y2="57.1" class="ref"/><text x="744" y="51.1" class="lab" text-anchor="end">private 0.942 (final)</text>
+<line x1="78.6" x2="78.6" y1="272.0" y2="255.0" class="stem own"/>
+<circle cx="78.6" cy="255.0" r="6" class="dot own"><title>Frozen DINOv2 head · Oct 8 · public 0.756</title></circle>
+<text x="78.6" y="244.0" class="val" text-anchor="middle">0.756</text>
+<text x="78.6" y="288" class="tick" text-anchor="middle">Oct 8</text>
+<line x1="131.8" x2="131.8" y1="272.0" y2="70.9" class="stem public"/>
+<circle cx="131.8" cy="70.9" r="6" class="dot public"><title>Public ConvNeXt reader · Oct 8 · public 0.929</title></circle>
+<text x="131.8" y="59.9" class="val" text-anchor="middle">0.929</text>
+<text x="131.8" y="288" class="tick" text-anchor="middle">Oct 8</text>
+<line x1="185.1" x2="185.1" y1="272.0" y2="63.5" class="stem public"/>
+<circle cx="185.1" cy="63.5" r="6" class="dot public"><title>ConvNeXt + Raptor blend · Oct 8 · public 0.936</title></circle>
+<text x="185.1" y="52.5" class="val" text-anchor="middle">0.936</text>
+<text x="185.1" y="288" class="tick" text-anchor="middle">Oct 8</text>
+<line x1="238.3" x2="238.3" y1="272.0" y2="49.7" class="stem public"/>
+<circle cx="238.3" cy="49.7" r="6" class="dot public"><title>Mirror Raptor (nartaa) · Oct 9 · public 0.949</title></circle>
+<text x="238.3" y="38.7" class="val" text-anchor="middle">0.949</text>
+<text x="238.3" y="288" class="tick" text-anchor="middle">Oct 9</text>
+<line x1="291.5" x2="291.5" y1="272.0" y2="125.2" class="stem own"/>
+<circle cx="291.5" cy="125.2" r="6" class="dot own"><title>Own ConvNeXt 5-fold · Oct 9 · public 0.878</title></circle>
+<text x="291.5" y="114.2" class="val" text-anchor="middle">0.878</text>
+<text x="291.5" y="288" class="tick" text-anchor="middle">Oct 9</text>
+<line x1="344.8" x2="344.8" y1="272.0" y2="86.9" class="stem own"/>
+<circle cx="344.8" cy="86.9" r="6" class="dot own"><title>Own CoAtNet-224 5-fold · Oct 10 · public 0.914</title></circle>
+<text x="344.8" y="75.9" class="val" text-anchor="middle">0.914</text>
+<text x="344.8" y="288" class="tick" text-anchor="middle">Oct 10</text>
+<line x1="398.0" x2="398.0" y1="272.0" y2="44.3" class="stem public"/>
+<circle cx="398.0" cy="44.3" r="6" class="dot public"><title>Raptor + S6 blend · Oct 12 · public 0.954</title></circle>
+<text x="398.0" y="33.3" class="val" text-anchor="middle">0.954</text>
+<text x="398.0" y="288" class="tick" text-anchor="middle">Oct 12</text>
+<line x1="451.2" x2="451.2" y1="272.0" y2="59.2" class="stem public"/>
+<circle cx="451.2" cy="59.2" r="6" class="dot public"><title>B0: Dread + S6 (no OAI) · Oct 13 · public 0.940</title></circle>
+<text x="451.2" y="48.2" class="val" text-anchor="middle">0.940</text>
+<text x="451.2" y="288" class="tick" text-anchor="middle">Oct 13</text>
+<line x1="504.5" x2="504.5" y1="272.0" y2="42.2" class="stem public"/>
+<circle cx="504.5" cy="42.2" r="6" class="dot public"><title>A': R7 + Raptor + S6 · Oct 15 · public 0.956</title></circle>
+<text x="504.5" y="31.2" class="val" text-anchor="middle">0.956</text>
+<text x="504.5" y="288" class="tick" text-anchor="middle">Oct 15</text>
+<line x1="557.7" x2="557.7" y1="272.0" y2="48.6" class="stem own"/>
+<circle cx="557.7" cy="48.6" r="6" class="dot own"><title>S6 retrained on our labels v2 · Oct 17 · public 0.950</title></circle>
+<text x="557.7" y="37.6" class="val" text-anchor="middle">0.950</text>
+<text x="557.7" y="288" class="tick" text-anchor="middle">Oct 17</text>
+<line x1="610.9" x2="610.9" y1="272.0" y2="41.1" class="stem public"/>
+<circle cx="610.9" cy="41.1" r="6" class="dot public"><title>A'-w: per-finding weights · Oct 18 · public 0.957</title></circle>
+<text x="610.9" y="30.1" class="val" text-anchor="middle">0.957</text>
+<text x="610.9" y="288" class="tick" text-anchor="middle">Oct 18</text>
+<line x1="664.2" x2="664.2" y1="272.0" y2="40.1" class="stem public"/>
+<circle cx="664.2" cy="40.1" r="6" class="dot public"><title>R6F v2: R6 flip-TTA + Raptor (selected) · Oct 18 · public 0.958</title></circle>
+<text x="664.2" y="29.1" class="val" text-anchor="middle">0.958</text>
+<text x="664.2" y="288" class="tick" text-anchor="middle">Oct 18</text>
+<line x1="717.4" x2="717.4" y1="272.0" y2="42.2" class="stem own"/>
+<circle cx="717.4" cy="42.2" r="6" class="dot own"><title>P11: own 8 members alone (private 0.944) · Oct 21 · public 0.956</title></circle>
+<text x="717.4" y="31.2" class="val" text-anchor="middle">0.956</text>
+<text x="717.4" y="288" class="tick" text-anchor="middle">Oct 21</text>
 <text x="52" y="322" class="lab">● our own trained weights &nbsp;&nbsp; ● public checkpoints wrapped by us &nbsp;&nbsp; hover a dot for the entry</text>
-</svg><figcaption>Public macro AUC of our scored submissions, by date. Hidden-rerun failures (six entries, one crash to 0.500, one nine-hour timeout) are not drawn. The dashed line is the final private score.</figcaption></figure>
+</svg><figcaption>Public macro AUC of our scored submissions, by date. Hidden-rerun failures (six entries, one crash to 0.500, one nine-hour timeout) are not drawn. The dashed line is the final private score of the selected entries.</figcaption></figure>
 <ul>
-<li><b>Our own trained weights topped out at 0.914</b> (five-fold CoAtNet-224) and 0.950 (nartaa's S6 recipe retrained on our labels v2). Everything above 0.950 was public checkpoints we wrapped, qualified and reweighted.</li>
-<li><b>The last 0.004 came from the public recipe, not from us.</b> Per-finding blend weights gave +0.001, R6 with flip TTA gave +0.001. Our labels v2 tied the control exactly (0.950 vs 0.950).</li>
+<li><b>Our own trained weights topped out at 0.914</b> until the last week, when image-teacher relabelling (labels v3 to v5) lifted our own compact models to 0.955 to 0.956 public and 0.942 to 0.944 private. Everything above 0.950 before that was public checkpoints we wrapped, qualified and reweighted.</li>
+<li><b>The selection rule, not the models, cost the medal.</b> We pre-registered "highest public display, ties to the own-heavy entry". It picked the public fork P2 and a Raptor blend S4, the same bet twice. Gold-58 had ranked the Raptor half last, and that was right on the private board.</li>
 <li><b>Operational losses were large.</b> Six hidden reruns failed with no score, one entry crashed to the constant fallback, one timed out at nine hours. Each cost a day of the five-per-day slot budget and a lot of verification work.</li>
 </ul>
 
-<h2>2. The shake-up was a shift, not a shuffle</h2>
-<figure><svg viewBox="0 0 760 300" role="img" aria-label="Public versus private score for entries with both numbers">
-<line y1="26" y2="260" x1="275.1" x2="275.1" class="grid"/><text x="275.1" y="276" class="tick" text-anchor="middle">0.80</text>
-<line y1="26" y2="260" x1="400.9" x2="400.9" class="grid"/><text x="400.9" y="276" class="tick" text-anchor="middle">0.85</text>
-<line y1="26" y2="260" x1="526.6" x2="526.6" class="grid"/><text x="526.6" y="276" class="tick" text-anchor="middle">0.90</text>
-<line y1="26" y2="260" x1="652.3" x2="652.3" class="grid"/><text x="652.3" y="276" class="tick" text-anchor="middle">0.95</text>
-<text x="240" y="49.5" class="lab" text-anchor="end">Public 0.958 recipe (R6 + Raptor), TranBaDat</text>
-<line x1="634.7" x2="672.4" y1="45.5" y2="45.5" class="link"/>
-<circle cx="672.4" cy="45.5" r="6" class="dot public"><title>public 0.958</title></circle>
-<circle cx="634.7" cy="45.5" r="6" class="dot private"><title>private 0.943</title></circle>
-<text x="682.4" y="49.5" class="val">−0.015</text>
-<text x="240" y="88.5" class="lab" text-anchor="end">Ours: R6F v2 → selected final</text>
-<line x1="632.2" x2="672.4" y1="84.5" y2="84.5" class="link"/>
-<circle cx="672.4" cy="84.5" r="6" class="dot public"><title>public 0.958</title></circle>
-<circle cx="632.2" cy="84.5" r="6" class="dot private"><title>private 0.942</title></circle>
-<text x="682.4" y="88.5" class="val">−0.016</text>
-<text x="240" y="127.5" class="lab" text-anchor="end">Own ConvNeXt-nano solo, TranBaDat</text>
-<line x1="546.7" x2="576.9" y1="123.5" y2="123.5" class="link"/>
-<circle cx="576.9" cy="123.5" r="6" class="dot public"><title>public 0.920</title></circle>
-<circle cx="546.7" cy="123.5" r="6" class="dot private"><title>private 0.908</title></circle>
-<text x="586.9" y="127.5" class="val">−0.012</text>
-<text x="240" y="166.5" class="lab" text-anchor="end">Public 0.943 stack + own 0.10 leg</text>
-<line x1="591.9" x2="632.2" y1="162.5" y2="162.5" class="link"/>
-<circle cx="632.2" cy="162.5" r="6" class="dot public"><title>public 0.942</title></circle>
-<circle cx="591.9" cy="162.5" r="6" class="dot private"><title>private 0.926</title></circle>
-<text x="642.2" y="166.5" class="val">−0.016</text>
-<text x="240" y="205.5" class="lab" text-anchor="end">Clean, no OAI weights (E8)</text>
-<line x1="579.4" x2="624.6" y1="201.5" y2="201.5" class="link"/>
-<circle cx="624.6" cy="201.5" r="6" class="dot public"><title>public 0.939</title></circle>
-<circle cx="579.4" cy="201.5" r="6" class="dot private"><title>private 0.921</title></circle>
-<text x="634.6" y="205.5" class="val">−0.018</text>
-<text x="240" y="244.5" class="lab" text-anchor="end">DINOv2 baseline, LLM labels</text>
-<line x1="285.2" x2="307.8" y1="240.5" y2="240.5" class="link"/>
-<circle cx="307.8" cy="240.5" r="6" class="dot public"><title>public 0.813</title></circle>
-<circle cx="285.2" cy="240.5" r="6" class="dot private"><title>private 0.804</title></circle>
-<text x="317.8" y="244.5" class="val">−0.009</text>
-<text x="250" y="294" class="lab">● public (30 %, ~385 studies) &nbsp; ● private (70 %) &nbsp; label = drop</text>
-</svg><figcaption>Entries for which both scores are known. Sources: our selected entry; TranBaDat2607's write-up (bronze, rank 340 of 6,425). The drop is 0.012 to 0.018 for every recipe, so the private split is simply harder.</figcaption></figure>
+<h2>2. The shake-up was a shift, with a family-dependent slope</h2>
+<figure><svg viewBox="0 0 760 380" role="img" aria-label="Public versus private score for entries with both numbers">
+<line y1="26" y2="340" x1="339.0" x2="339.0" class="grid"/><text x="339.0" y="356" class="tick" text-anchor="middle">0.93</text>
+<line y1="26" y2="340" x1="417.0" x2="417.0" class="grid"/><text x="417.0" y="356" class="tick" text-anchor="middle">0.94</text>
+<line y1="26" y2="340" x1="495.0" x2="495.0" class="grid"/><text x="495.0" y="356" class="tick" text-anchor="middle">0.95</text>
+<line y1="26" y2="340" x1="573.0" x2="573.0" class="grid"/><text x="573.0" y="356" class="tick" text-anchor="middle">0.96</text>
+<line y1="26" y2="340" x1="651.0" x2="651.0" class="grid"/><text x="651.0" y="356" class="tick" text-anchor="middle">0.97</text>
+<line y1="26" y2="340" x1="534.0" x2="534.0" class="ref"/><text x="537.0" y="36" class="tick">gold</text>
+<line y1="26" y2="340" x1="440.4" x2="440.4" class="ref"/><text x="443.4" y="36" class="tick">silver</text>
+<text x="290" y="47.4" class="lab" text-anchor="end">MURAD (private 2nd)</text>
+<line x1="573.0" x2="643.2" y1="43.4" y2="43.4" class="link"/>
+<circle cx="643.2" cy="43.4" r="6" class="dot public"><title>public 0.969</title></circle>
+<circle cx="573.0" cy="43.4" r="6" class="dot private"><title>private 0.960</title></circle>
+<text x="653.2" y="47.4" class="val">−0.009</text>
+<text x="290" y="82.3" class="lab" text-anchor="end">Barry (public 1st)</text>
+<line x1="549.6" x2="651.0" y1="78.3" y2="78.3" class="link"/>
+<circle cx="651.0" cy="78.3" r="6" class="dot public"><title>public 0.970</title></circle>
+<circle cx="549.6" cy="78.3" r="6" class="dot private"><title>private 0.957</title></circle>
+<text x="661.0" y="82.3" class="val">−0.013</text>
+<text x="290" y="117.2" class="lab" text-anchor="end">49th, own 2.5D reader + public blend</text>
+<line x1="502.8" x2="588.6" y1="113.2" y2="113.2" class="link"/>
+<circle cx="588.6" cy="113.2" r="6" class="dot public"><title>public 0.962</title></circle>
+<circle cx="502.8" cy="113.2" r="6" class="dot private"><title>private 0.951</title></circle>
+<text x="598.6" y="117.2" class="val">−0.011</text>
+<text x="290" y="152.1" class="lab" text-anchor="end">33rd, best single model (no external data)</text>
+<line x1="471.6" x2="588.6" y1="148.1" y2="148.1" class="link"/>
+<circle cx="588.6" cy="148.1" r="6" class="dot public"><title>public 0.962</title></circle>
+<circle cx="471.6" cy="148.1" r="6" class="dot private"><title>private 0.947</title></circle>
+<text x="598.6" y="152.1" class="val">−0.015</text>
+<text x="290" y="187.0" class="lab" text-anchor="end">77th, own ConvNeXt-S, no public weights</text>
+<line x1="440.4" x2="526.2" y1="183.0" y2="183.0" class="link"/>
+<circle cx="526.2" cy="183.0" r="6" class="dot public"><title>public 0.954</title></circle>
+<circle cx="440.4" cy="183.0" r="6" class="dot private"><title>private 0.943</title></circle>
+<text x="536.2" y="187.0" class="val">−0.011</text>
+<text x="290" y="221.9" class="lab" text-anchor="end">Ours P11: own 8 members, no Raptor (unselected)</text>
+<line x1="448.2" x2="541.8" y1="217.9" y2="217.9" class="link"/>
+<circle cx="541.8" cy="217.9" r="6" class="dot public"><title>public 0.956</title></circle>
+<circle cx="448.2" cy="217.9" r="6" class="dot private"><title>private 0.944</title></circle>
+<text x="551.8" y="221.9" class="val">−0.012</text>
+<text x="290" y="256.8" class="lab" text-anchor="end">Ours P2/S4: public R6 + Raptor blends (selected)</text>
+<line x1="432.6" x2="557.4" y1="252.8" y2="252.8" class="link"/>
+<circle cx="557.4" cy="252.8" r="6" class="dot public"><title>public 0.958</title></circle>
+<circle cx="432.6" cy="252.8" r="6" class="dot private"><title>private 0.942</title></circle>
+<text x="567.4" y="256.8" class="val">−0.016</text>
+<text x="290" y="291.7" class="lab" text-anchor="end">Ours: public S6 weights alone</text>
+<line x1="378.0" x2="495.0" y1="287.7" y2="287.7" class="link"/>
+<circle cx="495.0" cy="287.7" r="6" class="dot public"><title>public 0.950</title></circle>
+<circle cx="378.0" cy="287.7" r="6" class="dot private"><title>private 0.935</title></circle>
+<text x="505.0" y="291.7" class="val">−0.015</text>
+<text x="290" y="326.6" class="lab" text-anchor="end">Ours: runtime-trimmed entry E1</text>
+<line x1="346.8" x2="487.2" y1="322.6" y2="322.6" class="link"/>
+<circle cx="487.2" cy="322.6" r="6" class="dot public"><title>public 0.949</title></circle>
+<circle cx="346.8" cy="322.6" r="6" class="dot private"><title>private 0.931</title></circle>
+<text x="497.2" y="326.6" class="val">−0.018</text>
+<text x="300" y="374" class="lab">● public (30 %, ~390 studies) &nbsp; ● private (70 %) &nbsp; label = drop &nbsp; dashed = private medal lines</text>
+</svg><figcaption>Entries with both scores. Top teams and write-up authors (MURAD, Barry, 49th, 33rd, 77th) alongside our own entries. Own models trained on image-teacher labels dropped 0.011 to 0.013; blends built on the public Raptor and R6 weights dropped 0.015 to 0.016.</figcaption></figure>
 <ul>
-<li><b>Public rank was never a measurement.</b> The public split is about 385 studies with a macro standard error near 0.003. The 0.958 block held 865 to 1,475 teams, and teams moved hundreds of ranks with no new submission.</li>
-<li><b>Copies tie, and ties sort by time.</b> Submitting a byte-identical recipe late puts you behind every earlier copy, on both boards. Our R6F v2 differed from the public vector only by weight variant, so we sat inside the block.</li>
-<li><b>OAI-pretrained weights were worth +0.012 private.</b> The same author's clean track without them scored 0.931 against 0.943. External pretraining on a related knee corpus was the single biggest lever anyone measured.</li>
+<li><b>Public rank was never a measurement.</b> The public split is about 390 studies with a macro standard error near 0.003. At the deadline 1,638 teams displayed 0.958; on the private board 1,322 teams display 0.942 (ranks 616 to 1,937) and the bronze cut sits inside that tie.</li>
+<li><b>The public recipe lost 0.005 more than own models.</b> Its per-finding weights and probe switches were tuned on the public board by their authors. The private split was also harder on synovitis (0.914 to 0.860 for one team) and contusion, and easier on lateral OA.</li>
+<li><b>Gains confirmed offline held; gains found only on the public board did not.</b> Our image-teacher labels moved the own solo by +0.005 public and +0.006 private. Raptor over our own members was +0.002 public and −0.002 private.</li>
 </ul>
 
-<h2>3. What the top teams did</h2>
-<p class="note">Kaggle's writeup pages are not reachable from this environment. What follows is reconstructed from forum quotes recorded during the competition, the public 0.958 lineage, and community write-ups. The 1st-place post is titled "Correct Data is All You Need" and a 3rd-place post exists; paste them and I will extend this section.</p>
+<h2>3. What the medal teams did</h2>
+<p class="note">The top-three write-ups are not published yet (winners have until November 5). This section is built from the posts of places 32, 33, 38, 49, 73, 74, 77, 102, 220, 228, 243 and 671, all read on October 23. Links in the sources.</p>
 <ul>
-<li><b>Labels were the competition.</b> Rank 2 (azamat1ch) on the forum: labels were made by AI, not by hand, and "don't rely on reports alone". Rank 39 (colum2131): pseudo-labels are generated from the images, with the image model taking the same input as at submission time. The winning title says the same thing.</li>
-<li><b>The whole 0.956 to 0.958 public tier was one lineage:</b> heliosli's ConvNeXt-small R6/R7 (288 px cache, full-field plus 100 mm knee-centred crop placed by a SKM-TEA V-Net, Effusion and Baker's stackers, six rounds of pseudo-labels) rank-blended 50/50 with nartaa's CoAtNet "Raptor" arms (384 and 224 px, OAI-assisted, anatomical mirroring, SWA epochs picked on the 58 gold studies). Flip TTA and per-finding Raptor shares were the last public gains.</li>
-<li><b>Teams above the block had something unique:</b> private ConvNeXt-S or EfficientNetV2-S ensembles at 0.2 weight, a five-family 47-checkpoint ensemble on their own LLM labels (0.951 public, no public weights), or single models reported at 0.960 with no recipe given.</li>
-<li><b>Efficiency track was reachable.</b> One single-model entry scored 0.948 public in about four minutes for 1,300 studies, once its inference input matched the training cache pixel for pixel (+0.013 over a mismatched input).</li>
+<li><b>Labels were read like a clinician and against the rubric.</b> The 38th place team classified every report finding as meets threshold / below threshold / negative / not mentioned, then re-levelled each group to the expert-positive rate on gold-58 (not mentioned 6 %, mild 33 %, positive below rubric 71 %, meets rubric 85 %). Label AUC against gold went from 0.902 to 0.947, and "not mentioned means negative" alone was worth +0.012 on the board.</li>
+<li><b>Multimodal LLMs read the images.</b> A report-only LLM saturates near 0.90 against the experts. Reading report plus slice montage together reached 0.932 (77th), a two-model hybrid mosaic read 0.928 (243rd, Chris Deotte), and blind image reads merged with text 0.935 on the same model (65th). GPT-6 Astra blind-read effusion at 0.98 AUC. Mixing out-of-fold image predictions back in took labels to 0.945.</li>
+<li><b>The hospital is a variable.</b> Acquisition parameters predict report language with 98 % accuracy, and each site reports synovitis or PF OA at very different rates. The 33rd and 38th place teams added a site × finding bias term used only during training and dropped at inference. It was their largest single gain (+0.006 public for 38th, +0.009 to +0.015 private across four pairs for 33rd). The 228th place got +0.003 by subtracting a metadata-only prior after the blend.</li>
+<li><b>Architecture: all series, all slices, attention per finding.</b> The 33rd place used feature-map cells (~12 mm) as MIL instances with a 3D rotary attention across series, single model 0.947 private with no external data. The 49th used a slice-bag transformer with twelve finding queries. The 32nd added an evidence loss pulling attention toward the slices the VLM cited. Backbones were ConvNeXt-S/T, CoAtNet, EfficientNetV2-S; a partially fine-tuned OrthoFoundation-L ViT scored the same as CoAtNet at four times the compute.</li>
+<li><b>Anatomy-anchored crops beat centre crops.</b> The 30th place trained a YOLO knee-ROI detector on boxes drawn by Claude Code subagents under millimetre rules; the ROI crop mattered more than any model change. The 38th and 74th used landmark-anchored compartment crops as a second leg.</li>
+<li><b>External knee data worked only as pretraining or as a careful vote.</b> OAI-pretrained Raptor arms were +0.012 private over a clean track (671st); 2,399 OAI knees with MOAKS labels helped in a 50/50 average (32nd). Naive OAI mixing cost 0.012 (solo write-up), and fine-tuning the OAI CoAtNet on own labels cost 0.004.</li>
+<li><b>Everyone measured their instruments.</b> Paired noise on gold-58 is about ±0.0125, seed noise on a fold about 0.0025. The 77th pre-committed acceptance gates and passed 3 of 32 experiments. The 49th read a single finding's public AUC by resubmitting with one column inverted: AUC = 0.5 + 6 × (base − probe).</li>
 </ul>
 
 <h2>4. What worked and what did not</h2>
-<figure><svg viewBox="0 0 760 360" role="img" aria-label="Measured effect of individual changes on public macro AUC">
-<line y1="14" y2="326" x1="388.3" x2="388.3" class="grid"/><text x="388.3" y="342" class="tick" text-anchor="middle">-0.005</text>
-<line y1="14" y2="326" x1="461.2" x2="461.2" class="axis"/><text x="461.2" y="342" class="tick" text-anchor="middle">+0.000</text>
-<line y1="14" y2="326" x1="534.2" x2="534.2" class="grid"/><text x="534.2" y="342" class="tick" text-anchor="middle">+0.005</text>
-<line y1="14" y2="326" x1="607.1" x2="607.1" class="grid"/><text x="607.1" y="342" class="tick" text-anchor="middle">+0.010</text>
-<line y1="14" y2="326" x1="680.0" x2="680.0" class="grid"/><text x="680.0" y="342" class="tick" text-anchor="middle">+0.015</text>
-<text x="320" y="32.2" class="lab" text-anchor="end">Pixel-matched inference input (vs mismatched cache)</text>
-<rect x="461.2" y="17.0" width="189.6" height="22.4" rx="2" class="bar pos"><title>Pixel-matched inference input (vs mismatched cache): +0.013 (darcywjoseph)</title></rect>
-<text x="656.8" y="32.2" class="val" text-anchor="start">+0.013 <tspan class="src">darcywjoseph</tspan></text>
-<text x="320" y="60.5" class="lab" text-anchor="end">OAI-pretrained Raptor arms vs clean (private)</text>
-<rect x="461.2" y="45.4" width="175.0" height="22.4" rx="2" class="bar pos"><title>OAI-pretrained Raptor arms vs clean (private): +0.012 (TranBaDat)</title></rect>
-<text x="642.2" y="60.5" class="val" text-anchor="start">+0.012 <tspan class="src">TranBaDat</tspan></text>
-<text x="320" y="88.9" class="lab" text-anchor="end">Every series as a bag, not six fixed slots</text>
-<rect x="461.2" y="73.7" width="102.1" height="22.4" rx="2" class="bar pos"><title>Every series as a bag, not six fixed slots: +0.007 (darcywjoseph)</title></rect>
-<text x="569.3" y="88.9" class="val" text-anchor="start">+0.007 <tspan class="src">darcywjoseph</tspan></text>
-<text x="320" y="117.3" class="lab" text-anchor="end">Better LLM labels + image pseudo-label loop</text>
-<rect x="461.2" y="102.1" width="72.9" height="22.4" rx="2" class="bar pos"><title>Better LLM labels + image pseudo-label loop: +0.005 (darcywjoseph)</title></rect>
-<text x="540.2" y="117.3" class="val" text-anchor="start">+0.005 <tspan class="src">darcywjoseph</tspan></text>
-<text x="320" y="145.6" class="lab" text-anchor="end">Fifth family on a different label lineage</text>
-<rect x="461.2" y="130.5" width="43.8" height="22.4" rx="2" class="bar pos"><title>Fifth family on a different label lineage: +0.003 (darcywjoseph)</title></rect>
-<text x="511.0" y="145.6" class="val" text-anchor="start">+0.003 <tspan class="src">darcywjoseph</tspan></text>
-<text x="320" y="174.0" class="lab" text-anchor="end">Per-finding blend weights (Raptor share)</text>
-<rect x="461.2" y="158.8" width="14.6" height="22.4" rx="2" class="bar pos"><title>Per-finding blend weights (Raptor share): +0.001 (ours)</title></rect>
-<text x="481.8" y="174.0" class="val" text-anchor="start">+0.001 <tspan class="src">ours</tspan></text>
-<text x="320" y="202.4" class="lab" text-anchor="end">Our labels v2 vs public labels, same model</text>
-<rect x="461.2" y="187.2" width="1.5" height="22.4" rx="2" class="bar zero"><title>Our labels v2 vs public labels, same model: +0.000 (ours)</title></rect>
-<text x="467.2" y="202.4" class="val" text-anchor="start">+0.000 <tspan class="src">ours</tspan></text>
-<text x="320" y="230.7" class="lab" text-anchor="end">S6 added beside R6</text>
-<rect x="446.7" y="215.5" width="14.6" height="22.4" rx="2" class="bar neg"><title>S6 added beside R6: -0.001 (goodpjw)</title></rect>
-<text x="440.7" y="230.7" class="val" text-anchor="end">-0.001 <tspan class="src">goodpjw</tspan></text>
-<text x="320" y="259.1" class="lab" text-anchor="end">Blend weights refit on the 58 gold studies</text>
-<rect x="432.1" y="243.9" width="29.2" height="22.4" rx="2" class="bar neg"><title>Blend weights refit on the 58 gold studies: -0.002 (goodpjw)</title></rect>
-<text x="426.1" y="259.1" class="val" text-anchor="end">-0.002 <tspan class="src">goodpjw</tspan></text>
-<text x="320" y="287.5" class="lab" text-anchor="end">Longer training, EMA, heavier augmentation</text>
-<rect x="417.5" y="272.3" width="43.8" height="22.4" rx="2" class="bar neg"><title>Longer training, EMA, heavier augmentation: -0.003 (darcywjoseph)</title></rect>
-<text x="411.5" y="287.5" class="val" text-anchor="end">-0.003 <tspan class="src">darcywjoseph</tspan></text>
-<text x="320" y="315.8" class="lab" text-anchor="end">Weak own member (0.86) at weight 0.2</text>
-<rect x="359.2" y="300.6" width="102.1" height="22.4" rx="2" class="bar neg"><title>Weak own member (0.86) at weight 0.2: -0.007 (aditbytes)</title></rect>
-<text x="353.2" y="315.8" class="val" text-anchor="end">-0.007 <tspan class="src">aditbytes</tspan></text>
-</svg><figcaption>Measured effect of one change at a time, public macro AUC unless marked. Each bar is one author's paired comparison; 0.001 is inside public noise, so read the signs and the big bars, not the small ones.</figcaption></figure>
+<figure><svg viewBox="0 0 760 440" role="img" aria-label="Measured effect of individual changes on macro AUC">
+<line y1="14" y2="406" x1="330.0" x2="330.0" class="grid"/><text x="330.0" y="422" class="tick" text-anchor="middle">-0.010</text>
+<line y1="14" y2="406" x1="396.7" x2="396.7" class="grid"/><text x="396.7" y="422" class="tick" text-anchor="middle">-0.005</text>
+<line y1="14" y2="406" x1="463.3" x2="463.3" class="axis"/><text x="463.3" y="422" class="tick" text-anchor="middle">+0.000</text>
+<line y1="14" y2="406" x1="530.0" x2="530.0" class="grid"/><text x="530.0" y="422" class="tick" text-anchor="middle">+0.005</text>
+<line y1="14" y2="406" x1="596.7" x2="596.7" class="grid"/><text x="596.7" y="422" class="tick" text-anchor="middle">+0.010</text>
+<text x="320" y="30.2" class="lab" text-anchor="end">“Not mentioned” set to negative in the labels</text>
+<rect x="463.3" y="17.0" width="160.0" height="18.5" rx="2" class="bar pos"><title>“Not mentioned” set to negative in the labels: +0.012 (38th, public)</title></rect>
+<text x="629.3" y="30.2" class="val" text-anchor="start">+0.012 <tspan class="src">38th, public</tspan></text>
+<text x="320" y="54.8" class="lab" text-anchor="end">Report + image montage read jointly by an LLM</text>
+<rect x="463.3" y="41.5" width="133.3" height="18.5" rx="2" class="bar pos"><title>Report + image montage read jointly by an LLM: +0.010 (77th, public)</title></rect>
+<text x="602.7" y="54.8" class="val" text-anchor="start">+0.010 <tspan class="src">77th, public</tspan></text>
+<text x="320" y="79.2" class="lab" text-anchor="end">Training-only hospital/site bias term</text>
+<rect x="463.3" y="66.0" width="106.7" height="18.5" rx="2" class="bar pos"><title>Training-only hospital/site bias term: +0.008 (33rd, private)</title></rect>
+<text x="576.0" y="79.2" class="val" text-anchor="start">+0.008 <tspan class="src">33rd, private</tspan></text>
+<text x="320" y="103.8" class="lab" text-anchor="end">Mild/borderline labels set to ~0.33</text>
+<rect x="463.3" y="90.5" width="93.3" height="18.5" rx="2" class="bar pos"><title>Mild/borderline labels set to ~0.33: +0.007 (38th, public)</title></rect>
+<text x="562.7" y="103.8" class="val" text-anchor="start">+0.007 <tspan class="src">38th, public</tspan></text>
+<text x="320" y="128.2" class="lab" text-anchor="end">Image models vote on report-stated findings</text>
+<rect x="463.3" y="115.0" width="93.3" height="18.5" rx="2" class="bar pos"><title>Image models vote on report-stated findings: +0.007 (38th, public)</title></rect>
+<text x="562.7" y="128.2" class="val" text-anchor="start">+0.007 <tspan class="src">38th, public</tspan></text>
+<text x="320" y="152.8" class="lab" text-anchor="end">Acquisition-parameter branch, training only</text>
+<rect x="463.3" y="139.5" width="80.0" height="18.5" rx="2" class="bar pos"><title>Acquisition-parameter branch, training only: +0.006 (33rd, private)</title></rect>
+<text x="549.3" y="152.8" class="val" text-anchor="start">+0.006 <tspan class="src">33rd, private</tspan></text>
+<text x="320" y="177.2" class="lab" text-anchor="end">Image-teacher label rounds on our own solo</text>
+<rect x="463.3" y="164.0" width="80.0" height="18.5" rx="2" class="bar pos"><title>Image-teacher label rounds on our own solo: +0.006 (ours, private)</title></rect>
+<text x="549.3" y="177.2" class="val" text-anchor="start">+0.006 <tspan class="src">ours, private</tspan></text>
+<text x="320" y="201.8" class="lab" text-anchor="end">Rank blend of two model families vs best single</text>
+<rect x="463.3" y="188.5" width="53.3" height="18.5" rx="2" class="bar pos"><title>Rank blend of two model families vs best single: +0.004 (38th, public)</title></rect>
+<text x="522.7" y="201.8" class="val" text-anchor="start">+0.004 <tspan class="src">38th, public</tspan></text>
+<text x="320" y="226.2" class="lab" text-anchor="end">OOF self-distillation into LLM labels</text>
+<rect x="463.3" y="213.0" width="40.0" height="18.5" rx="2" class="bar pos"><title>OOF self-distillation into LLM labels: +0.003 (77th, public)</title></rect>
+<text x="509.3" y="226.2" class="val" text-anchor="start">+0.003 <tspan class="src">77th, public</tspan></text>
+<text x="320" y="250.8" class="lab" text-anchor="end">Per-finding blend weights (public-tuned)</text>
+<rect x="463.3" y="237.5" width="13.3" height="18.5" rx="2" class="bar pos"><title>Per-finding blend weights (public-tuned): +0.001 (ours, private)</title></rect>
+<text x="482.7" y="250.8" class="val" text-anchor="start">+0.001 <tspan class="src">ours, private</tspan></text>
+<text x="320" y="275.2" class="lab" text-anchor="end">S6 added beside R6</text>
+<rect x="450.0" y="262.0" width="13.3" height="18.5" rx="2" class="bar neg"><title>S6 added beside R6: -0.001 (public forks)</title></rect>
+<text x="444.0" y="275.2" class="val" text-anchor="end">-0.001 <tspan class="src">public forks</tspan></text>
+<text x="320" y="299.8" class="lab" text-anchor="end">Blend weights refit on gold-58</text>
+<rect x="436.7" y="286.5" width="26.7" height="18.5" rx="2" class="bar neg"><title>Blend weights refit on gold-58: -0.002 (49th/goodpjw, public)</title></rect>
+<text x="430.7" y="299.8" class="val" text-anchor="end">-0.002 <tspan class="src">49th/goodpjw, public</tspan></text>
+<text x="320" y="324.2" class="lab" text-anchor="end">Fine-tuning the OAI CoAtNet on own labels</text>
+<rect x="410.0" y="311.0" width="53.3" height="18.5" rx="2" class="bar neg"><title>Fine-tuning the OAI CoAtNet on own labels: -0.004 (Northstar, private)</title></rect>
+<text x="404.0" y="324.2" class="val" text-anchor="end">-0.004 <tspan class="src">Northstar, private</tspan></text>
+<text x="320" y="348.8" class="lab" text-anchor="end">Flip TTA on a canonicalised knee</text>
+<rect x="383.3" y="335.5" width="80.0" height="18.5" rx="2" class="bar neg"><title>Flip TTA on a canonicalised knee: -0.006 (49th, public)</title></rect>
+<text x="377.3" y="348.8" class="val" text-anchor="end">-0.006 <tspan class="src">49th, public</tspan></text>
+<text x="320" y="373.2" class="lab" text-anchor="end">Weak own member (0.86) at weight 0.2</text>
+<rect x="370.0" y="360.0" width="93.3" height="18.5" rx="2" class="bar neg"><title>Weak own member (0.86) at weight 0.2: -0.007 (aditbytes, public)</title></rect>
+<text x="364.0" y="373.2" class="val" text-anchor="end">-0.007 <tspan class="src">aditbytes, public</tspan></text>
+<text x="320" y="397.8" class="lab" text-anchor="end">In-domain masked-image pretraining (SimMIM)</text>
+<rect x="356.7" y="384.5" width="106.7" height="18.5" rx="2" class="bar neg"><title>In-domain masked-image pretraining (SimMIM): -0.008 (49th, OOF)</title></rect>
+<text x="350.7" y="397.8" class="val" text-anchor="end">-0.008 <tspan class="src">49th, OOF</tspan></text>
+</svg><figcaption>Measured effect of one change at a time, from the write-ups and our own paired entries. Public unless marked private or OOF. Anything under 0.002 is inside noise; read the signs and the big bars.</figcaption></figure>
 <h3>Worked</h3>
 <ul>
-<li><b>2.5D attention MIL over slices and series</b> with ImageNet-pretrained ConvNeXt or CoAtNet backbones. Three-slice RGB windows, 96 to 128 slice vectors, per-finding attention pooling. Every strong model in the field used this shape.</li>
-<li><b>Anatomy-aware preprocessing:</b> 140 mm square crop, intensity clipped at the 0.5 to 99.5 percentiles, right knees mirrored to left, a learned knee-centre crop as a second view.</li>
-<li><b>Label quality measured against gold:</b> an LLM prompt revised after reading the 58 expert reports (0.814 rule-based → 0.869 → 0.90 gold AUC), then a pseudo-label loop mixing LLM labels with held-out image predictions. Diversity in the final ensemble came from label lineages more than from architectures.</li>
-<li><b>Rank averaging, fixed weights, one strong decorrelated extra member.</b> The rule one author derived: a new member helps only if it scores at least 0.93 on gold and correlates at most 0.88 with what is already there.</li>
-<li><b>Related-domain pretraining</b> (OAI, fastMRI+, SKM-TEA) before competition fine-tuning.</li>
+<li><b>Label work against the rubric</b>: four-state report classes re-levelled to expert rates, silence treated as a low non-zero probability, mild as one-in-three, image models voting on what the report states, then two to four image-teacher rounds. The 49th: of 0.019 gained by a five-fold ensemble, 0.013 came from label rounds.</li>
+<li><b>Training-only site bias</b> or a post-hoc metadata de-bias, to stop the image model learning "which hospital is this".</li>
+<li><b>2.5D attention MIL over every slice of every series</b> at 320 to 384 px over a 130 to 140 mm field, three-slice windows, per-finding attention or queries, knees mirrored to one side.</li>
+<li><b>Rank blends of two or three model families</b> with label-lineage diversity. Label diversity beat seed diversity everywhere; a new member needed to be within a few points of the stack and decorrelated.</li>
+<li><b>Fail-soft inference</b>: per-member timeouts, weights renormalised over surviving legs, offline decoders for 13 DICOM transfer syntaxes. Fixing 1 to 13 hidden studies that fell back to a prior was worth +0.001.</li>
 </ul>
 <h3>Did not work</h3>
 <ul>
-<li><b>Frozen foundation features.</b> Our frozen DINOv2 head scored 0.756; OrthoFoundation ViT-L reached 0.896 on gold and V-JEPA 0.80. Full fine-tuning of a mid-size CNN beat every frozen or giant backbone.</li>
-<li><b>Bigger inputs and backbones on their own:</b> 384 vs 320 px, Small vs Tiny, wider crops, native-resolution compartment crops all measured level. Longer training with EMA and heavy augmentation lost 0.003 public.</li>
-<li><b>Tuning anything on the 58 gold studies or the public board.</b> Gold-refit blend weights lost 0.001 to 0.003; seed noise on gold is about ±0.006. Our labels v2 beat v1 by +0.019 on gold and +0.000 on the board.</li>
-<li><b>Weak members.</b> A 0.86 model at weight 0.2 cost 0.007; our 0.9075-gold ConvNeXt lowered the public score. Adding a second compact model (S6) beside R6 cost 0.001.</li>
-<li><b>Report-only labels for synovitis and lateral OA.</b> The expert set contradicted the reports on these; image models cannot fix a wrong target.</li>
+<li><b>Frozen foundation features.</b> Our frozen DINOv2 head scored 0.756; frozen DINOv3-H+ ceilinged at 0.826 OOF for the 49th; DINOv3 at the wrong learning rate lost 0.03. Only partial fine-tuning of a knee-pretrained ViT-L matched a CNN.</li>
+<li><b>Bigger inputs, backbones, schedules:</b> 448 px, Small vs Tiny, SWA, EMA, longer training, more seeds, stacking, 3D through-plane branches, SimMIM pretraining (−0.008). All level or worse once labels were good.</li>
+<li><b>Flip TTA on canonicalised knees</b> (−0.006) because it swaps medial and lateral. Learned spatial attention was average pooling in disguise for the 77th.</li>
+<li><b>Using gold-58 as a target:</b> as training rows, as few-shot examples in the labelling prompt (0.947 vs 0.951), or to fit blend weights. Every team that tried it lost.</li>
+<li><b>Agentic LLM readers with tools</b> did not beat a plain multimodal prompt (77th), though a purpose-built viewer with crop, window and measure tools produced auditable labels (73rd). Rule-based relabelling from report wording cost 0.020 (74th).</li>
 </ul>
 <figure><svg viewBox="0 0 760 230" role="img" aria-label="Per-finding public AUC of a single efficiency model">
 <line y1="16" y2="196" x1="170.0" x2="170.0" class="grid"/><text x="170.0" y="212" class="tick" text-anchor="middle">0.85</text>
@@ -259,45 +299,45 @@ a{color:var(--accent)}
 <text x="160" y="182.0" class="lab" text-anchor="end">Other eight (mean)</text>
 <rect x="170" y="164.0" width="460.7" height="28.0" rx="3" class="bar"><title>Other eight (mean) 0.963</title></rect>
 <text x="638.7" y="182.0" class="val">0.963</text>
-</svg><figcaption>Per-finding public AUC of darcywjoseph's single efficiency model. The three weakest targets are the ones with the worst report labels (synovitis, lateral OA) or the least image signal (patellofemoral OA, where the text extractor scores 0.96 and image models 0.89).</figcaption></figure>
+</svg><figcaption>Per-finding public AUC of a single efficiency model (darcywjoseph). The weakest targets are the ones with the worst report labels (synovitis, lateral OA) or the least image signal (PF OA). The 32nd place added a lateral-zoom model for exactly these three columns.</figcaption></figure>
 
 <h2>5. What we got wrong</h2>
 <ul>
-<li><b>We built an auditing machine, not a model.</b> Qualification gates, receipts, waivers and a 4,000-line handoff log consumed most of two agents' time. The models that mattered were trained by others in that time.</li>
-<li><b>We trained for weeks on GPU budgets measured in hours.</b> Our best own fit used 2,000 to 4,345 studies at 256 to 320 px; the public R6 ran six pseudo-label rounds on all studies with crops and stackers. We never reached the data scale where our label work could show.</li>
-<li><b>We spent the gold set early.</b> Ten label variants were selected on gold-58, after which nothing could be validated. The forum's own estimate of ±0.006 seed noise on 58 studies should have stopped us.</li>
-<li><b>We chased the public block.</b> P3/P4/P5 variants reweighted a 0.958 recipe by 0.001 steps inside 0.003 noise. The private board then moved every recipe by the same 0.015, so none of that work could have changed the rank.</li>
-<li><b>Inference fragility cost scored slots.</b> Hidden reruns failed where the visible three studies passed. The fix that finally held, salvaging every finished ledger before writing a constant file, should have been there on day one.</li>
+<li><b>We picked a public fork as a final.</b> With 1,400 copies tied, P2 could only land where the block landed. S4 held nearly the same bet. P11, our own members alone, was the obvious hedge and would have been silver.</li>
+<li><b>We ranked finals by public score inside the noise band.</b> The pre-registered rule was right to exist and wrong in its criterion. Gold-58 and out-of-fold both put our members at R6 level and Raptor last; we trusted a +0.002 public difference instead.</li>
+<li><b>We built an auditing machine, not a model, for the first three weeks.</b> Qualification gates, receipts, waivers and a 4,000-line handoff log consumed most of two agents' time. The relabelling that finally moved our own models came in the last five days.</li>
+<li><b>We spent the gold set early.</b> Ten label variants were selected on gold-58, after which nothing could be validated there. Everyone who medalled used it as a hands-off sanity check.</li>
+<li><b>We never looked for the site shortcut.</b> We had the DICOM headers and the language column. Two teams found +0.006 to +0.015 there with a bias term that costs nothing at inference.</li>
+<li><b>Inference fragility cost scored slots.</b> Hidden reruns failed where the visible three studies passed. The ledger-salvage fix that finally held should have been there on day one.</li>
 </ul>
 
 <h2>6. Research perspective: knee MRI detection</h2>
 <ul>
-<li><b>The field's recipe since MRNet (2018) still holds:</b> per-slice 2D encoder, pooling across slices, per-plane models combined by a small head. The 2026 version swaps AlexNet for ConvNeXt/CoAtNet, max pooling for attention MIL (Ilse et al. 2018), and plane-wise logistic regression for a rank blend. No 3D network and no video or volumetric transformer placed.</li>
-<li><b>Public knee datasets matter as pretraining, not as extra labels.</b> OAI (osteoarthritis grading), fastMRI+ (pathology boxes) and SKM-TEA (segmentations) gave the two weights that dominated the board. Licensing was the recurring risk: OAI needs registration, and the host's rule was "registration plus licence acknowledgement is fine, institutional agreements are not".</li>
-<li><b>Weak supervision from reports is a label-noise problem first.</b> The winning pattern is LLM extraction calibrated against a small expert set, then self-training (noisy student) with image-derived pseudo-labels at the same input as inference. Report-to-image disagreement is finding-specific and should be measured per target before training.</li>
-<li><b>Macro AUC over twelve targets rewards fixing the worst three.</b> PF OA, lateral OA and synovitis sat 0.03 to 0.07 below the rest. A specialist head or a crop for the patellofemoral compartment is the open research gap; nobody measured a gain there.</li>
-<li><b>Foundation models for MRI are not there yet.</b> Frozen DINOv2, V-JEPA and an orthopaedic ViT-L all lost to a fine-tuned ConvNeXt-small. Domain-specific supervised pretraining at 2.5D still wins at 5,000-study scale.</li>
+<li><b>The field's recipe since MRNet (2018) still holds, upgraded.</b> Per-slice 2D encoder, pooling across slices and planes. The 2026 version swaps AlexNet for ConvNeXt or CoAtNet, max pooling for attention MIL (Ilse et al. 2018) with one query per finding, and adds geometry: feature cells with 3D patient coordinates and rotary attention across series (33rd), or a 3D splat grid around the joint centre (73rd). No pure 3D network placed.</li>
+<li><b>Weak supervision from reports is a label-noise and label-shift problem.</b> Report wording does not match an expert rubric, silence is informative, and reporting habits vary by site. The winning pattern is LLM extraction with rubric-level classes, calibration to a small expert set, self-training with image-derived pseudo-labels, and a debiasing term for the site. This is product-of-experts debiasing applied to medical weak labels.</li>
+<li><b>Multimodal LLMs are now usable radiology readers for labelling.</b> Blind image reads reached 0.98 AUC on effusion and 0.96 on lateral OA against experts (65th), and a coding agent drew usable anatomical bounding boxes under millimetre rules (30th). Pathology boxes for small structures still failed.</li>
+<li><b>Knee-specific pretraining matters more than scale.</b> OAI pretraining was worth +0.012 private. A DINOv3 ViT-L further trained on knee images matched a CoAtNet only after fine-tuning eight blocks; frozen or generically pretrained ViTs lost. SimMIM in-domain pretraining hurt.</li>
+<li><b>Macro AUC rewards fixing the worst three findings.</b> PF OA, lateral OA and synovitis sat 0.03 to 0.07 below the rest. The gains there came from lateral-zoom models, the synovitis composite (effusion plus OA) and site debiasing, not from backbones.</li>
+<li><b>Licensing shaped the field.</b> OAI needs registration; the host ruled registration plus licence acknowledgement acceptable, institutional agreements not. Several strong teams stayed clean and still reached 0.947 to 0.952 private.</li>
 </ul>
 
 <h2>7. Checklist for the next competition</h2>
 <ul>
-<li>Week 1: a reliable offline inference harness with per-stage deadlines and ledger salvage. Measure hidden-run time on the full test size, not three visible studies.</li>
-<li>Week 1: estimate public-board noise (split size, macro SE) and never tune on differences smaller than two SE.</li>
-<li>Hold the expert set for one final check only. Select on out-of-fold folds grouped by patient.</li>
-<li>Find the public lineage early, reproduce it once, then spend all GPU on one strong, decorrelated member of our own (target: gold ≥ 0.93, correlation ≤ 0.88 with the lineage).</li>
-<li>Prefer label work that changes targets per finding over model work that changes resolution or backbone.</li>
-<li>Submit a unique prediction vector. Identical copies tie and sort by submission time.</li>
+<li>Week 1: a reliable offline inference harness with per-member timeouts, salvage of finished members, and a hidden-size timing run. Audit hidden studies that fall back to a prior.</li>
+<li>Week 1: measure every instrument's noise (public split SE, expert-set paired SD, seed SD) and write acceptance rules before each experiment.</li>
+<li>Read the labels like a clinician: rubric-level classes, silence as low non-zero, calibration to the expert set, then image-teacher rounds. Read images with a multimodal model early, blind of the report.</li>
+<li>Check for site, scanner and language shortcuts in the first week. Add a training-only bias term when they exist.</li>
+<li>Hold the expert set for hands-off checks. Select on scanner-grouped out-of-fold folds.</li>
+<li>Reproduce the public lineage once, then put all GPU into one strong, decorrelated member of our own.</li>
+<li>Never pick a public fork as a final. Pick 1 is the best entry on trusted validation; pick 2 differs from pick 1 and from the crowd.</li>
 <li>Keep one experiment log and one state file. Every verification minute is a minute not spent training.</li>
 </ul>
 
 <h2>Sources</h2>
 <ul class="src-list">
-<li>Our repo: STATUS.md, docs/claude-astra-handoff.md, docs/research/strategy-revision-20261017.md, docs/experiments/20261018-public-notebook-scan.md, docs/experiments/campaign-overview-20261013.md.</li>
-<li><a href="https://github.com/TranBaDat2607/RSNA-Knee-Abnormality-Detection">TranBaDat2607 write-up</a>: private 0.943, rank 340 of 6,425, clean-track 0.931, ablations on TTA, fine-tuning and blend members.</li>
-<li><a href="https://github.com/darcywjoseph/Knee-Abnormality-Detection/blob/main/SOLUTION.md">darcywjoseph SOLUTION.md</a>: five-family 47-checkpoint ensemble, 0.951 public, efficiency entry 0.948, per-finding AUCs and lever measurements.</li>
-<li><a href="https://github.com/ppx16/rsna-knee-record">ppx16 record</a>: public-board noise and weight-variant results around the 0.958 recipe.</li>
-<li><a href="https://github.com/A-b29/RSNA-Knee-Competition">A-b29</a> and <a href="https://github.com/aditbytes/kaggle-rsna-knee-abnormality">aditbytes</a>: label denoising, weak-member results, medal cutoffs on 6 Oct.</li>
-<li>Public notebooks: <a href="https://www.kaggle.com/code/goodpjw2008/rsna-knee-coatnet-r6-2-5d-mil-lb-0-958">goodpjw2008 R6 + Raptor</a>, <a href="https://www.kaggle.com/code/heliosli/blend-mine-in-private-lb-luck-to-all-upvoters">heliosli blend</a>, <a href="https://www.kaggle.com/code/leoprovorov/rsna-knee-0-957-explained-why-the-open-ensembl">leoprovorov noise analysis</a>, <a href="https://www.kaggle.com/code/nartaa/rsna-knee-s6fall-solo">nartaa S6</a>.</li>
-<li>Forum quotes (topics 748295, 735304, 743416) as recorded in our strategy revision; the official 1st and 3rd place write-ups were not readable from this session.</li>
+<li>Ours: <a href="https://github.com/ozgung/rsna-knee-abnormality-detection/blob/main/docs/research/retrospective-20261023.md">docs/research/retrospective-20261023.md</a> (final selection, per-family shake-up), STATUS.md, docs/claude-astra-handoff.md, docs/research/strategy-revision-20261017.md, docs/experiments/campaign-overview-20261013.md.</li>
+<li>Write-ups: <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/751930">32nd (zosamu)</a> · <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/writeups/33rd-place-silver-solution-no-external-data">33rd (hirokenn)</a> · <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/writeups/the-hospital-is-a-variable-too">38th (The Hospital Is a Variable Too)</a> and <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/751924">38th summary</a> · <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/writeups/49th-place-silver-solo-whole-study-2-5d-reader">49th (Komil Parmar)</a> · <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/751903">30th ROI boxes (YYama)</a> · <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/751920">65th labels (tingyi)</a> · <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/writeups/kneesplatnet">73rd KneeSplatNet</a> · <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/writeups/74th-place-knee-centred-views-llm-labels-and-oa">74th</a> · <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/writeups/multimodal-llm-relabeling-oof-self-distillation">77th (Civitasmass)</a> · <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/writeups/102nd-place-local-llm-report-labeling-and-anatomy">102nd</a> · <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/writeups/220th-place-silver-gold-batch-fine-tuning-on-to">220th</a> · <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/writeups/228-solo-silver-subtract-the-report-style-prior">228th</a> · <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/writeups/243rd-silver-medal">243rd (Chris Deotte)</a> · <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/751949">507th</a> · <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/writeups/public-0-958-private-0-942-what-65-submissions">671st (Northstar, same scores as ours)</a>.</li>
+<li>GitHub write-ups: <a href="https://github.com/TranBaDat2607/RSNA-Knee-Abnormality-Detection">TranBaDat2607</a> (private 0.943, clean track 0.931), <a href="https://github.com/darcywjoseph/Knee-Abnormality-Detection/blob/main/SOLUTION.md">darcywjoseph</a> (per-finding AUCs, efficiency entry), <a href="https://github.com/ppx16/rsna-knee-record">ppx16</a>, <a href="https://github.com/aditbytes/kaggle-rsna-knee-abnormality">aditbytes</a>.</li>
+<li>Public lineage: <a href="https://www.kaggle.com/code/goodpjw2008/rsna-knee-coatnet-r6-2-5d-mil-lb-0-958">goodpjw2008 R6 + Raptor</a>, <a href="https://www.kaggle.com/code/heliosli/blend-mine-in-private-lb-luck-to-all-upvoters">heliosli blend</a>, <a href="https://www.kaggle.com/code/nartaa/rsna-knee-s6fall-solo">nartaa S6</a>, <a href="https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/leaderboard">final leaderboard</a>.</li>
 </ul>
 </main>

@@ -1,0 +1,212 @@
+<title>P11 Own-Model Solution</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column (65ch), charts span the column, lab-notebook register. */
+:root{
+  --bg:#f7f6f2; --fg:#1c1b18; --muted:#5d5a52; --rule:#d9d6cc; --card:#ffffff;
+  --accent:#1f6f8b; --own:#eb6834; --pub:#2a78d6; --pos:#1baf7a; --neg:#e34948; --zero:#9a978f;
+  --display:"Source Serif 4", Georgia, "Times New Roman", serif;
+  --body:"IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono:"IBM Plex Mono", "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#17181a; --fg:#ecebe6; --muted:#b3b0a6; --rule:#363840; --card:#1f2124; --accent:#5fb3cf; --own:#f07a46; --pub:#3987e5; --pos:#22c184; --neg:#e66767; --zero:#7d7b74; color-scheme:dark } }
+:root[data-theme="dark"]{ --bg:#17181a; --fg:#ecebe6; --muted:#b3b0a6; --rule:#363840; --card:#1f2124; --accent:#5fb3cf; --own:#f07a46; --pub:#3987e5; --pos:#22c184; --neg:#e66767; --zero:#7d7b74; color-scheme:dark }
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px}
+main{max-width:72ch;margin:0 auto}
+h1{font-family:var(--display);font-weight:600;font-size:2.1rem;line-height:1.15;margin:0 0 .4rem;text-wrap:balance}
+h2{font-family:var(--display);font-weight:600;font-size:1.45rem;margin:2.4rem 0 .6rem;text-wrap:balance;border-top:1px solid var(--rule);padding-top:1.2rem}
+h3{font-size:1rem;font-weight:600;margin:1.4rem 0 .3rem}
+p{margin:.5rem 0}
+.eyebrow{font-family:var(--mono);font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{font-size:1.08rem;color:var(--fg)}
+ul{padding-left:1.2rem;margin:.4rem 0}
+li{margin:.3rem 0}
+li b, p b{font-weight:600}
+.kpis{display:flex;flex-wrap:wrap;gap:12px;margin:1.2rem 0}
+.kpi{flex:1 1 150px;min-width:0;background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:10px 14px}
+.kpi .n{font-family:var(--mono);font-size:1.6rem;font-weight:500;font-variant-numeric:tabular-nums}
+.kpi .l{font-size:.8rem;color:var(--muted)}
+figure{margin:1.2rem 0;background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:12px 12px 6px}
+figure svg{width:100%;height:auto;display:block;font-family:var(--body)}
+figcaption{font-size:.82rem;color:var(--muted);margin-top:6px}
+svg .grid{stroke:var(--rule);stroke-width:1}
+svg .axis{stroke:var(--muted);stroke-width:1}
+svg .ref{stroke:var(--accent);stroke-width:1.5;stroke-dasharray:5 4}
+svg .tick{fill:var(--muted);font-size:11px;font-family:var(--mono)}
+svg .lab{fill:var(--fg);font-size:11.5px}
+svg .val{fill:var(--fg);font-size:11px;font-family:var(--mono)}
+svg .src{fill:var(--muted);font-size:10px;font-family:var(--body)}
+svg .stem{stroke-width:1.5;opacity:.45}
+svg .stem.own{stroke:var(--own)} svg .stem.public{stroke:var(--pub)}
+svg .dot{stroke:var(--card);stroke-width:2}
+svg .dot.own{fill:var(--own)} svg .dot.public{fill:var(--pub)} svg .dot.private{fill:var(--own)}
+svg .link{stroke:var(--muted);stroke-width:2;opacity:.6}
+svg .bar{fill:var(--own)} svg .bar.ref{fill:var(--zero)} svg .sq{fill:var(--accent)} svg .bar.pos{fill:var(--pos)} svg .bar.neg{fill:var(--neg)} svg .bar.zero{fill:var(--zero)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;margin:.6rem 0}
+.tw{overflow-x:auto}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.note{border-left:3px solid var(--accent);padding:4px 12px;margin:1rem 0;color:var(--muted);font-size:.92rem}
+a{color:var(--accent)}
+.src-list{font-size:.86rem;color:var(--muted)}
+@media (max-width:480px){ h1{font-size:1.7rem} body{font-size:15px} }
+</style>
+<main>
+<p class="eyebrow">RSNA Knee Abnormality Detection · submission 57471109 (P11) · Oct 21 2026 · unselected</p>
+<h1>Our best entry was the one with none of the public weights in it.</h1>
+<p class="lede">P11 is the mean of eight ConvNeXt-small readers we trained ourselves in the last four days, on labels rewritten by image teachers. It scored <b>0.956 public</b> and <b>0.944 private</b>. We did not select it. It would have been silver (the 0.944 block ends at rank 311). This is the write-up we would have posted.</p>
+
+<div class="kpis">
+  <div class="kpi"><div class="n">0.944</div><div class="l">private · public 0.956 · drop 0.012</div></div>
+  <div class="kpi"><div class="n">8</div><div class="l">own ConvNeXt-S members, mean logit, no Raptor, no R6</div></div>
+  <div class="kpi"><div class="n">0.939</div><div class="l">gold-58 macro of the blend · R6 flip 0.937</div></div>
+  <div class="kpi"><div class="n">5.5 h</div><div class="l">hidden wall on 2×T4, 0 fallback studies</div></div>
+</div>
+
+<h2>1. Summary</h2>
+<ul>
+<li><b>Model.</b> nartaa's public S6 recipe, unchanged: ConvNeXt-small (ImageNet-22k), 288 px crop from a 320 px cache, two views per slice (full field and a 100 mm knee-centred crop placed by SKM-TEA anatomy anchors), three-slice windows 3.5 mm apart, per-finding spatial attention, 16 epochs on all 4,345 non-gold studies. Only the targets and the seed change between members.</li>
+<li><b>Labels.</b> Three image-teacher rounds on top of the public report consensus: a public out-of-fold teacher (R6 flip), then a calibrated mean of our own out-of-fold fold models with R6 and R7, then our round-2 fold models alone. Label AUC against the 58 expert studies went 0.901 → 0.925 → 0.934 → 0.935, and the single-model private score followed, 0.936 → 0.942 → 0.943.</li>
+<li><b>Ensemble.</b> Mean logit of eight members from the v3 and v4b label families, including four 12-epoch fold models and one student that also saw 745 fastMRI exams with soft targets. No public weights. No per-finding weights, no TTA, no stacking.</li>
+<li><b>What decided it.</b> Labels. Seeds, resolution and blend weights were flat. Raptor, the OAI-pretrained CoAtNet everyone's 0.958 depended on, added +0.001 public and −0.002 private to this compact.</li>
+</ul>
+
+<h2>2. Labels: three rounds of image teachers</h2>
+<figure><svg viewBox="0 0 760 300" role="img" aria-label="Label quality and single-model scores by label round">
+<line y1="30" y2="260" x1="281.4" x2="281.4" class="grid"/><text x="281.4" y="276" class="tick" text-anchor="middle">0.90</text>
+<line y1="30" y2="260" x1="344.3" x2="344.3" class="grid"/><text x="344.3" y="276" class="tick" text-anchor="middle">0.91</text>
+<line y1="30" y2="260" x1="407.1" x2="407.1" class="grid"/><text x="407.1" y="276" class="tick" text-anchor="middle">0.92</text>
+<line y1="30" y2="260" x1="470.0" x2="470.0" class="grid"/><text x="470.0" y="276" class="tick" text-anchor="middle">0.93</text>
+<line y1="30" y2="260" x1="532.9" x2="532.9" class="grid"/><text x="532.9" y="276" class="tick" text-anchor="middle">0.94</text>
+<line y1="30" y2="260" x1="595.7" x2="595.7" class="grid"/><text x="595.7" y="276" class="tick" text-anchor="middle">0.95</text>
+<line y1="30" y2="260" x1="658.6" x2="658.6" class="grid"/><text x="658.6" y="276" class="tick" text-anchor="middle">0.96</text>
+<text x="240" y="57.0" class="lab" text-anchor="end">v1 blend (public report labels)</text>
+<rect x="282.7" y="48.0" width="10" height="10" class="sq"><title>label table vs gold-58: 0.901</title></rect>
+<line x1="501.4" x2="595.7" y1="53.0" y2="53.0" class="link"/>
+<circle cx="595.7" cy="53.0" r="6" class="dot public"><title>solo public 0.950</title></circle>
+<circle cx="501.4" cy="53.0" r="6" class="dot private"><title>solo private 0.935</title></circle>
+<text x="240" y="103.0" class="lab" text-anchor="end">v2: + own CoAtNet-224 OOF teacher</text>
+<rect x="402.1" y="94.0" width="10" height="10" class="sq"><title>label table vs gold-58: 0.920</title></rect>
+<line x1="507.7" x2="595.7" y1="99.0" y2="99.0" class="link"/>
+<circle cx="595.7" cy="99.0" r="6" class="dot public"><title>solo public 0.950</title></circle>
+<circle cx="507.7" cy="99.0" r="6" class="dot private"><title>solo private 0.936</title></circle>
+<text x="240" y="149.0" class="lab" text-anchor="end">v3: + R6-flip OOF teacher</text>
+<rect x="433.6" y="140.0" width="10" height="10" class="sq"><title>label table vs gold-58: 0.925</title></rect>
+<line x1="545.4" x2="627.1" y1="145.0" y2="145.0" class="link"/>
+<circle cx="627.1" cy="145.0" r="6" class="dot public"><title>solo public 0.955</title></circle>
+<circle cx="545.4" cy="145.0" r="6" class="dot private"><title>solo private 0.942</title></circle>
+<text x="240" y="195.0" class="lab" text-anchor="end">v4b: + mean(own r1, R6, R7) OOF</text>
+<rect x="490.1" y="186.0" width="10" height="10" class="sq"><title>label table vs gold-58: 0.934</title></rect>
+<line x1="551.7" x2="633.4" y1="191.0" y2="191.0" class="link"/>
+<circle cx="633.4" cy="191.0" r="6" class="dot public"><title>solo public 0.956</title></circle>
+<circle cx="551.7" cy="191.0" r="6" class="dot private"><title>solo private 0.943</title></circle>
+<text x="240" y="241.0" class="lab" text-anchor="end">v5: + own r2 OOF teacher</text>
+<rect x="496.4" y="232.0" width="10" height="10" class="sq"><title>label table vs gold-58: 0.935</title></rect>
+<text x="532.9" y="241.0" class="src">no solo entry; six v5 seeds went into S4</text>
+<text x="250" y="294" class="lab">■ label table AUC vs gold-58 &nbsp; ● own single model public &nbsp; ● private (S6 recipe, seed 42/43)</text>
+</svg><figcaption>Each round rewrites the training targets; the label table is scored once against the 58 expert studies (exposed, never fitted on). The single-model scores are seed-42/43 all-data fits of the same recipe, one per label round. v5 landed on the last day and went into S4, not a solo.</figcaption></figure>
+<ul>
+<li><b>Base.</b> A parameter-free mean of six public report-derived tables plus a Dread teacher column (`mean6_plus_dread`), built on the 4,349 non-gold studies only. Report-only consensus saturates at 0.90 against the experts, whatever the blend.</li>
+<li><b>v3 (Oct 19).</b> Teacher = R6 flip run on its own held-out hash fold, so every study gets a prediction from a model that never trained on it. We confirmed the fold mapping first: in-fold AUC sits clearly above out-of-fold for every fold model. Target = base with the teacher mixed at weight 0.30 (MCL 0.15). Label AUC 0.925.</li>
+<li><b>v4b (Oct 20).</b> Teacher = calibrated mean of three out-of-fold columns: our own four round-1 fold models (12 epochs each on labels v3), R6 flip and R7 plain. Weight 0.50 (MCL 0.25). Label AUC 0.934. A variant that let an LLM override the teacher toward the report text failed its gate (0.912) and was dropped.</li>
+<li><b>v5 (Oct 21).</b> Same construction with the round-2 fold models (trained on v4b) as the only teacher. Label AUC 0.935; out of fold, round 2 beat round 1 by +0.003 [+0.002, +0.004] on 4,345 studies. The gain per round is shrinking, as every other team reported.</li>
+<li><b>Rules we kept.</b> Gold-58 excluded from every fit and read once per artifact. Teachers only from held-out folds. Pre-registered kill rules per round (label AUC must beat the previous table; out-of-fold gain with CI above zero).</li>
+</ul>
+
+<h2>3. Members</h2>
+<figure><svg viewBox="0 0 760 300" role="img" aria-label="Gold-58 macro AUC of each P11 member and public references">
+<line y1="16" y2="266" x1="341.7" x2="341.7" class="grid"/><text x="341.7" y="282" class="tick" text-anchor="middle">0.92</text>
+<line y1="16" y2="266" x1="485.0" x2="485.0" class="grid"/><text x="485.0" y="282" class="tick" text-anchor="middle">0.93</text>
+<line y1="16" y2="266" x1="628.3" x2="628.3" class="grid"/><text x="628.3" y="282" class="tick" text-anchor="middle">0.94</text>
+<text x="260" y="31.4" class="lab" text-anchor="end">v3-s43 (all data, 16 ep)</text>
+<rect x="270" y="19.0" width="329.7" height="16.7" rx="2" class="bar"><title>v3-s43 (all data, 16 ep) 0.938</title></rect>
+<text x="605.7" y="31.4" class="val">0.938</text>
+<text x="260" y="54.1" class="lab" text-anchor="end">fastMRI student (v3 + 745 NYU exams)</text>
+<rect x="270" y="41.7" width="286.7" height="16.7" rx="2" class="bar"><title>fastMRI student (v3 + 745 NYU exams) 0.935</title></rect>
+<text x="562.7" y="54.1" class="val">0.935</text>
+<text x="260" y="76.8" class="lab" text-anchor="end">v4b-s42 (all data)</text>
+<rect x="270" y="64.5" width="229.3" height="16.7" rx="2" class="bar"><title>v4b-s42 (all data) 0.931</title></rect>
+<text x="505.3" y="76.8" class="val">0.931</text>
+<text x="260" y="99.5" class="lab" text-anchor="end">v4b-s43 (all data)</text>
+<rect x="270" y="87.2" width="358.3" height="16.7" rx="2" class="bar"><title>v4b-s43 (all data) 0.940</title></rect>
+<text x="634.3" y="99.5" class="val">0.940</text>
+<text x="260" y="122.3" class="lab" text-anchor="end">r1 fold 0 (v3, 12 ep, 3/4 data)</text>
+<rect x="270" y="109.9" width="301.0" height="16.7" rx="2" class="bar"><title>r1 fold 0 (v3, 12 ep, 3/4 data) 0.936</title></rect>
+<text x="577.0" y="122.3" class="val">0.936</text>
+<text x="260" y="145.0" class="lab" text-anchor="end">r1 fold 1</text>
+<rect x="270" y="132.6" width="272.3" height="16.7" rx="2" class="bar"><title>r1 fold 1 0.934</title></rect>
+<text x="548.3" y="145.0" class="val">0.934</text>
+<text x="260" y="167.7" class="lab" text-anchor="end">r1 fold 2</text>
+<rect x="270" y="155.4" width="315.3" height="16.7" rx="2" class="bar"><title>r1 fold 2 0.937</title></rect>
+<text x="591.3" y="167.7" class="val">0.937</text>
+<text x="260" y="190.5" class="lab" text-anchor="end">r1 fold 3</text>
+<rect x="270" y="178.1" width="286.7" height="16.7" rx="2" class="bar"><title>r1 fold 3 0.935</title></rect>
+<text x="562.7" y="190.5" class="val">0.935</text>
+<text x="260" y="213.2" class="lab" text-anchor="end">R6 flip (public, 4 folds)</text>
+<rect x="270" y="200.8" width="315.3" height="16.7" rx="2" class="bar ref"><title>R6 flip (public, 4 folds) 0.937</title></rect>
+<text x="591.3" y="213.2" class="val">0.937</text>
+<text x="260" y="235.9" class="lab" text-anchor="end">Raptor half (public)</text>
+<rect x="270" y="223.5" width="129.0" height="16.7" rx="2" class="bar ref"><title>Raptor half (public) 0.924</title></rect>
+<text x="405.0" y="235.9" class="val">0.924</text>
+<text x="260" y="258.6" class="lab" text-anchor="end">P11 mean logit</text>
+<rect x="270" y="246.3" width="349.7" height="16.7" rx="2" class="bar ref"><title>P11 mean logit 0.939</title></rect>
+<text x="625.7" y="258.6" class="val">0.939</text>
+</svg><figcaption>Gold-58 macro AUC of each member (orange) and public references (grey). The blend's 0.939 versus R6 flip's 0.937 is inside the ±0.0125 paired noise; out of fold on report truth the own fold models led R6 flip by +0.0135 on 11 of 12 findings.</figcaption></figure>
+<div class="tw"><table>
+<tr><th>Member</th><th>Labels</th><th>Data</th><th>Training</th><th>Gold-58</th></tr>
+<tr><td>v3-s43</td><td>v3</td><td>all 4,345</td><td>16 epochs, seed 43, 7.2 h A100</td><td class="n">0.938</td></tr>
+<tr><td>fastMRI student</td><td>v3 + P2-teacher soft targets</td><td>4,345 + 745 NYU fastMRI knee exams</td><td>16 epochs, effective weight 0.5 on fastMRI rows</td><td class="n">0.935</td></tr>
+<tr><td>v4b-s42, v4b-s43</td><td>v4b</td><td>all 4,345</td><td>16 epochs</td><td class="n">0.931, 0.940</td></tr>
+<tr><td>r1 folds 0–3</td><td>v3</td><td>3/4 of the pool each, hash folds</td><td>12 epochs</td><td class="n">0.934–0.937</td></tr>
+</table></div>
+<ul>
+<li><b>Combination.</b> Per study and finding, the mean of the eight logits. We tested rank-mean and mean-probability on the 39-study rehearsal ledgers; the differences were below 0.001 and mean logit was the simplest to replay.</li>
+<li><b>Why the fold models are in.</b> They are the teachers of v4b, trained on 75 % of the data, and individually within 0.005 of the all-data fits on gold. They add label-family diversity at no new training cost. Checkpoint averaging over the last three epochs was tested out of fold and was null.</li>
+</ul>
+
+<h2>4. Inference</h2>
+<ul>
+<li>One notebook, 2×T4, offline. Each study is decoded once, rendered to the pinned 320 px cache layout, and every member runs on the same windows at stride 1 in its own worker. Sentinel studies are repeated across processes and boards before production (max |Δp| 0).</li>
+<li>Rehearsal on the frozen 39-study set projected 17,925 s; the hidden run took about 5.5 h. A deadline guard would have salvaged finished members before writing a constant file; it was not needed (0 fallback studies).</li>
+<li>CPU-only strict load of every checkpoint (hash, constructor state, two full forwards, repeat and unchanged-state checks) before the packet was sealed.</li>
+</ul>
+
+<h2>5. Evidence from paired entries</h2>
+<div class="tw"><table>
+<tr><th>Entry</th><th>Compact slot</th><th>Raptor half</th><th>Public</th><th>Private</th></tr>
+<tr><td>V2 solo</td><td>one S6, labels v2</td><td>none</td><td class="n">0.950</td><td class="n">0.936</td></tr>
+<tr><td>C1 solo</td><td>one S6, labels v3</td><td>none</td><td class="n">0.955</td><td class="n">0.942</td></tr>
+<tr><td>v4b-s43 solo</td><td>one S6, labels v4b</td><td>none</td><td class="n">0.956</td><td class="n">0.943</td></tr>
+<tr><td><b>P11</b></td><td>own 8, mean logit</td><td>none</td><td class="n">0.956</td><td class="n"><b>0.944</b></td></tr>
+<tr><td>P10p</td><td>own 8</td><td>R384</td><td class="n">0.957</td><td class="n">—</td></tr>
+<tr><td>S4 (selected)</td><td>own 8 (v5 family)</td><td>R384 + R224</td><td class="n">0.958</td><td class="n">0.942</td></tr>
+<tr><td>P12</td><td>½ R6 plain + ½ own 8</td><td>none</td><td class="n">0.950</td><td class="n">0.936</td></tr>
+<tr><td>P2 (selected)</td><td>R6 flip</td><td>R384 + R224</td><td class="n">0.958</td><td class="n">0.942</td></tr>
+</table></div>
+<ul>
+<li><b>Label rounds carried over to private in full</b> (+0.006 on the solo, +0.008 from V2 to P11). The public board showed the same ordering.</li>
+<li><b>Raptor flattered the public split.</b> On gold-58 the Raptor half ranked last (0.924). Adding it to the own compact gave +0.002 public and −0.002 private. Everyone's 0.958 recipe lost 0.016; ours lost 0.012.</li>
+<li><b>R6 plain beside our members hurt without Raptor</b> (P12, 0.936), so the public compact model was only ever useful as Raptor's partner.</li>
+<li><b>Eight members equal one good member on the public board</b> (0.956 = 0.956) but gave +0.001 private over the best solo. Seeds are cheap insurance, not a lever.</li>
+</ul>
+
+<h2>6. What we would change</h2>
+<ul>
+<li><b>Start the label rounds on day two, not day fifteen.</b> The whole P11 line took four days of wall clock once the out-of-fold machinery existed. Three more rounds, a multimodal reader on the images, and rubric-level report classes were all within reach.</li>
+<li><b>Add a training-only site bias.</b> Two silver teams got +0.006 to +0.015 from a hospital × finding offset dropped at inference. Our DICOM headers and the report-language column were already in the cache.</li>
+<li><b>Train on every slice of every series.</b> The S6 recipe samples 64 windows from fixed slots; the 33rd and 49th place readers used all series and all slices with cell-level or query attention and reached 0.947 to 0.951 private as single models.</li>
+<li><b>Select finals on trusted evidence, not the public tie.</b> Gold-58 and out-of-fold both said this entry was at least R6-class and Raptor was last. The pre-registered rule looked at the public display first and picked two Raptor blends.</li>
+</ul>
+
+<h2>Reproducibility and sources</h2>
+<ul class="src-list">
+<li>Training code: nartaa's S6 `training_code/` (Apache-2.0) via `scripts/s6v2/vm_train.sh`, pinned trainer 12e430a3…; inference `compact_infer.py` 34f433fe…, anatomy checkpoint 5904dd16….</li>
+<li>Labels: `scripts/laneb/build_labels_v3.py`, Lane L4 `build_v4b.sh`; out-of-fold columns `scripts/laneb/vm_oof_infer.py` and Lane F round scripts. Tables and per-study columns are in ignored `outputs/` only.</li>
+<li>Repo notes: <a href="https://github.com/ozgung/rsna-knee-abnormality-detection/blob/main/docs/research/retrospective-20261023.md">retrospective</a>, <a href="https://github.com/ozgung/rsna-knee-abnormality-detection/blob/main/docs/experiments/lane-b-oof-20261019.md">Lane B</a>, <a href="https://github.com/ozgung/rsna-knee-abnormality-detection/blob/main/docs/experiments/lane-c-seeds-20261019.md">Lane C</a>, <a href="https://github.com/ozgung/rsna-knee-abnormality-detection/blob/main/docs/experiments/lane-d-fastmri-20261019.md">Lane D</a>, <a href="https://github.com/ozgung/rsna-knee-abnormality-detection/blob/main/docs/experiments/labels-v2-20261015.md">labels v2</a>, STATUS.md entries of Oct 20–22.</li>
+<li>Data terms: competition data under the RSNA agreement; fastMRI knee DICOM batch 2 under the NYU data-use agreement (student weights private); SKM-TEA anchors via heliosli's public checkpoint. No OAI-derived weights in P11.</li>
+<li>Companion post: <a href="https://claude.ai/artifact/B3DfmAiWDrS4SE7FcFizwW">competition review</a>.</li>
+</ul>
+</main>
