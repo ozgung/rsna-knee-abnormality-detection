@@ -4,8 +4,8 @@
 # (hand-offs, failures, idle stop); (2) for each slot without a live assignment, if seeds remain and a fit can still finish by
 # 06:00 (no new session after 01:50), request a session (rotating A100, G4, H100; any region), resume its first unfinished seed
 # from the latest backup and queue the rest.  Log: supervisor.log; slot state: slots.state (slot session endpoint).
-cd "$(dirname "$0")"; ROOT=/Users/ozgun/Dev/rsna-knee-abnormality-detection; M=$ROOT/outputs/lanef-20261020/members
-P=/Users/ozgun/.local/share/uv/tools/google-colab-cli/bin/python
+cd "$(dirname "$0")"; ROOT=~/Dev/rsna-knee-abnormality-detection; M=$ROOT/outputs/lanef-20261020/members
+P=~/.local/share/uv/tools/google-colab-cli/bin/python
 HARD=$(date -u -j -f "%Y-%m-%d %H:%M" "2026-10-22 06:30" +%s); LASTNEW=$(date -u -j -f "%Y-%m-%d %H:%M" "2026-10-22 01:50" +%s)
 log() { echo "$(date -u +%FT%TZ) $*" >> supervisor.log; }
 touch slots.state; n=30; gi=0; GPUS=(A100 G4 H100)

@@ -4,7 +4,7 @@
 # private dataset copy knee-s6-r1-f<k>-20261020 (checkpoint + receipts + probe-36 fp16 reference when fetched), then
 # members/r1-f<k>/READY.json and an EXPORTS.md line.  usage: fold_members.sh [folds...]   (default 0 1 2 3)
 set -uo pipefail
-cd "$(dirname "$0")"; ROOT=/Users/ozgun/Dev/rsna-knee-abnormality-detection; PY=${QPY:-$ROOT/.venv/bin/python}
+cd "$(dirname "$0")"; ROOT=~/Dev/rsna-knee-abnormality-detection; PY=${QPY:-$ROOT/.venv/bin/python}
 L=$ROOT/outputs/lanef-20261020; EX=$ROOT/outputs/s6v2/dl/extras/heliosli; CTRL=$ROOT/outputs/analysis/s6v2-final-acceptance-20261016/control/E_prior_s42_fall.pt
 TAG=${TAG:-r1}; FOLDS=${@:-0 1 2 3}
 for k in $FOLDS; do

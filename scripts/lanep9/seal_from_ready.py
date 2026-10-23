@@ -88,7 +88,7 @@ def entry_from_ready(name, path):
             if not logits.is_file() and ds.get('status') == 'ready':      # the read-out may live only in the export dataset
                 (path.parent / 'ds').mkdir(exist_ok=True)
                 for fname in ('probe36_fp16_logits.json', 'probe36_fp16_receipt.json'):
-                    subprocess.run(['/Users/ozgun/miniconda3/bin/kaggle', 'datasets', 'download', '-f', fname, '-p', str(path.parent / 'ds'),
+                    subprocess.run(['~/miniconda3/bin/kaggle', 'datasets', 'download', '-f', fname, '-p', str(path.parent / 'ds'),
                                     '--force', '-q', ds['ref']], capture_output=True, text=True)
                     z = path.parent / 'ds' / (fname + '.zip')
                     if z.exists():

@@ -5,8 +5,8 @@
 # without a local members/<tag>-s<seed>/READY.json, run member_export.sh; (3) surface failures; (4) at the deadline (Oct 22
 # 06:30 UTC; Oct 22 00:00 + 23400 s) regardless; each VM is stopped as soon as its queues are done and its members handed off, stop both VMs and the refreshers.  Exits on every event so the
 # agent is notified; rerun to continue.  Log: autopilot.log; state: autopilot.state (v5 handled flag).
-cd "$(dirname "$0")"; SESSIONS=${SESSIONS:-"lanef10 lanef11 lanef12"}; ROOT=/Users/ozgun/Dev/rsna-knee-abnormality-detection; L=$ROOT/outputs/lanef-20261020
-export QPY=/Users/ozgun/miniconda3/envs/fastgen/bin/python
+cd "$(dirname "$0")"; SESSIONS=${SESSIONS:-"lanef10 lanef11 lanef12"}; ROOT=~/Dev/rsna-knee-abnormality-detection; L=$ROOT/outputs/lanef-20261020
+export QPY=~/miniconda3/envs/fastgen/bin/python
 V5=$ROOT/outputs/lanel4-20261020/labels_v5; DEADLINE=$(date -u -j -f "%Y-%m-%d %H:%M:%S" "2026-10-22 00:00:00" +%s 2>/dev/null || date -u -d "2026-10-22 00:00:00" +%s)
 touch autopilot.state; log() { echo "$(date -u +%FT%TZ) $*" >> autopilot.log; }
 probe() { ./c.sh exec -s $1 -f /tmp/lanef_ap_probe.py --timeout 90 2>&1 | tail -1; }
@@ -41,11 +41,11 @@ while true; do
 import json, sys, os
 S, r = sys.argv[1], json.loads(sys.argv[2])
 for tag, seed, ver in r["done"]:
-    if not os.path.exists("/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/lanef-20261020/members/%s-s%d/READY.json" % (tag, seed)):
+    if not os.path.exists("~/Dev/rsna-knee-abnormality-detection/outputs/lanef-20261020/members/%s-s%d/READY.json" % (tag, seed)):
         print("handoff", S, tag, seed, ver)
 for f in r["fail"]: print("fail", S, f)
 print("gpu", S, r["gpu_procs"])
-pending = any(not os.path.exists("/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/lanef-20261020/members/%s-s%d/READY.json" % (t, sd)) for t, sd, v in r["done"])
+pending = any(not os.path.exists("~/Dev/rsna-knee-abnormality-detection/outputs/lanef-20261020/members/%s-s%d/READY.json" % (t, sd)) for t, sd, v in r["done"])
 if r.get("queues_done") and r["gpu_procs"] == 0 and not pending: print("idle", S, 0)
 PY
     while read kind a b c d; do
@@ -59,7 +59,7 @@ PY
   done
   # (3b) unit guard (parent 11:35): a new seed costs about 20 units; keep >= 15 after all running fits finish
   if ! grep -q "^units_stop" autopilot.state; then
-    bal=$(LB_COLAB_CONFIG=~/.config/colab-cli/sessions-lanef-20261020.json /Users/ozgun/.local/share/uv/tools/google-colab-cli/bin/python $ROOT/scripts/laneb/ccu_info.py 2>/dev/null | grep -o '"currentBalance": [0-9.]*' | awk '{print $2}')
+    bal=$(LB_COLAB_CONFIG=~/.config/colab-cli/sessions-lanef-20261020.json ~/.local/share/uv/tools/google-colab-cli/bin/python $ROOT/scripts/laneb/ccu_info.py 2>/dev/null | grep -o '"currentBalance": [0-9.]*' | awk '{print $2}')
     need=$(grep -h "running" /tmp/lanef_ap_last_*.json 2>/dev/null | python3 -c "
 import sys, json, re
 tot = 0.0

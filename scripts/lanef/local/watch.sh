@@ -3,7 +3,7 @@
 # new event: epoch-0 loss, fold FIT_DONE/EXPORT_DONE, KILL/FAIL, a lost session, or when a slot frees and lanef9 is created
 # (then fold 1 is launched there with a 1 -> 3 chain). Seen events are kept in watch.seen. usage: watch.sh <session>...
 cd "$(dirname "$0")"; touch watch.seen; MAXMIN=${MAXMIN:-400}; t0=$(date +%s)
-PYC=/Users/ozgun/.local/share/uv/tools/google-colab-cli/bin/python
+PYC=~/.local/share/uv/tools/google-colab-cli/bin/python
 cat > /tmp/lanef_probe2.py <<'PY'
 import subprocess, os, glob, re
 def sh(c): return subprocess.run(c, shell=True, capture_output=True, text=True).stdout.strip()

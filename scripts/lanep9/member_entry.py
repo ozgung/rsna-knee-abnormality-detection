@@ -21,7 +21,7 @@ PROJECT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT))
 from knee import public_s6c as S6C
 
-KAGGLE = '/Users/ozgun/miniconda3/bin/kaggle'
+KAGGLE = '~/miniconda3/bin/kaggle'
 
 
 def dataset_sha_and_bytes(dataset, version, file, work):

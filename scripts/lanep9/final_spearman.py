@@ -17,7 +17,7 @@ import pandas as pd
 from knee import public_r6flip as R6F
 from knee import public_r6flip_entry as ENTRY
 
-K = Path('/Users/ozgun/Dev/rsna-knee-abnormality-detection/outputs/kaggle')
+K = Path('~/Dev/rsna-knee-abnormality-detection/outputs/kaggle')
 ENTRIES = [  # (label, submission, rehearsal result dir, variant whose sealed blend is replayed)
     ('P2', 57340072, 'r6flip-rehearsal-20261017-v4-out', None),
     ('P10p', 57472040, 'r6flip-p10p-rehearsal-20261021-out', 'p10p'),

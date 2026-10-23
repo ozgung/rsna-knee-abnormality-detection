@@ -1,7 +1,7 @@
 #!/bin/bash
 # Lane F: fetch the 4-fold bundle read-outs from lanef8 (export_r1_bundle), verify, score gold-58 (one compact_infer bf16 read of the
 # 4-fold mean; per-model logits in the same file), write members/r1-bundle/READY.json and an EXPORTS.md line.  usage: bundle_member.sh <session> <model version>
-set -u; cd "$(dirname "$0")"; S=$1; VER=$2; ROOT=/Users/ozgun/Dev/rsna-knee-abnormality-detection; PY=$ROOT/.venv/bin/python
+set -u; cd "$(dirname "$0")"; S=$1; VER=$2; ROOT=~/Dev/rsna-knee-abnormality-detection; PY=$ROOT/.venv/bin/python
 L=$ROOT/outputs/lanef-20261020; M=$L/members/r1-bundle; mkdir -p $M/dl $M/ro_gold
 for f in SHA256SUMS MODELS_SHA256SUMS gold58_4fold_predictions.csv gold58_4fold_logits.json gold58_4fold_receipt.json probe36_fp16_4fold_predictions.csv probe36_fp16_4fold_logits.json probe36_fp16_4fold_receipt.json; do
   for i in 1 2 3; do ./c.sh download /content/export_r1_bundle/$f $M/dl/$f -s $S | tail -1 | grep -qi "error\|fail\|not found" || break; sleep 10; done

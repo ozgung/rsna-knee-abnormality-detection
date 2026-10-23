@@ -5,7 +5,7 @@
 # usage: member_export.sh <session> <tag> <seed> <model version>
 set -uo pipefail
 cd "$(dirname "$0")"; SES=$1; TAG=$2; SEED=$3; VER=$4
-ROOT=/Users/ozgun/Dev/rsna-knee-abnormality-detection; WT=$ROOT/.claude/worktrees/lanef-20261020; PY=$ROOT/.venv/bin/python
+ROOT=~/Dev/rsna-knee-abnormality-detection; WT=$ROOT/.claude/worktrees/lanef-20261020; PY=$ROOT/.venv/bin/python
 NAME=${TAG}-s${SEED}; CK=E_prior_s${SEED}_${TAG}all.pt
 LANE=$ROOT/outputs/analysis/lanef-20261020; DL=$LANE/$NAME/dl; mkdir -p $DL
 M=$ROOT/outputs/lanef-20261020/members/$NAME; mkdir -p $M

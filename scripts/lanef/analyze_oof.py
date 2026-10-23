@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from knee.paired_validation import _auc_draws, resample_counts  # noqa: E402
 
-MAIN = Path("/Users/ozgun/Dev/rsna-knee-abnormality-detection")
+MAIN = Path("~/Dev/rsna-knee-abnormality-detection")
 LABELS = ["ACL", "MCL", "Medial Meniscus", "Lateral Meniscus", "Medial OA", "Lateral OA", "PF OA", "Effusion", "Synovitis",
           "Baker's", "Contusion", "Fracture"]
 BLEND = MAIN / "data/weak-labels/nartaa_rsna-knee-hpo-assets/labels_v1_blend.parquet.csv"
